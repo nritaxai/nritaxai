@@ -1,10 +1,15 @@
 import { useState } from "react";
+import axios from "axios";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { Bot, Send, Languages, Sparkles } from "lucide-react";
+
+const API = import.meta.env.VITE_API_URL ;
+
+console.log("Loaded API URL:", API);
 
 export function Chat() {
   const [question, setQuestion] = useState("");
@@ -18,29 +23,64 @@ export function Chat() {
   ]);
   const [isTyping, setIsTyping] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!question.trim()) return;
+  const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!question.trim()) return;
 
-    setMessages(prev => [...prev, { role: "user", content: question }]);
-    setQuestion("");
-    setIsTyping(true);
+  const userMessage = question;
 
-    setTimeout(() => {
-      const aiResponses = [
-        "Based on current DTAA regulations between India and your country of residence, you may be eligible for tax relief. To provide specific guidance, I'll need to know: 1) Your country of residence, 2) Type of income (salary/capital gains/rental), and 3) Whether you have a Tax Residency Certificate.",
-        "For the India-Singapore DTAA, the recent amendment effective April 1, 2025, reduces royalty withholding tax from 15% to 10%. This applies to payments made from April 1, 2025 onwards. You'll need to submit Form 10F along with your Tax Residency Certificate to claim treaty benefits.",
-        "NRIs must file ITR if their total income in India exceeds ₹2.5 lakh (basic exemption limit). Common scenarios include: rental income, capital gains from property/shares sold in India, interest on NRO accounts, or business income. DTAA provisions can help reduce your tax liability.",
-        "To claim DTAA benefits, you need: 1) Valid Tax Residency Certificate (TRC) from your country, 2) Form 10F submission, 3) PAN card, and 4) Documentation of income source. The TRC must be from the financial year for which you're claiming benefits.",
-        "For NRO (Non-Resident Ordinary) accounts, interest earned is taxable at 30% (plus applicable surcharge and cess). However, you can claim DTAA benefits to reduce this rate. NRE (Non-Resident External) account interest is tax-free in India.",
-        "Long-term capital gains (LTCG) on equity shares and equity mutual funds exceeding ₹1.25 lakh are taxed at 12.5%. Short-term capital gains (STCG) are taxed at 20%. Remember to check DTAA provisions for your country of residence."
-      ];
+  setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
+  setQuestion("");
+  setIsTyping(true);
+
+  try {
+    const response = await axios.post(`${API}/api/chat`, {
+      messages: userMessage,
+    });
+
+    setMessages((prev) => [
+      ...prev,
+      { role: "ai", content: response.data.reply },
+    ]);
+
+  } catch (error: any) {
+    console.error("Chat Error:", error.response?.data || error.message);
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "ai",
+        content: "AI service unavailable. Please try again.",
+      },
+    ]);
+  } finally {
+    setIsTyping(false);
+  }
+};
+
+  // const handleSubmit = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   if (!question.trim()) return;
+
+  //   setMessages(prev => [...prev, { role: "user", content: question }]);
+  //   setQuestion("");
+  //   setIsTyping(true);
+
+  //   setTimeout(() => {
+  //     const aiResponses = [
+  //       "Based on current DTAA regulations between India and your country of residence, you may be eligible for tax relief. To provide specific guidance, I'll need to know: 1) Your country of residence, 2) Type of income (salary/capital gains/rental), and 3) Whether you have a Tax Residency Certificate.",
+  //       "For the India-Singapore DTAA, the recent amendment effective April 1, 2025, reduces royalty withholding tax from 15% to 10%. This applies to payments made from April 1, 2025 onwards. You'll need to submit Form 10F along with your Tax Residency Certificate to claim treaty benefits.",
+  //       "NRIs must file ITR if their total income in India exceeds ₹2.5 lakh (basic exemption limit). Common scenarios include: rental income, capital gains from property/shares sold in India, interest on NRO accounts, or business income. DTAA provisions can help reduce your tax liability.",
+  //       "To claim DTAA benefits, you need: 1) Valid Tax Residency Certificate (TRC) from your country, 2) Form 10F submission, 3) PAN card, and 4) Documentation of income source. The TRC must be from the financial year for which you're claiming benefits.",
+  //       "For NRO (Non-Resident Ordinary) accounts, interest earned is taxable at 30% (plus applicable surcharge and cess). However, you can claim DTAA benefits to reduce this rate. NRE (Non-Resident External) account interest is tax-free in India.",
+  //       "Long-term capital gains (LTCG) on equity shares and equity mutual funds exceeding ₹1.25 lakh are taxed at 12.5%. Short-term capital gains (STCG) are taxed at 20%. Remember to check DTAA provisions for your country of residence."
+  //     ];
       
-      const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-      setMessages(prev => [...prev, { role: "ai", content: randomResponse }]);
-      setIsTyping(false);
-    }, 1500);
-  };
+  //     const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
+  //     setMessages(prev => [...prev, { role: "ai", content: randomResponse }]);
+  //     setIsTyping(false);
+  //   }, 1500);
+  // };
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">

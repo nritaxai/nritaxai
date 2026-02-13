@@ -7,6 +7,8 @@ import { Badge } from "./ui/badge";
 import { Bot, Send, Languages } from "lucide-react";
 import axios from "axios";
 
+const API = import.meta.env.VITE_API_URL;
+
 export function AIChat() {
   const [question, setQuestion] = useState("");
   const [language, setLanguage] = useState("english");
@@ -28,31 +30,14 @@ export function AIChat() {
     setQuestion("");
     setIsTyping(true);
 
-
     try {
-      const response = await axios.post("chat",
-        {
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are NRITAX AI, a professional NRI tax assistant. Provide clear, structured, India-focused tax guidance.",
-            },
-            ...messages.map((msg) => ({
-              role: msg.role === "ai" ? "assistant" : "user",
-              content: msg.content,
-            })),
-            {
-              role: "user",
-              content: userMessage,
-            },
-          ],
-        }
-      );
+      const response = await axios.post(`${API}/api/chat`, {
+        messages: userMessage,
+      });
 
       const aiReply = response.data.reply;
 
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         { role: "ai", content: aiReply },
       ]);
@@ -63,39 +48,69 @@ export function AIChat() {
       const errorMessage =
         error.response?.data?.error || "Something went wrong";
 
-      setMessages((prev) => [
+      setMessages(prev => [
         ...prev,
         { role: "ai", content: errorMessage },
       ]);
-    }
-    finally {
+    } finally {
       setIsTyping(false);
     }
   };
 
 
-  // const handleSubmit = (e: React.FormEvent) => {
+  // const handleSubmit = async (e: React.FormEvent) => {
   //   e.preventDefault();
   //   if (!question.trim()) return;
 
-  //   // Add user message
-  //   setMessages(prev => [...prev, { role: "user", content: question }]);
+  //   const userMessage = question;
+
+  //   setMessages(prev => [...prev, { role: "user", content: userMessage }]);
   //   setQuestion("");
   //   setIsTyping(true);
 
-  //   // Simulate AI response
-  //   setTimeout(() => {
-  //     const aiResponses = [
-  //       "Based on current DTAA regulations between India and your country of residence, you may be eligible for tax relief. To provide specific guidance, I'll need to know: 1) Your country of residence, 2) Type of income (salary/capital gains/rental), and 3) Whether you have a Tax Residency Certificate.",
-  //       "For the India-Singapore DTAA, the recent amendment effective April 1, 2025, reduces royalty withholding tax from 15% to 10%. This applies to payments made from April 1, 2025 onwards. You'll need to submit Form 10F along with your Tax Residency Certificate to claim treaty benefits.",
-  //       "NRIs must file ITR if their total income in India exceeds ₹2.5 lakh (basic exemption limit). Common scenarios include: rental income, capital gains from property/shares sold in India, interest on NRO accounts, or business income. DTAA provisions can help reduce your tax liability.",
-  //       "To claim DTAA benefits, you need: 1) Valid Tax Residency Certificate (TRC) from your country, 2) Form 10F submission, 3) PAN card, and 4) Documentation of income source. The TRC must be from the financial year for which you're claiming benefits."
-  //     ];
 
-  //     const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-  //     setMessages(prev => [...prev, { role: "ai", content: randomResponse }]);
+  //   try {
+  //     const response = await axios.post(`${API}/api/chat`,
+  //       {
+  //         messages: [
+  //           {
+  //             role: "system",
+  //             content:
+  //               "You are NRITAX AI, a professional NRI tax assistant. Provide clear, structured, India-focused tax guidance.",
+  //           },
+  //           ...messages.map((msg) => ({
+  //             role: msg.role === "ai" ? "assistant" : "user",
+  //             content: msg.content,
+  //           })),
+  //           {
+  //             role: "user",
+  //             content: userMessage,
+  //           },
+  //         ],
+  //       }
+  //     );
+
+  //     const aiReply = response.data.reply;
+
+  //     setMessages((prev) => [
+  //       ...prev,
+  //       { role: "ai", content: aiReply },
+  //     ]);
+
+  //   } catch (error: any) {
+  //     console.error(error);
+
+  //     const errorMessage =
+  //       error.response?.data?.error || "Something went wrong";
+
+  //     setMessages((prev) => [
+  //       ...prev,
+  //       { role: "ai", content: errorMessage },
+  //     ]);
+  //   }
+  //   finally {
   //     setIsTyping(false);
-  //   }, 1500);
+  //   }
   // };
 
   return (
