@@ -9,7 +9,7 @@ import chatRoute from "./Routes/chatRoute.js";
 dotenv.config();
 
 const app = express();
-// const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5000;
 
 // Connect to MongoDB
 connectDB();
@@ -48,8 +48,6 @@ app.use("/api/chat", chatRoute);
 // });
 
 // Start the server
-// app.listen(PORT, () => {
-//   console.log(`Server is running on port http://localhost:${PORT}`);
-// });
-
-export default app;
+app.listen(PORT, () => {
+  console.log(`Server is running on port http://localhost:${PORT}`);
+});
