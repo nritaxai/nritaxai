@@ -1,0 +1,48 @@
+<svg width="920" height="220" viewBox="0 0 920 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="iconBg" x1="20" y1="20" x2="180" y2="180" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#007a8d"/>
+      <stop offset="1" stop-color="#2ab6c8"/>
+    </linearGradient>
+    <linearGradient id="iconStroke" x1="40" y1="44" x2="160" y2="164" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F7FAFC"/>
+      <stop offset="1" stop-color="#68c4d3"/>
+    </linearGradient>
+    <linearGradient id="wordmarkAccent" x1="665" y1="96" x2="892" y2="168" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2ab6c8"/>
+      <stop offset="1" stop-color="#68c4d3"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="20" y="20" width="160" height="160" rx="38" fill="url(#iconBg)"/>
+  <path d="M54 146V54H74L128 124V54H146V146H126L72 76V146H54Z" fill="url(#iconStroke)"/>
+
+  <text
+    x="220"
+    y="146"
+    font-family="Inter, 'Segoe UI', Arial, sans-serif"
+    font-size="84"
+    font-weight="800"
+    letter-spacing="1.2"
+    fill="#F7FAFC"
+    stroke="#007a8d"
+    stroke-width="1.6"
+    paint-order="stroke"
+  >
+    NRITAX
+  </text>
+  <text
+    x="635"
+    y="146"
+    font-family="Inter, 'Segoe UI', Arial, sans-serif"
+    font-size="84"
+    font-weight="800"
+    letter-spacing="1.2"
+    fill="url(#wordmarkAccent)"
+    stroke="#007a8d"
+    stroke-width="1.2"
+    paint-order="stroke"
+  >
+    .AI
+  </text>
+</svg>

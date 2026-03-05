@@ -1,0 +1,194 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --ambient-bg: #f7fafc;
+  --ambient-layer: linear-gradient(120deg, rgba(247, 250, 252, 0.7), rgba(0, 255, 255, 0.06), rgba(247, 250, 252, 0.7));
+  --glass-card-start: #ffffff;
+  --glass-card-mid: #ffffff;
+  --glass-card-end: #ffffff;
+  --glass-border: #e2e8f0;
+  --glass-shadow: rgba(15, 23, 42, 0.06);
+}
+
+.dark {
+  --ambient-bg: #f7fafc;
+  --ambient-layer: linear-gradient(120deg, rgba(247, 250, 252, 0.7), rgba(0, 255, 255, 0.06), rgba(247, 250, 252, 0.7));
+  --glass-card-start: #ffffff;
+  --glass-card-mid: #ffffff;
+  --glass-card-end: #ffffff;
+  --glass-border: #e2e8f0;
+  --glass-shadow: rgba(15, 23, 42, 0.06);
+}
+
+body {
+  margin: 0;
+  position: relative;
+  background: var(--ambient-bg);
+  background-size: 220% 220%;
+  animation: premiumGradientShift 18s ease-in-out infinite;
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: -12%;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::before {
+  background:
+    radial-gradient(28rem 22rem at 15% 18%, rgba(0, 255, 255, 0.1) 0%, transparent 70%),
+    radial-gradient(26rem 20rem at 82% 24%, rgba(0, 229, 229, 0.08) 0%, transparent 72%);
+  filter: blur(30px);
+  animation: auraFloat 24s ease-in-out infinite;
+}
+
+body::after {
+  background:
+    var(--ambient-layer),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.06) 0px,
+      rgba(255, 255, 255, 0.06) 2px,
+      transparent 2px,
+      transparent 12px
+    );
+  mix-blend-mode: soft-light;
+  opacity: 0.45;
+  animation: shimmerDrift 20s linear infinite;
+}
+
+.app-shell {
+  position: relative;
+  z-index: 1;
+  min-height: 100dvh;
+  padding-top: var(--safe-top);
+  padding-right: var(--safe-right);
+  padding-bottom: var(--safe-bottom);
+  padding-left: var(--safe-left);
+}
+
+[data-slot="card"] {
+  background: var(--glass-card-start);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 10px 30px var(--glass-shadow);
+}
+
+.glass-panel {
+  background: linear-gradient(
+    145deg,
+    var(--glass-card-start) 0%,
+    var(--glass-card-mid) 54%,
+    var(--glass-card-end) 100%
+  );
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  box-shadow: 0 16px 44px var(--glass-shadow);
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  font-size: 16px;
+}
+
+@media (max-width: 640px) {
+  button,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+  }
+}
+
+@keyframes premiumGradientShift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes auraFloat {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -1.5%, 0) scale(1.035);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes shimmerDrift {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-3%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body,
+  body::before,
+  body::after {
+    animation: none !important;
+  }
+}
+
+@keyframes nriTicker {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.nri-ticker-track {
+  animation: nriTicker 45s linear infinite;
+}
+
+.nri-ticker-track:hover {
+  animation-play-state: paused;
+}
+
+
+
+
+

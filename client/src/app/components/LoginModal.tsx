@@ -1,0 +1,572 @@
+import { useEffect, useState } from "react";
+import { GoogleLogin } from "@react-oauth/google";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { X, Eye, EyeOff, Loader2 } from "lucide-react";
+import { appleLoginUser, loginUser, signupUser, googleLoginUser } from "../../utils/api";
+import { APPLE_AUTH_CONFIG, GOOGLE_AUTH_CONFIG } from "../../config/appConfig";
+import { AuthPopup } from "./AuthPopup";
+
+interface LoginModalProps {
+  onClose: () => void;
+}
+
+export function LoginModal({ onClose }: LoginModalProps) {
+  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [signupData, setSignupData] = useState({
+    name: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [signupError, setSignupError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+
+  const [popup, setPopup] = useState<{
+    message: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  const resolveAuthUser = (response: any) =>
+    response?.user || response?.data?.user || response?.data || null;
+
+  const showGoogleOriginMismatchHint = (mode: "login" | "signup") => {
+    const currentOrigin = GOOGLE_AUTH_CONFIG.origin || window.location.origin;
+    const actionLabel = mode === "signup" ? "Sign-Up" : "Sign-In";
+    setPopup({
+      message: `Google ${actionLabel} blocked. Add '${currentOrigin}' to Authorized JavaScript origins in Google Cloud Console.`,
+      type: "error",
+    });
+    setTimeout(() => setPopup(null), 4500);
+  };
+
+  const completeAppleLogin = async (
+    mode: "login" | "signup",
+    payload: {
+      code?: string;
+      id_token?: string;
+      user?: { name?: { firstName?: string; lastName?: string } };
+    }
+  ) => {
+    const response = await appleLoginUser({
+      code: payload.code,
+      id_token: payload.id_token,
+      user: payload.user,
+      authorizationCode: payload.code,
+      identityToken: payload.id_token,
+      fullName: payload.user?.name,
+    });
+    const user = resolveAuthUser(response);
+    const successMessage =
+      mode === "signup"
+        ? `Account created successfully! Welcome ${user?.name || "User"}`
+        : `Welcome ${user?.name || "User"}!`;
+    handleAuthSuccess(response, successMessage);
+  };
+
+  const handleAppleSignIn = async (mode: "login" | "signup") => {
+    try {
+      const appleAuth = (window as any).AppleID?.auth;
+      if (!appleAuth) {
+        throw new Error("Apple Sign-In SDK not loaded");
+      }
+
+      if (!APPLE_AUTH_CONFIG.clientId || !APPLE_AUTH_CONFIG.redirectURI) {
+        throw new Error("Apple Sign-In configuration is missing");
+      }
+
+      appleAuth.init({
+        clientId: APPLE_AUTH_CONFIG.clientId,
+        scope: APPLE_AUTH_CONFIG.scope,
+        redirectURI: APPLE_AUTH_CONFIG.redirectURI,
+        state: mode,
+        usePopup: APPLE_AUTH_CONFIG.usePopup,
+      });
+
+      const result = await appleAuth.signIn();
+      const code = result?.authorization?.code;
+      const idToken = result?.authorization?.id_token;
+      const user = result?.user ? { name: result.user.name } : undefined;
+
+      if (!code && !idToken) {
+        throw new Error("Apple Sign-In returned no auth token");
+      }
+
+      await completeAppleLogin(mode, { code, id_token: idToken, user });
+    } catch (error: any) {
+      const popupFailed =
+        String(error?.error || "").toLowerCase().includes("popup") ||
+        String(error?.message || "").toLowerCase().includes("popup");
+
+      if (popupFailed) {
+        try {
+          const appleAuth = (window as any).AppleID?.auth;
+          appleAuth.init({
+            clientId: APPLE_AUTH_CONFIG.clientId,
+            scope: APPLE_AUTH_CONFIG.scope,
+            redirectURI: APPLE_AUTH_CONFIG.redirectURI,
+            state: mode,
+            usePopup: false,
+          });
+          await appleAuth.signIn();
+          return;
+        } catch {
+        }
+      }
+
+      const message =
+        error?.response?.data?.message || error?.message || "Apple Sign-In failed";
+      setPopup({
+        message,
+        type: "error",
+      });
+      setTimeout(() => setPopup(null), 2200);
+    }
+  };
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code") || undefined;
+    const idToken = params.get("id_token") || undefined;
+    const state = params.get("state") || "";
+    if (!code && !idToken) return;
+
+    const mode = state === "signup" ? "signup" : "login";
+    void completeAppleLogin(mode, { code, id_token: idToken }).finally(() => {
+      const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ""}`;
+      window.history.replaceState({}, document.title, cleanUrl);
+    });
+  }, []);
+
+  const handleAuthSuccess = (response: any, message: string) => {
+    const token = response?.token;
+    const user = resolveAuthUser(response);
+
+    if (!token || !user) {
+      throw new Error("Invalid authentication response");
+    }
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+
+    setPopup({
+      message,
+      type: "success",
+    });
+
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("auth-changed"));
+
+    setTimeout(() => {
+      setPopup(null);
+      onClose();
+    }, 800);
+  };
+
+  // ================= LOGIN =================
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+
+    if (!loginData.email.trim() || !loginData.password.trim()) {
+      setLoginError("Please enter both email and password.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(loginData.email.trim())) {
+      setLoginError("Please enter a valid email address.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await loginUser(loginData);
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(response, `Welcome back, ${user?.name || "User"}!`);
+
+    } catch (err: any) {
+      setLoginError(err.response?.data?.message || "Login failed");
+      setPopup({
+        message: err.response?.data?.message || "Login failed",
+        type: "error",
+      });
+
+      setTimeout(() => setPopup(null), 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ================= SIGNUP =================
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSignupError(null);
+
+    if (!signupData.name.trim() || !signupData.email.trim() || !signupData.password || !signupData.confirmPassword) {
+      setSignupError("Please fill all fields to create your account.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupData.email.trim())) {
+      setSignupError("Please enter a valid email address.");
+      return;
+    }
+
+    if (signupData.password.length < 6) {
+      setSignupError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (signupData.password !== signupData.confirmPassword) {
+      setSignupError("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await signupUser(signupData);
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(
+        response,
+        `Account created successfully! Welcome ${user?.name || "User"}`
+      );
+    } catch (err: any) {
+      setSignupError(err.response?.data?.message || "Signup failed");
+      setPopup({
+        message: err.response?.data?.message || "Signup failed",
+        type: "error",
+      });
+
+      setTimeout(() => setPopup(null), 2000);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-4 py-6 overflow-y-auto">
+      <Card className="w-full max-w-md max-h-[92dvh] overflow-y-auto">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Welcome to NRITAX.AI</CardTitle>
+              <CardDescription>
+                Login or create an account to continue
+              </CardDescription>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="size-5" />
+            </Button>
+          </div>
+        </CardHeader>
+
+        <CardContent>
+          <Tabs defaultValue="login" value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            </TabsList>
+
+            {/* ================= LOGIN TAB ================= */}
+            <TabsContent value="login">
+              <form onSubmit={handleLogin} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    required
+                    placeholder="your.email@example.com"
+                    value={loginData.email}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, email: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2 relative">
+                  <Label>Password</Label>
+                  <Input
+                    type={showLoginPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    value={loginData.password}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, password: e.target.value })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowLoginPassword(!showLoginPassword)
+                    }
+                    className="absolute right-3 top-9 text-[#E2E8F0]"
+                  >
+                    {showLoginPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
+                  </button>
+                </div>
+
+                {loginError && activeTab === "login" && (
+                  <p className="text-red-500 text-sm">{loginError}</p>
+                )}
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    "Login"
+                  )}
+                </Button>
+                {loading && <p className="text-xs text-[#0F172A] text-center">Processing...</p>}
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-[#F7FAFC] px-2 text-[#E2E8F0]">Or continue with</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-black text-black hover:bg-black hover:text-white"
+                    onClick={() => handleAppleSignIn("login")}
+                  >
+                    Continue with Apple
+                  </Button>
+                  <GoogleLogin
+                   text="signin_with"
+                    onSuccess={async (credentialResponse) => {
+                      try {
+                        if (!credentialResponse.credential) {
+                          throw new Error("Missing Google credential");
+                        }
+
+                        const response = await googleLoginUser(
+                          credentialResponse.credential
+                        );
+                        const user = resolveAuthUser(response);
+                        handleAuthSuccess(
+                          response,
+                          `Welcome ${user?.name || "User"}!`
+                        );
+                      } catch (err: any) {
+                        setPopup({
+                          message: err.response?.data?.message || "Google login failed",
+                          type: "error",
+                        });
+                        setTimeout(() => setPopup(null), 2000);
+                      }
+                    }}
+                    onError={() => {
+                      showGoogleOriginMismatchHint("login");
+                    }}
+                  />
+                </div>
+
+              </form>
+            </TabsContent>
+
+            {/* ================= SIGNUP TAB ================= */}
+            <TabsContent value="signup">
+              <form onSubmit={handleSignup} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Full Name</Label>
+                  <Input
+                    required
+                    value={signupData.name}
+                    placeholder="Your full name"
+                    onChange={(e) =>
+                      setSignupData({ ...signupData, name: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Email</Label>
+                  <Input
+                    type="email"
+                    required
+                    placeholder="your.email@example.com"
+                    value={signupData.email}
+                    onChange={(e) =>
+                      setSignupData({ ...signupData, email: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2 relative">
+                  <Label>Password</Label>
+                  <Input
+                    type={showSignupPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    value={signupData.password}
+                    onChange={(e) =>
+                      setSignupData({
+                        ...signupData,
+                        password: e.target.value,
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowSignupPassword(!showSignupPassword)
+                    }
+                    className="absolute right-3 top-9 text-[#E2E8F0]"
+                  >
+                    {showSignupPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
+                  </button>
+                </div>
+
+                <div className="space-y-2 relative">
+                  <Label>Confirm Password</Label>
+                  <Input
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                    placeholder="••••••••"
+                    value={signupData.confirmPassword}
+                    onChange={(e) =>
+                      setSignupData({
+                        ...signupData,
+                        confirmPassword: e.target.value,
+                      })
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }
+                    className="absolute right-3 top-9 text-[#E2E8F0]"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff size={18} />
+                    ) : (
+                      <Eye size={18} />
+                    )}
+                  </button>
+                </div>
+
+                {signupError && activeTab === "signup" && (
+                  <p className="text-red-500 text-sm">{signupError}</p>
+                )}
+
+                <p className="text-xs text-[#0F172A]">
+                  Use at least 6 characters for a secure password.
+                </p>
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+                {loading && <p className="text-xs text-[#0F172A] text-center">Processing...</p>}
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" /> </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-[#F7FAFC] px-2 text-[#E2E8F0]">Or continue with</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-black text-black hover:bg-black hover:text-white"
+                    onClick={() => handleAppleSignIn("signup")}
+                  >
+                    Continue with Apple
+                  </Button>
+                  <GoogleLogin
+                    text="signup_with"
+                    onSuccess={async (credentialResponse) => {
+                      try {
+                        if (!credentialResponse.credential) {
+                          throw new Error("Missing Google credential");
+                        }
+
+                        const response = await googleLoginUser(
+                          credentialResponse.credential
+                        );
+                        const user = resolveAuthUser(response);
+                        handleAuthSuccess(
+                          response,
+                          `Account created successfully! Welcome ${user?.name || "User"}`
+                        );
+                      } catch (err: any) {
+                        setPopup({
+                          message: err.response?.data?.message || "Google signup failed",
+                          type: "error",
+                        });
+
+                        setTimeout(() => setPopup(null), 2000);
+                      }
+                    }}
+                    onError={() => {
+                      showGoogleOriginMismatchHint("signup");
+                    }}
+                  />
+                </div>
+                <p className="text-xs text-[#E2E8F0] text-center">
+                  By signing up, you agree to our Terms of Service and Privacy Policy
+                </p>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+      {popup && <AuthPopup message={popup.message} type={popup.type} />}
+
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
