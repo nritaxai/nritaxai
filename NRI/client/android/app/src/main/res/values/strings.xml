@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Nritaxai</string>
-    <string name="title_activity_main">Nritaxai</string>
-    <string name="package_name">www.nritaxai.com</string>
-    <string name="custom_url_scheme">www.nritaxai.com</string>
-</resources>
