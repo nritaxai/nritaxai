@@ -42,6 +42,11 @@ const stripBoldMarkers = (text: string) =>
   String(text || "")
     .replace(/\*\*/g, "")
     .replace(/__/g, "")
+    .replace(/###\s*Note[\s\S]*?uploaded\s*pdfs?[\s\S]*?(?=\n###\s|\s*$)/im, "")
+    .replace(/^\s*Note:\s*.*uploaded\s*pdfs?.*$/gim, "")
+    .replace(/^\s*.*uploaded\s*pdfs?.*$/gim, "")
+    .replace(/^\s*###\s*Note\s*$/gim, "")
+    .replace(/^\s*Note\s*$/gim, "")
     .replace(/[ \t]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();

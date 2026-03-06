@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Award, Check, Lock, Shield, Sparkles, X, Zap } from "lucide-react";
+import { motion } from "motion/react";
 import { AuthGateCard } from "../components/AuthGateCard";
 import { Button } from "../components/ui/button";
 import { formatInr } from "../../utils/currency";
@@ -159,7 +160,13 @@ export function Pricing({ onRequireLogin }: PricingProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <div className="mb-12 pt-8 text-center">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="mb-12 pt-8 text-center"
+      >
         <h1 className="mb-4 text-4xl font-bold text-[#0F172A] md:text-5xl">Simple, Transparent Pricing</h1>
         <p className="mb-8 text-lg text-[#475569] md:text-xl">Choose the plan that fits your needs</p>
 
@@ -184,7 +191,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
             </span>
           </button>
         </div>
-      </div>
+      </motion.div>
 
       {isIosNativeApp && (
         <div className="mx-auto mb-8 max-w-4xl rounded-lg border border-blue-200 bg-blue-50 p-4">
@@ -200,15 +207,29 @@ export function Pricing({ onRequireLogin }: PricingProps) {
         </div>
       )}
 
-      <div className="mx-auto mb-16 grid max-w-6xl gap-6 px-4 md:grid-cols-3 md:gap-8 md:px-6">
+      <motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
+        }}
+        className="mx-auto mb-16 grid max-w-6xl gap-6 px-4 md:grid-cols-3 md:gap-8 md:px-6"
+      >
         {plans.map((plan) => {
           const monthlyDisplay = getMonthlyDisplay(plan);
           const yearlySavings = getYearlySavingsPercent(plan.monthlyInr, plan.yearlyInr);
           const isPopular = Boolean(plan.popular);
 
           return (
-            <div
+            <motion.div
               key={plan.name}
+              variants={{
+                hidden: { opacity: 0, y: 24, scale: 0.98 },
+                visible: { opacity: 1, y: 0, scale: 1 },
+              }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
               className={`relative rounded-lg border p-8 transition-all ${
                 isPopular
                   ? "scale-100 border-blue-600 bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-xl md:scale-105"
@@ -292,10 +313,10 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 {isIosNativeApp && plan.name === "pro" ? "Subscribe on Website" : plan.cta}
                 {plan.name === "pro" ? <ArrowRight className="ml-2 inline h-4 w-4" /> : null}
               </button>
-            </div>
+            </motion.div>
           );
         })}
-      </div>
+      </motion.div>
 
       <div className="mx-auto mb-16 max-w-5xl px-4 md:px-6">
         <div className="rounded-lg border border-gray-200 bg-white p-8 md:p-12">

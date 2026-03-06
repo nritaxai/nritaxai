@@ -14,7 +14,6 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
-
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -109,17 +108,17 @@ export function Header({ onLogin }: HeaderProps) {
     <header className="relative z-50">
       <div className="border-b border-slate-800 bg-slate-900">
         <div className="h-10 overflow-x-auto">
-          <div className="mx-auto flex h-full min-w-max max-w-6xl items-center justify-center gap-8 px-4">
+          <div className="mx-auto flex h-full min-w-max max-w-6xl items-center justify-start gap-6 px-4 sm:justify-center">
             {trustItems.map((item) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.label}
-                  className="group flex cursor-default items-center gap-2.5 text-sm text-slate-200 transition-colors duration-200 hover:text-white"
+                  className="group inline-flex cursor-default items-center gap-2.5 whitespace-nowrap text-sm text-slate-200 transition-colors duration-200 hover:text-white"
                   title={item.title}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span className="whitespace-nowrap">{renderTextWithShortForms(item.label)}</span>
+                  <span>{item.label}</span>
                 </div>
               );
             })}
@@ -138,7 +137,9 @@ export function Header({ onLogin }: HeaderProps) {
                   )}
                   <Globe className="size-4 shrink-0" />
                   <span className="text-xs text-slate-400">{item.date}</span>
+                  <span aria-hidden="true" className="text-slate-500">|</span>
                   {item.region && <span className="text-xs font-medium text-blue-400">{item.region}</span>}
+                  <span aria-hidden="true" className="text-slate-500">|</span>
                   <span className="text-slate-100">{renderTextWithShortForms(item.text)}</span>
                 </div>
               ))}

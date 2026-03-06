@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { motion } from "motion/react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
@@ -30,6 +31,11 @@ const stripBoldMarkers = (text: string) =>
   String(text || "")
     .replace(/\*\*/g, "")
     .replace(/__/g, "")
+    .replace(/###\s*Note[\s\S]*?uploaded\s*pdfs?[\s\S]*?(?=\n###\s|\s*$)/im, "")
+    .replace(/^\s*Note:\s*.*uploaded\s*pdfs?.*$/gim, "")
+    .replace(/^\s*.*uploaded\s*pdfs?.*$/gim, "")
+    .replace(/^\s*###\s*Note\s*$/gim, "")
+    .replace(/^\s*Note\s*$/gim, "")
     .replace(/[ \t]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
@@ -247,16 +253,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
     return () => cancelAnimationFrame(id);
   }, [messages, isTyping]);
 
-  if (!isAuthenticated) {
-    return (
-      <AuthGateCard
-        title="Login to access AI Tax Chat"
-        description="Sign in to start chat sessions, save history, and use premium AI guidance."
-        onRequireLogin={onRequireLogin}
-      />
-    );
-  }
-
   useEffect(() => {
     const welcomeMessage = getWelcomeMessage();
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -303,6 +299,16 @@ export function Chat({ onRequireLogin }: ChatProps) {
       isCancelled = true;
     };
   }, [language, isAuthenticated, knowledgeSource, userName]);
+
+  if (!isAuthenticated) {
+    return (
+      <AuthGateCard
+        title="Login to access AI Tax Chat"
+        description="Sign in to start chat sessions, save history, and use premium AI guidance."
+        onRequireLogin={onRequireLogin}
+      />
+    );
+  }
 
   const submitQuestion = async (forcedQuestion?: string) => {
     const effectiveQuestion = typeof forcedQuestion === "string" ? forcedQuestion.trim() : question.trim();
@@ -397,6 +403,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
   return (
     <div className="mx-auto w-full max-w-[1320px] space-y-5">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      >
       <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82">
         <CardHeader className="pb-3">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#CBD5E1] bg-[#E2E8F0] px-4 py-2 text-[#0F172A]">
@@ -409,10 +421,27 @@ export function Chat({ onRequireLogin }: ChatProps) {
           </p>
         </CardHeader>
       </Card>
+      </motion.div>
 
-        <div className="grid gap-4 xl:grid-cols-3">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={{
+            hidden: {},
+            visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
+          }}
+          className="grid gap-4 xl:grid-cols-3"
+        >
           {/* Main Chat */}
-          <div className="xl:col-span-2">
+          <motion.div
+            className="xl:col-span-2"
+            variants={{
+              hidden: { opacity: 0, y: 24, scale: 0.98 },
+              visible: { opacity: 1, y: 0, scale: 1 },
+            }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          >
             <Card className="flex h-[78dvh] min-h-[460px] max-h-[820px] flex-col rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82">
               <CardHeader className="flex-shrink-0">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -535,10 +564,17 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 <p className="px-6 pb-4 text-xs text-red-600">Listening... tap mic again to stop.</p>
               )}
             </Card>
-          </div>
+          </motion.div>
 
           {/* Sidebar with starter questions */}
-          <div className="space-y-4">
+          <motion.div
+            className="space-y-4"
+            variants={{
+              hidden: { opacity: 0, y: 24, scale: 0.98 },
+              visible: { opacity: 1, y: 0, scale: 1 },
+            }}
+            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          >
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Starter Questions</CardTitle>
@@ -583,8 +619,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 </CardContent>
               </Card>
             )}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
     </div>
   );
 }

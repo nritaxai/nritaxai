@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Calculator, DollarSign, FileText, Info, Users } from 'lucide-react'
+import { motion } from 'motion/react'
 import { COUNTRY_LIST, getTaxData, calculateTax, getTaxSlabDescription, formatCurrency, type CountryCode } from '../data/taxRegulations'
 import { renderTextWithShortForms } from '../utils/shortForms'
 
@@ -23,14 +24,36 @@ export function Calculators(_props: CalculatorsProps) {
 
   return (
     <div className="min-h-screen">
-      <div className="mb-8">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, amount: 0.3 }}
+        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="mb-8"
+      >
         <h1 className="text-4xl font-bold mb-4">Tax Calculators</h1>
         <p className="text-gray-600 text-lg">
           {renderTextWithShortForms('Free tools to help you understand your NRI tax obligations')}
         </p>
-      </div>
+      </motion.div>
 
-      <div className="grid md:grid-cols-3 gap-6 mb-8">
+      <motion.div
+        initial="hidden"
+        whileInView="visible"
+        viewport={{ once: true, amount: 0.2 }}
+        variants={{
+          hidden: {},
+          visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
+        }}
+        className="grid md:grid-cols-3 gap-6 mb-8"
+      >
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 24, scale: 0.98 },
+            visible: { opacity: 1, y: 0, scale: 1 },
+          }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
         <button
           onClick={() => setActiveCalc('residency')}
           className={`p-6 rounded-lg border-2 transition-all text-left ${
@@ -47,7 +70,15 @@ export function Calculators(_props: CalculatorsProps) {
             Determine your residency status in India and Indonesia
           </p>
         </button>
+        </motion.div>
 
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 24, scale: 0.98 },
+            visible: { opacity: 1, y: 0, scale: 1 },
+          }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
         <button
           onClick={() => setActiveCalc('income')}
           className={`p-6 rounded-lg border-2 transition-all text-left ${
@@ -64,7 +95,15 @@ export function Calculators(_props: CalculatorsProps) {
             Calculate your India or Indonesia income tax liability
           </p>
         </button>
+        </motion.div>
 
+        <motion.div
+          variants={{
+            hidden: { opacity: 0, y: 24, scale: 0.98 },
+            visible: { opacity: 1, y: 0, scale: 1 },
+          }}
+          transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+        >
         <button
           onClick={() => setActiveCalc('dtaa')}
           className={`p-6 rounded-lg border-2 transition-all text-left ${
@@ -81,11 +120,19 @@ export function Calculators(_props: CalculatorsProps) {
             {renderTextWithShortForms('Calculate tax credit available under DTAA')}
           </p>
         </button>
-      </div>
+        </motion.div>
+      </motion.div>
 
-      {activeCalc === 'residency' && <ResidencyCalculator />}
-      {activeCalc === 'income' && <IncomeTaxCalculator />}
-      {activeCalc === 'dtaa' && <DTAACalculator />}
+      <motion.div
+        key={activeCalc ?? 'none'}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      >
+        {activeCalc === 'residency' && <ResidencyCalculator />}
+        {activeCalc === 'income' && <IncomeTaxCalculator />}
+        {activeCalc === 'dtaa' && <DTAACalculator />}
+      </motion.div>
 
       {!activeCalc && (
         <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">

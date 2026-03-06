@@ -61,11 +61,11 @@ export function Home() {
       <section className="bg-gradient-to-b from-gray-50 to-white py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
-            <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{renderTextWithShortForms(heroContent.badge)}</span>
-            <h1 className="mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
-            <p className="mb-6 text-2xl font-semibold text-blue-700">{renderTextWithShortForms(heroContent.subheadline)}</p>
-            <p className="mx-auto mb-8 max-w-2xl text-lg text-gray-600">{renderTextWithShortForms(heroContent.description)}</p>
-            <div className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <span className="reveal-drop rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{renderTextWithShortForms(heroContent.badge)}</span>
+            <h1 className="reveal-drop reveal-delay-1 mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
+            <p className="reveal-drop reveal-delay-2 mb-6 text-2xl font-semibold text-blue-700">{renderTextWithShortForms(heroContent.subheadline)}</p>
+            <p className="reveal-drop reveal-delay-3 mx-auto mb-8 max-w-2xl text-lg text-gray-600">{renderTextWithShortForms(heroContent.description)}</p>
+            <div className="reveal-drop reveal-delay-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 to="/chat"
                 aria-label="Ask AI instantly"
@@ -85,8 +85,12 @@ export function Home() {
           </div>
 
           <div className="mt-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {heroContent.stats.map((stat) => (
-              <div key={stat.label} className="rounded-xl border bg-white p-6 text-center shadow-sm">
+            {heroContent.stats.map((stat, index) => (
+              <div
+                key={stat.label}
+                className="reveal-tile rounded-xl border bg-white p-6 text-center shadow-sm"
+                style={{ ["--reveal-delay" as any]: `${160 + index * 90}ms` }}
+              >
                 <div className="mb-2 text-3xl font-bold text-blue-700">{stat.value}</div>
                 <div className="text-sm text-gray-500">{stat.label}</div>
               </div>
@@ -96,8 +100,12 @@ export function Home() {
           <section id="tax-updates" className="mt-14">
             <h3 className="mb-5 text-center text-2xl font-bold text-gray-900">Tax Updates</h3>
             <div className="grid gap-4 md:grid-cols-3">
-              {taxUpdates.map((item) => (
-                <article key={item.date + item.title} className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
+              {taxUpdates.map((item, index) => (
+                <article
+                  key={item.date + item.title}
+                  className="reveal-tile rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                  style={{ ["--reveal-delay" as any]: `${140 + index * 100}ms` }}
+                >
                   <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium text-blue-700">
                     <Globe className="size-3.5" />
                     {item.date}
@@ -111,14 +119,15 @@ export function Home() {
           <div className="mt-16">
             <h3 className="mb-8 text-center text-2xl font-bold text-gray-900">Quick Access by Scenario</h3>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-              {scenarioCards.map((scenario) => {
+              {scenarioCards.map((scenario, index) => {
                 const Icon = scenario.icon;
                 return (
                   <Link
                     key={scenario.title}
                     to="/chat"
                     state={{ starterMessage: scenario.message }}
-                    className={`${scenario.color} rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg`}
+                    className={`reveal-tile ${scenario.color} rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg`}
+                    style={{ ["--reveal-delay" as any]: `${180 + index * 90}ms` }}
                     aria-label={scenario.title}
                   >
                     <Icon className="mb-3 size-8" />

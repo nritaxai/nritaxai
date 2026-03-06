@@ -117,9 +117,71 @@ textarea {
   font-size: 16px;
 }
 
+form > :nth-child(1) { --entry-stagger: 0; }
+form > :nth-child(2) { --entry-stagger: 1; }
+form > :nth-child(3) { --entry-stagger: 2; }
+form > :nth-child(4) { --entry-stagger: 3; }
+form > :nth-child(5) { --entry-stagger: 4; }
+form > :nth-child(6) { --entry-stagger: 5; }
+form > :nth-child(7) { --entry-stagger: 6; }
+form > :nth-child(8) { --entry-stagger: 7; }
+form > :nth-child(9) { --entry-stagger: 8; }
+form > :nth-child(10) { --entry-stagger: 9; }
+form > :nth-child(11) { --entry-stagger: 10; }
+form > :nth-child(12) { --entry-stagger: 11; }
+
+:is(input, select, textarea, [data-slot="input"], [data-slot="select-trigger"], [data-slot="textarea"]) {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  transition: box-shadow 220ms ease, border-color 220ms ease, transform 220ms ease;
+}
+
+form :is(button, [data-slot="button"]) {
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+:is(input, textarea, [data-slot="input"], [data-slot="textarea"]):focus,
+:is(input, textarea, [data-slot="input"], [data-slot="textarea"]):focus-visible,
+:is(select, [data-slot="select-trigger"]):focus,
+:is(select, [data-slot="select-trigger"]):focus-visible,
+[data-slot="select-trigger"][data-state="open"] {
+  animation: fieldEnterFromTop var(--field-drop-duration, 420ms) cubic-bezier(0.19, 1, 0.22, 1);
+}
+
+form :is(button, [data-slot="button"]):hover,
+form :is(button, [data-slot="button"]):focus-visible {
+  transform: translate3d(0, -2px, 0);
+}
+
+.reveal-drop {
+  opacity: 0;
+  transform: translate3d(0, -28px, 0);
+  animation: revealDrop 920ms cubic-bezier(0.19, 1, 0.22, 1) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+.reveal-delay-1 { --reveal-delay: 120ms; }
+.reveal-delay-2 { --reveal-delay: 240ms; }
+.reveal-delay-3 { --reveal-delay: 360ms; }
+.reveal-delay-4 { --reveal-delay: 480ms; }
+
+.reveal-tile {
+  opacity: 0;
+  transform: translate3d(0, -20px, 0);
+  animation: revealDrop 860ms cubic-bezier(0.19, 1, 0.22, 1) both;
+  animation-delay: var(--reveal-delay, 0ms);
+}
+
+.auto-reveal {
+  opacity: 0;
+  transform: translate3d(0, -24px, 0);
+  animation: revealDrop 900ms cubic-bezier(0.19, 1, 0.22, 1) both;
+  animation-delay: var(--auto-reveal-delay, 0ms);
+}
+
 @media (max-width: 640px) {
   button,
-  [role="button"],
+  [data-slot="button"],
   input,
   select,
   textarea {
@@ -163,11 +225,56 @@ textarea {
   }
 }
 
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -20px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes fieldEnterFromTop {
+  from {
+    transform: translate3d(0, calc(-1 * var(--field-drop-distance, 14px)), 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes revealDrop {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -28px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   body,
   body::before,
   body::after {
     animation: none !important;
+  }
+
+  form :is(button, [data-slot="button"], input, select, textarea, [data-slot="input"], [data-slot="select-trigger"], [data-slot="textarea"]) {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .reveal-drop,
+  .reveal-tile,
+  .auto-reveal {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
   }
 }
 

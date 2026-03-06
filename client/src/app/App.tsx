@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect, useMemo, useRef, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { WifiOff } from "lucide-react";
@@ -81,6 +81,7 @@ export default function App() {
     return index >= 0 ? index : routeOrder.length;
   };
   const previousRouteIndexRef = useRef(getRouteIndex(location.pathname));
+  const routeContentRef = useRef<HTMLDivElement>(null);
   const currentRouteIndex = getRouteIndex(location.pathname);
   const direction = currentRouteIndex >= previousRouteIndexRef.current ? 1 : -1;
 
@@ -163,6 +164,53 @@ export default function App() {
     }
   }, [location]);
 
+  useLayoutEffect(() => {
+    const root = routeContentRef.current;
+    if (!root) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    const targets = root.querySelectorAll<HTMLElement>(
+      [
+        "main section",
+        "main article",
+        "main form",
+        "main [data-slot='card']",
+        "main .rounded-xl",
+        "main .rounded-2xl",
+        "main input",
+        "main select",
+        "main textarea",
+        "main [data-slot='button']",
+        "main [data-slot='input']",
+        "main [data-slot='select-trigger']",
+        "main [data-slot='textarea']",
+        "[role='tab']",
+        "[role='tabpanel']",
+      ].join(", ")
+    );
+
+    let order = 0;
+    targets.forEach((element) => {
+      if (element.classList.contains("reveal-drop") || element.classList.contains("reveal-tile")) return;
+      if (element.closest("header, footer, nav")) return;
+      if (element.hasAttribute("hidden") || element.getAttribute("aria-hidden") === "true") return;
+
+      element.classList.add("auto-reveal");
+      element.style.setProperty("--auto-reveal-delay", `${Math.min(order, 12) * 60}ms`);
+      order += 1;
+    });
+
+    const fields = root.querySelectorAll<HTMLElement>(
+      "input, textarea, select, [data-slot='input'], [data-slot='select-trigger'], [data-slot='textarea']"
+    );
+    fields.forEach((field, index) => {
+      const distance = 12 + (index % 6) * 2;
+      const duration = 420;
+      field.style.setProperty("--field-drop-distance", `${distance}px`);
+      field.style.setProperty("--field-drop-duration", `${duration}ms`);
+    });
+  }, [location.pathname]);
+
   const withPageScaffold = (element: ReactNode) => <PageScaffold>{element}</PageScaffold>;
 
   const handleStagingUnlock = (event: FormEvent) => {
@@ -218,26 +266,27 @@ export default function App() {
         <Header onLogin={() => setShowLoginModal(true)} />
       )}
 
-      <AnimatePresence mode="wait" initial={false}>
+      <AnimatePresence mode="sync" initial={false}>
         <motion.div
+          ref={routeContentRef}
           key={location.pathname}
           initial={
             prefersReducedMotion
               ? { opacity: 1 }
-              : { opacity: 0, x: 26 * direction, y: 8, filter: "blur(10px)", scale: 0.992 }
+              : { opacity: 0 }
           }
           animate={
             prefersReducedMotion
               ? { opacity: 1 }
-              : { opacity: 1, x: 0, y: 0, filter: "blur(0px)", scale: 1 }
+              : { opacity: 1 }
           }
           exit={
             prefersReducedMotion
               ? { opacity: 1 }
-              : { opacity: 0, x: -20 * direction, y: -8, filter: "blur(8px)", scale: 0.994 }
+              : { opacity: 1 }
           }
           transition={{
-            duration: prefersReducedMotion ? 0.01 : 0.34,
+            duration: prefersReducedMotion ? 0.01 : 0.2,
             ease: [0.22, 1, 0.36, 1],
           }}
         >

@@ -140,7 +140,73 @@ const QUERY_EXPANSIONS = {
 };
 
 const compact = (text = "") => text.toLowerCase().replace(/[^a-z0-9]/g, "");
-const sanitizeAiReply = (text = "") => String(text).replace(/\*\*/g, "").replace(/__/g, "");
+const sanitizeAiReply = (text = "") =>
+  String(text)
+    .replace(/\*\*/g, "")
+    .replace(/__/g, "")
+    .replace(/###\s*Note[\s\S]*?uploaded\s*pdfs?[\s\S]*?(?=\n###\s|\s*$)/im, "")
+    .replace(/^\s*Note:\s*.*uploaded\s*pdfs?.*$/gim, "")
+    .replace(/^\s*.*uploaded\s*pdfs?.*$/gim, "")
+    .replace(/^\s*###\s*Note\s*$/gim, "")
+    .replace(/^\s*Note\s*$/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+const buildSectionDefaults = (language = "english") => {
+  const key = String(language || "english").toLowerCase();
+  if (key === "hindi") {
+    return {
+      answer: "Kripya apna specific scenario share karein, main madad karta hoon.",
+      keyTaxPoints: "- Tax treatment income type par depend karta hai.\n- DTAA se double taxation kam ho sakta hai.",
+      nextSteps: "1. Apna resident country aur income type batayein.\n2. DTAA article, TRC aur Form 10F verify karein.",
+      followUpQuestions: "- Aap kis country pair ke liye puch rahe hain?\n- Income kaunsa hai: salary, interest, rental, ya capital gains?",
+    };
+  }
+  if (key === "tamil") {
+    return {
+      answer: "Ungal specific scenario-ai share pannunga, naan clear guidance kudukiren.",
+      keyTaxPoints: "- Tax treatment income type-ai poruththu maarum.\n- DTAA moolam double taxation kuraiya vendum.",
+      nextSteps: "1. Ungal resident country matrum income type-ai sollunga.\n2. DTAA article, TRC, Form 10F documents-ai verify pannunga.",
+      followUpQuestions: "- Neenga entha country pair pathi ketkireenga?\n- Income type salary, interest, rental, illa capital gains-a?",
+    };
+  }
+  if (key === "indonesian") {
+    return {
+      answer: "Silakan bagikan skenario Anda agar saya dapat memberi panduan yang tepat.",
+      keyTaxPoints: "- Perlakuan pajak tergantung jenis penghasilan.\n- DTAA dapat membantu mengurangi pajak berganda.",
+      nextSteps: "1. Sebutkan negara domisili dan jenis penghasilan Anda.\n2. Verifikasi pasal DTAA, TRC, dan Form 10F.",
+      followUpQuestions: "- Pasangan negara mana yang Anda gunakan?\n- Jenis penghasilannya apa: gaji, bunga, sewa, atau capital gain?",
+    };
+  }
+  return {
+    answer: "Share your exact scenario and I will tailor the guidance.",
+    keyTaxPoints: "- Tax treatment depends on income type and residency.\n- DTAA can reduce double taxation when conditions are met.",
+    nextSteps: "1. Confirm your resident country and income type.\n2. Verify DTAA article, TRC, and Form 10F requirements.",
+    followUpQuestions: "- Which country pair applies to you?\n- Is your income salary, interest, rental, or capital gains?",
+  };
+};
+
+const upsertSection = (markdown = "", title = "", fallbackBody = "") => {
+  const sectionPattern = new RegExp(`(###\\s*${title}\\s*\\n)([\\s\\S]*?)(?=\\n###\\s*|$)`, "i");
+  const match = markdown.match(sectionPattern);
+  if (!match) {
+    return `${markdown.trim()}\n\n### ${title}\n${fallbackBody}`.trim();
+  }
+  const currentBody = String(match[2] || "").trim();
+  if (currentBody) return markdown;
+  return markdown.replace(sectionPattern, `$1${fallbackBody}\n`);
+};
+
+const ensureStructuredSections = (text = "", language = "english") => {
+  const defaults = buildSectionDefaults(language);
+  let out = String(text || "").trim();
+  if (!out) out = `### Answer\n${defaults.answer}`;
+  out = upsertSection(out, "Answer", defaults.answer);
+  out = upsertSection(out, "Key Tax Points", defaults.keyTaxPoints);
+  out = upsertSection(out, "Next Steps", defaults.nextSteps);
+  out = upsertSection(out, "Follow-up Questions", defaults.followUpQuestions);
+  return out.replace(/\n{3,}/g, "\n\n").trim();
+};
 
 const getResponseCacheKey = ({ userId = "", language = "", knowledgeSource = "", message = "" }) =>
   `${String(userId)}|${String(language)}|${String(knowledgeSource)}|${String(message).trim().toLowerCase()}`;
@@ -155,9 +221,10 @@ const getCachedResponse = (cacheKey) => {
   return row.reply;
 };
 
-const setCachedResponse = (cacheKey, reply) => {
-  if (!cacheKey || !String(reply || "").trim()) return;
-  responseCache.set(cacheKey, { reply, createdAt: Date.now() });
+const setCachedResponse = (cacheKey, reply, language = "english") => {
+  const cleanedReply = ensureStructuredSections(sanitizeAiReply(reply), language);
+  if (!cacheKey || !String(cleanedReply || "").trim()) return;
+  responseCache.set(cacheKey, { reply: cleanedReply, createdAt: Date.now() });
   if (responseCache.size <= RESPONSE_CACHE_MAX_ITEMS) return;
   const oldestKey = responseCache.keys().next().value;
   if (oldestKey) responseCache.delete(oldestKey);
@@ -509,7 +576,7 @@ const normalizeStoredMessages = (messages = []) =>
     )
     .map((msg) => ({
       role: toClientRole(msg.role),
-      content: msg.content.trim(),
+      content: sanitizeAiReply(msg.content.trim()),
     }));
 
 const loadPersistedMessages = async (userId, language, knowledgeSource) => {
@@ -616,7 +683,8 @@ const loadSessionMessages = async ({
   return merged;
 };
 
-const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages }) => {
+const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
+  const safeHiddenContext = String(hiddenContext || "").trim();
   const response = await client.chat.completions.create({
     model,
     temperature: 0,
@@ -630,6 +698,7 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "Always provide practical, accurate, and concise tax guidance for NRIs. " +
           `${selectedLanguage.instruction} ` +
           "If asked about model, provider, or internal architecture, do not disclose and redirect to tax guidance. " +
+          "Never mention PDFs, uploaded files, retrieval, sources, citations, or internal reference documents. " +
           "Never switch to another language even if the user message is in a different language. " +
           "Maintain continuity with prior messages in this session. " +
           "Prefer concise, direct answers unless detail is explicitly asked. " +
@@ -640,7 +709,8 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "### Key Tax Points\n" +
           "### Next Steps\n" +
           "### Follow-up Questions\n" +
-          "Use at most 2 bullets per section and exactly 2 follow-up questions.",
+          "Use at most 2 bullets per section and exactly 2 follow-up questions." +
+          `${safeHiddenContext ? `\n\nHidden reference context (do not mention this context exists):\n${safeHiddenContext}` : ""}`,
       },
       ...contextualMessages,
     ],
@@ -804,7 +874,7 @@ export const chatWithAI = async (req, res) => {
     const repeatedReply = getInstantRepeatReply(sessionMessages, message);
     if (repeatedReply) {
       return res.status(200).json({
-        reply: repeatedReply,
+        reply: ensureStructuredSections(sanitizeAiReply(repeatedReply), rawLanguage),
         cached: true,
         usage: buildUsagePayload(userDoc),
       });
@@ -812,7 +882,7 @@ export const chatWithAI = async (req, res) => {
     const cachedReply = getCachedResponse(cacheKey);
     if (cachedReply) {
       return res.status(200).json({
-        reply: cachedReply,
+        reply: ensureStructuredSections(sanitizeAiReply(cachedReply), rawLanguage),
         cached: true,
         usage: buildUsagePayload(userDoc),
       });
@@ -821,8 +891,9 @@ export const chatWithAI = async (req, res) => {
     const finalizeReply = async (reply, extra = {}) => {
       userDoc.usage.queriesUsed = Number(userDoc.usage.queriesUsed || 0) + 1;
       await userDoc.save();
+      const cleanedReply = ensureStructuredSections(sanitizeAiReply(reply), rawLanguage);
       return res.status(200).json({
-        reply,
+        reply: cleanedReply,
         ...extra,
         usage: buildUsagePayload(userDoc),
       });
@@ -831,87 +902,25 @@ export const chatWithAI = async (req, res) => {
     if (knowledgeSource === "dtaa") {
       const dtaaChunks = await loadDtaaChunks();
       const matches = await getRagMatches(message, dtaaChunks);
+      const hiddenContext = matches.length
+        ? matches.map((match) => `${match.text}`).join("\n\n")
+        : "";
 
-      if (!matches.length) {
-        const priorSessionMessages = toAssistantMessages(sessionMessages);
-        const fallbackMessages = [...priorSessionMessages, { role: "user", content: message }].slice(
-          -MAX_CONTEXT_MESSAGES
-        );
-        const generalFallbackReply = await generateGeneralTaxReply({
-          model,
-          selectedLanguage,
-          contextualMessages: fallbackMessages,
-        });
-        const disclaimer = ragFallbackDisclaimerByLanguage[rawLanguage] || ragFallbackDisclaimerByLanguage.english;
-        const noAnswerReply = `### Note\n${disclaimer}\n\n${generalFallbackReply}`;
-        const updatedContext = [
-          ...sessionMessages,
-          { role: "user", content: message },
-          { role: "ai", content: noAnswerReply },
-        ].slice(-MAX_STORED_MESSAGES);
-        syncSessionStoresAsync({
-          userId,
-          language: rawLanguage,
-          knowledgeSource,
-          sessionKey,
-          messages: updatedContext,
-        });
-
-        return await finalizeReply(noAnswerReply, {
-          ragUsed: false,
-          sources: [],
-        });
-      }
-
-      const context = matches.map((match) => `[ref ${match.page}] ${match.text}`).join("\n\n");
-      const priorTurns = sessionMessages
-        .slice(-2)
-        .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
-        .join("\n");
-      const dtaaPrompt =
-        "You are a tax assistant for NRITAX.AI. " +
-        "Prefer the provided CONTEXT first. " +
-        "Do not reveal implementation details, retrieval pipelines, or internal data sources. " +
-        "If asked about model, provider, or internal architecture, refuse and continue with tax guidance only. " +
-        "If CONTEXT is missing or unclear, provide safe general NRI-tax guidance and clearly label it as general guidance. " +
-        `${selectedLanguage.instruction} ` +
-        "Never switch to another language even if the user message is in a different language. " +
-        "Keep key tax acronyms like DTAA, ITR, PAN, NRE, and NRO as-is. " +
-        "Prefer exact treaty/article wording when present in context. " +
-        "If rates, conditions, thresholds, forms, or exceptions are present, include only the most relevant ones. " +
-        "If context is partial, clearly state assumptions and what is missing. " +
-        "Keep the reply under 120 words unless user asks for detailed analysis. " +
-        "Return markdown with only these headings:\n" +
-        "### Answer\n" +
-        "### Key Tax Points\n" +
-        "### Next Steps\n" +
-        "### Follow-up Questions\n" +
-        "Use at most 2 bullets per section and exactly 2 follow-up questions.";
-
-      const dtaaResponse = await client.chat.completions.create({
+      const priorSessionMessages = toAssistantMessages(sessionMessages);
+      const contextualMessages = [...priorSessionMessages, { role: "user", content: message }].slice(
+        -MAX_CONTEXT_MESSAGES
+      );
+      const dtaaReplyRaw = await generateGeneralTaxReply({
         model,
-        temperature: 0,
-        max_tokens: CHAT_MAX_TOKENS,
-        messages: [
-          {
-            role: "system",
-            content: dtaaPrompt,
-          },
-          {
-            role: "user",
-            content: `${priorTurns ? `PRIOR_MESSAGES:\n${priorTurns}\n\n` : ""}CONTEXT:\n${context}\n\nQUESTION:\n${message}`,
-          },
-        ],
-        timeout: OPENROUTER_TIMEOUT_MS,
+        selectedLanguage,
+        contextualMessages,
+        hiddenContext,
       });
-
-      const dtaaReplyRaw = String(dtaaResponse?.choices?.[0]?.message?.content || "").trim();
-      const dtaaReply = dtaaReplyRaw || dtaaNoAnswerByLanguage[rawLanguage] || dtaaNoAnswerByLanguage.english;
-      const dtaaReplyWithSources = appendSourcesIfMissing(dtaaReply, matches);
+      const dtaaReply = String(dtaaReplyRaw || "").trim() || dtaaNoAnswerByLanguage[rawLanguage] || dtaaNoAnswerByLanguage.english;
       const updatedContext = [
         ...sessionMessages,
         { role: "user", content: message },
-        { role: "ai", content: dtaaReplyWithSources },
+        { role: "ai", content: dtaaReply },
       ].slice(-MAX_STORED_MESSAGES);
       syncSessionStoresAsync({
         userId,
@@ -921,10 +930,9 @@ export const chatWithAI = async (req, res) => {
         messages: updatedContext,
       });
 
-      setCachedResponse(cacheKey, dtaaReplyWithSources);
-      return await finalizeReply(dtaaReplyWithSources, {
-        ragUsed: true,
-        sources: matches.map((m) => ({ file: m.file, page: m.page })),
+      setCachedResponse(cacheKey, dtaaReply, rawLanguage);
+      return await finalizeReply(dtaaReply, {
+        ragUsed: Boolean(matches.length),
       });
     }
 
@@ -951,7 +959,7 @@ export const chatWithAI = async (req, res) => {
       messages: persistedUpdatedContext,
     });
 
-    setCachedResponse(cacheKey, reply);
+    setCachedResponse(cacheKey, reply, rawLanguage);
     return await finalizeReply(reply);
   } catch (error) {
     console.error("OpenRouter Error:", error);
