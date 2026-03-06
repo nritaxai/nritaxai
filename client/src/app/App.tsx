@@ -1,6 +1,5 @@
-import { lazy, Suspense, useState, useEffect, useMemo, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
+import { lazy, Suspense, useState, useEffect, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
 import { Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { WifiOff } from "lucide-react";
 
 import { Header } from "./components/Header";
@@ -51,43 +50,7 @@ export default function App() {
   });
 
   const location = useLocation();
-  const prefersReducedMotion = useReducedMotion();
-  const routeOrder = useMemo(
-    () =>
-      [
-        "/",
-        "/hero",
-        "/home",
-        "/calculators",
-        "/pricing",
-        "/checkout",
-        "/chat",
-        "/dashboard",
-        "/compliance",
-        "/builder",
-        "/consult",
-        "/profile",
-        "/privacy-policy",
-        "/about-us",
-        "/terms-and-conditions",
-        "/refund-policy",
-        "/disclaimer",
-      ],
-    []
-  );
-  const getRouteIndex = (pathname: string) => {
-    const normalized = pathname.toLowerCase();
-    const index = routeOrder.indexOf(normalized);
-    return index >= 0 ? index : routeOrder.length;
-  };
-  const previousRouteIndexRef = useRef(getRouteIndex(location.pathname));
   const routeContentRef = useRef<HTMLDivElement>(null);
-  const currentRouteIndex = getRouteIndex(location.pathname);
-  const direction = currentRouteIndex >= previousRouteIndexRef.current ? 1 : -1;
-
-  useEffect(() => {
-    previousRouteIndexRef.current = currentRouteIndex;
-  }, [currentRouteIndex]);
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -266,63 +229,39 @@ export default function App() {
         <Header onLogin={() => setShowLoginModal(true)} />
       )}
 
-      <AnimatePresence mode="sync" initial={false}>
-        <motion.div
-          ref={routeContentRef}
-          key={location.pathname}
-          initial={
-            prefersReducedMotion
-              ? { opacity: 1 }
-              : { opacity: 0 }
-          }
-          animate={
-            prefersReducedMotion
-              ? { opacity: 1 }
-              : { opacity: 1 }
-          }
-          exit={
-            prefersReducedMotion
-              ? { opacity: 1 }
-              : { opacity: 1 }
-          }
-          transition={{
-            duration: prefersReducedMotion ? 0.01 : 0.2,
-            ease: [0.22, 1, 0.36, 1],
-          }}
-        >
-          <Suspense fallback={<div className="p-6 text-sm text-[#0F172A]">Loading...</div>}>
-            <Routes location={location}>
-              <Route path="/" element={<HeroPage />} />
-              <Route path="/Hero" element={<HeroPage />} />
-              <Route path="/hero" element={<HeroPage />} />
-              <Route path="/home" element={withPageScaffold(<HomePage />)} />
+      <div ref={routeContentRef}>
+        <Suspense fallback={<div className="p-6 text-sm text-[#0F172A]">Loading...</div>}>
+          <Routes location={location}>
+            <Route path="/" element={<HeroPage />} />
+            <Route path="/Hero" element={<HeroPage />} />
+            <Route path="/hero" element={<HeroPage />} />
+            <Route path="/home" element={withPageScaffold(<HomePage />)} />
 
-              <Route
-                path="/calculators"
-                element={<Calculators onRequireLogin={() => setShowLoginModal(true)} />}
-              />
-              <Route path="/Pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
-              <Route path="/pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
-              <Route
-                path="/checkout"
-                element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
-              />
-              <Route path="/login" element={withPageScaffold(<Login />)} />
-              <Route path="/profile" element={withPageScaffold(<Profile />)} />
-              <Route path="/chat" element={withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
-              <Route path="/dashboard" element={withPageScaffold(<AdminDashboard />)} />
-              <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
-              <Route path="/builder" element={withPageScaffold(<Builder />)} />
-              <Route path="/consult" element={withPageScaffold(<Consult />)} />
-              <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
-              <Route path="/about-us" element={withPageScaffold(<AboutUs />)} />
-              <Route path="/terms-and-conditions" element={withPageScaffold(<TermsAndConditions />)} />
-              <Route path="/refund-policy" element={withPageScaffold(<RefundPolicy />)} />
-              <Route path="/disclaimer" element={withPageScaffold(<Disclaimer />)} />
-            </Routes>
-          </Suspense>
-        </motion.div>
-      </AnimatePresence>
+            <Route
+              path="/calculators"
+              element={<Calculators onRequireLogin={() => setShowLoginModal(true)} />}
+            />
+            <Route path="/Pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route
+              path="/checkout"
+              element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
+            />
+            <Route path="/login" element={withPageScaffold(<Login />)} />
+            <Route path="/profile" element={withPageScaffold(<Profile />)} />
+            <Route path="/chat" element={withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/dashboard" element={withPageScaffold(<AdminDashboard />)} />
+            <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
+            <Route path="/builder" element={withPageScaffold(<Builder />)} />
+            <Route path="/consult" element={withPageScaffold(<Consult />)} />
+            <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
+            <Route path="/about-us" element={withPageScaffold(<AboutUs />)} />
+            <Route path="/terms-and-conditions" element={withPageScaffold(<TermsAndConditions />)} />
+            <Route path="/refund-policy" element={withPageScaffold(<RefundPolicy />)} />
+            <Route path="/disclaimer" element={withPageScaffold(<Disclaimer />)} />
+          </Routes>
+        </Suspense>
+      </div>
 
       <TigerBotAvatar />
 
