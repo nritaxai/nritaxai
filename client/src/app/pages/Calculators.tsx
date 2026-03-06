@@ -115,7 +115,7 @@ export function Calculators(_props: CalculatorsProps) {
           <div className="bg-blue-100 w-12 h-12 rounded-lg flex items-center justify-center mb-4">
             <DollarSign className="w-6 h-6 text-blue-600" />
           </div>
-          <h3 className="text-xl font-semibold mb-2">DTAA Tax Credit</h3>
+          <h3 className="text-xl font-semibold mb-2">{renderTextWithShortForms("DTAA Tax Credit")}</h3>
           <p className="text-gray-600 text-sm">
             {renderTextWithShortForms('Calculate tax credit available under DTAA')}
           </p>
@@ -590,7 +590,7 @@ function DTAACalculator() {
       <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Income earned in India (INR)
+            {renderTextWithShortForms("Income earned in India (INR)")}
           </label>
           <input
             type="text"
@@ -604,7 +604,7 @@ function DTAACalculator() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Tax paid in India (INR)
+            {renderTextWithShortForms("Tax paid in India (INR)")}
           </label>
           <input
             type="text"

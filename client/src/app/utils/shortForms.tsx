@@ -3,10 +3,12 @@ import { Fragment, type ReactNode } from "react";
 import { ShortFormLink } from "../components/ShortFormLink";
 
 const SHORT_FORMS: Record<string, string> = {
+  "AI": "Artificial Intelligence",
   "DTAA": "Double Taxation Avoidance Agreement",
   "NRI": "Non-Resident Indian",
   "NRIs": "Non-Resident Indians",
   "CPA": "Certified Public Accountant",
+  "CPAs": "Certified Public Accountants",
   "ITR": "Income Tax Return",
   "TRC": "Tax Residency Certificate",
   "RNOR": "Resident but Not Ordinarily Resident",

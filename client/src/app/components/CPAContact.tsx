@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Calendar, CheckCircle2, Mail, MessageSquare, UserCheck, X } from "lucide-react";
 import { submitConsultationRequest } from "../../utils/api";
 import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
+import { renderTextWithShortForms } from "../utils/shortForms";
 
 interface CPAContactProps {
   onClose: () => void;
@@ -117,7 +118,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 <UserCheck className="size-6 text-[#2563eb]" />
               </div>
               <div>
-                <CardTitle>Consult a Certified CPA</CardTitle>
+                <CardTitle>{renderTextWithShortForms("Consult a Certified CPA")}</CardTitle>
                 <CardDescription>Expert tax planning and compliance support</CardDescription>
               </div>
             </div>
@@ -278,10 +279,10 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="tax-planning">Tax Planning & Strategy</SelectItem>
-                  <SelectItem value="dtaa">DTAA Consultation</SelectItem>
-                  <SelectItem value="itr-filing">ITR Filing Assistance</SelectItem>
+                  <SelectItem value="dtaa">{renderTextWithShortForms("DTAA Consultation")}</SelectItem>
+                  <SelectItem value="itr-filing">{renderTextWithShortForms("ITR Filing Assistance")}</SelectItem>
                   <SelectItem value="compliance">Compliance Review</SelectItem>
-                  <SelectItem value="nro-nre">NRO/NRE Account Guidance</SelectItem>
+                  <SelectItem value="nro-nre">{renderTextWithShortForms("NRO/NRE Account Guidance")}</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -301,8 +302,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
             <div className="bg-[#2563eb]/12 border border-[#2563eb]/40 rounded-lg p-4 text-sm">
               <p className="text-[#2563eb]">
-                <strong>Note:</strong> All consultations are confidential and comply with ICAI standards.
-                Our CPAs are registered professionals with expertise in NRI taxation and DTAA regulations.
+                <strong>Note:</strong> {renderTextWithShortForms("All consultations are confidential and comply with ICAI standards. Our CPAs are registered professionals with expertise in NRI taxation and DTAA regulations.")}
               </p>
             </div>
 

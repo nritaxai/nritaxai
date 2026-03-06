@@ -8,6 +8,7 @@ import {
   Clock
 } from "lucide-react";
 import { motion } from "motion/react";
+import { renderTextWithShortForms } from "../utils/shortForms";
 
 export function Features() {
   const features = [
@@ -96,11 +97,11 @@ export function Features() {
                   <div className={`inline-flex w-12 h-12 items-center justify-center rounded-lg shadow-md ${feature.color} mb-4 group-hover:scale-110 transition-transform`}>
                     <Icon className="size-6" />
                   </div>
-                  <CardTitle className="text-xl font-extrabold text-[#0F172A]">{feature.title}</CardTitle>
+                  <CardTitle className="text-xl font-extrabold text-[#0F172A]">{renderTextWithShortForms(feature.title)}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <CardDescription className="text-base font-semibold text-[#0F172A] leading-relaxed">
-                    {feature.description}
+                    {renderTextWithShortForms(feature.description)}
                   </CardDescription>
                 </CardContent>
               </Card>

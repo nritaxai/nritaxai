@@ -118,7 +118,7 @@ export function Header({ onLogin }: HeaderProps) {
                   title={item.title}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span>{item.label}</span>
+                  <span>{renderTextWithShortForms(item.label)}</span>
                 </div>
               );
             })}
@@ -177,7 +177,7 @@ export function Header({ onLogin }: HeaderProps) {
                       isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
                     }`}
                   >
-                    {item.label}
+                    {renderTextWithShortForms(item.label)}
                   </Link>
                 );
               })}
@@ -252,7 +252,7 @@ export function Header({ onLogin }: HeaderProps) {
                       }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
-                      {item.label}
+                      {renderTextWithShortForms(item.label)}
                     </Link>
                   );
                 })}
