@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Award, Check, Lock, Shield, Sparkles, X, Zap } from "lucide-react";
 import { motion } from "motion/react";
 import { AuthGateCard } from "../components/AuthGateCard";
 import { Button } from "../components/ui/button";
-import { formatInr } from "../../utils/currency";
-import { IS_IOS_NATIVE_APP } from "../../config/appConfig";
-import { getSubscriptionStatus } from "../../utils/api";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { convertInrToCurrency, formatCurrency, formatInr, resolveCurrencyByCode, SUPPORTED_CURRENCIES } from "../../utils/currency";
+import { GSTIN, IS_IOS_NATIVE_APP } from "../../config/appConfig";
+import { getStoredAuthToken, getSubscriptionStatus } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
 type PlanName = "free" | "pro" | "enterprise";
@@ -35,11 +36,14 @@ interface PricingProps {
 
 export function Pricing({ onRequireLogin }: PricingProps) {
   const navigate = useNavigate();
-  const isAuthenticated = Boolean(typeof window !== "undefined" && localStorage.getItem("token"));
+  const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
   const isIosNativeApp = IS_IOS_NATIVE_APP;
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [syncMessage, setSyncMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [currencyOverride, setCurrencyOverride] = useState<string>(
+    () => localStorage.getItem("pricing_currency_override") || "INR"
+  );
 
   const plans: Plan[] = [
     {
@@ -108,6 +112,24 @@ export function Pricing({ onRequireLogin }: PricingProps) {
     const monthlyCost = monthlyInr * 12;
     return Math.round(((monthlyCost - yearlyInr) / monthlyCost) * 100);
   };
+
+  const displayCurrency = resolveCurrencyByCode(currencyOverride || "INR");
+  const formatDisplayAmount = (inrValue: number) =>
+    formatCurrency(convertInrToCurrency(inrValue, displayCurrency), displayCurrency, {
+      minFractionDigits: 0,
+      maxFractionDigits: 0,
+    });
+
+  const getDisplayPriceLine = (inrValue: number) => {
+    if (displayCurrency.code === "INR") {
+      return formatInr(inrValue, { minFractionDigits: 0, maxFractionDigits: 0 });
+    }
+    return formatDisplayAmount(inrValue);
+  };
+
+  useEffect(() => {
+    localStorage.setItem("pricing_currency_override", currencyOverride);
+  }, [currencyOverride]);
 
   const handleSelect = (planName: PlanName) => {
     if (planName === "free") {
@@ -191,6 +213,24 @@ export function Pricing({ onRequireLogin }: PricingProps) {
             </span>
           </button>
         </div>
+        <div className="mx-auto mt-4 max-w-xs text-left">
+          <p className="mb-2 text-sm text-[#0F172A]">Display Currency</p>
+          <Select value={currencyOverride} onValueChange={setCurrencyOverride}>
+            <SelectTrigger className="bg-white border-gray-300">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map((code) => (
+                <SelectItem key={code} value={code}>
+                  {code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="mt-4 text-sm text-[#64748B]">
+          Prices are billed in INR. Payment providers may convert this to your local currency and forex charges may apply.
+        </p>
       </motion.div>
 
       {isIosNativeApp && (
@@ -260,15 +300,16 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                   <>
                     <div className="mb-2 flex items-baseline">
                       <span className={`text-5xl font-bold ${isPopular ? "text-white" : "text-[#0F172A]"}`}>
-                        {formatInr(monthlyDisplay)}
+                        {getDisplayPriceLine(monthlyDisplay)}
                       </span>
                       <span className={`ml-2 ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>/ month</span>
                     </div>
                     {typeof plan.yearlyInr === "number" && (
                       <p className={`text-sm ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>
-                        or {formatInr(plan.yearlyInr)} / year {yearlySavings > 0 ? `(save ${yearlySavings}%)` : ""}
+                        or {getDisplayPriceLine(plan.yearlyInr)} / year {yearlySavings > 0 ? `(save ${yearlySavings}%)` : ""}
                       </p>
                     )}
+                    <p className={`mt-2 text-xs ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>All prices are exclusive of GST.</p>
                   </>
                 ) : (
                   <div className="mb-2 text-4xl font-bold text-[#0F172A]">Custom</div>
@@ -385,7 +426,12 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 <span className="font-medium">{renderTextWithShortForms("Trusted by NRIs")}</span>
               </div>
           </div>
-          <p className="text-center text-sm text-[#64748B]">All prices are in INR. Additional forex charges may apply.</p>
+          <p className="text-center text-sm text-[#64748B]">
+            Prices are shown in INR. Additional forex charges may apply.
+          </p>
+          <p className="mt-2 text-center text-sm text-[#64748B]">
+            GSTIN: {GSTIN}
+          </p>
         </div>
       </div>
     </div>

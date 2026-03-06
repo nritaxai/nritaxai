@@ -3,9 +3,11 @@ import { API_BASE_URL } from "../config/api";
 
 export const API_URL = API_BASE_URL;
 export const buildApiUrl = (path: string) => `${API_URL}${path}`;
+export const getStoredAuthToken = () =>
+  typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
 export const getAuthHeaders = () => {
-  const token = localStorage.getItem("token");
+  const token = getStoredAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
@@ -131,6 +133,10 @@ export const submitConsultationRequest = async (payload: {
   country: string;
   service: string;
   taxQuery: string;
+  preferredContact?: string;
+  whatsappNumber?: string;
+  date?: string;
+  time?: string;
 }) => {
   return postRequest("/api/consultations", payload);
 };

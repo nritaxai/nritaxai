@@ -10,8 +10,12 @@ const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 
 createRoot(document.getElementById("root")!).render(
   <Router>
-    <GoogleOAuthProvider clientId={GOOGLE_AUTH_CONFIG.clientId}>
+    {GOOGLE_AUTH_CONFIG.clientId ? (
+      <GoogleOAuthProvider clientId={GOOGLE_AUTH_CONFIG.clientId}>
+        <App />
+      </GoogleOAuthProvider>
+    ) : (
       <App />
-    </GoogleOAuthProvider>
+    )}
   </Router>
 );

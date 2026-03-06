@@ -77,10 +77,10 @@ export const formatCurrency = (
     maximumFractionDigits: options?.maxFractionDigits ?? 2,
   }).format(Number.isFinite(value) ? value : 0);
 
-export const formatInr = (value: number) =>
+export const formatInr = (value: number, options?: { minFractionDigits?: number; maxFractionDigits?: number }) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: options?.minFractionDigits ?? 2,
+    maximumFractionDigits: options?.maxFractionDigits ?? 2,
   }).format(Number.isFinite(value) ? value : 0);

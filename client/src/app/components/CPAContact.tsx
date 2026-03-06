@@ -5,14 +5,16 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { X, UserCheck, CheckCircle2 } from "lucide-react";
+import { Calendar, CheckCircle2, Mail, MessageSquare, UserCheck, X } from "lucide-react";
 import { submitConsultationRequest } from "../../utils/api";
+import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 
 interface CPAContactProps {
   onClose: () => void;
+  embedded?: boolean;
 }
 
-export function CPAContact({ onClose }: CPAContactProps) {
+export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -20,18 +22,35 @@ export function CPAContact({ onClose }: CPAContactProps) {
     name: "",
     email: "",
     phone: "",
+    whatsappNumber: "",
+    preferredContact: "email",
     country: "",
     customCountry: "",
     taxQuery: "",
-    service: ""
+    service: "",
+    preferredDate: "",
+    preferredTime: "",
   });
+
+  const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const country = formData.country === "other" ? formData.customCountry.trim() : formData.country;
+    if (!country) {
+      setError("Please select your country of residence.");
+      return;
+    }
+
+    if (formData.preferredContact === "whatsapp" && !formData.whatsappNumber.trim()) {
+      setError("Please provide your WhatsApp number for WhatsApp contact preference.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const country = formData.country === "other" ? formData.customCountry.trim() : formData.country;
       await submitConsultationRequest({
         name: formData.name.trim(),
         email: formData.email.trim(),
@@ -39,6 +58,10 @@ export function CPAContact({ onClose }: CPAContactProps) {
         country,
         service: formData.service.trim(),
         taxQuery: formData.taxQuery.trim(),
+        preferredContact: formData.preferredContact,
+        whatsappNumber: formData.whatsappNumber.trim(),
+        date: formData.preferredDate,
+        time: formData.preferredTime,
       });
       setSubmitted(true);
     } catch (err: any) {
@@ -48,28 +71,36 @@ export function CPAContact({ onClose }: CPAContactProps) {
     }
   };
 
+  const wrapperClass = embedded
+    ? "w-full"
+    : "fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto";
+
   if (submitted) {
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className={wrapperClass}>
         <Card className="w-full max-w-md">
           <CardHeader>
-            <div className="flex justify-end">
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="size-5" />
-              </Button>
-            </div>
+            {!embedded && (
+              <div className="flex justify-end">
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                  <X className="size-5" />
+                </Button>
+              </div>
+            )}
             <div className="text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
                 <CheckCircle2 className="size-8 text-blue-600" />
               </div>
               <CardTitle className="text-2xl">Request Submitted!</CardTitle>
               <CardDescription className="mt-2">
-                Our certified CPA will contact you within 24 hours to discuss your tax planning needs. We&#39;ve emailed your confirmation.
+                Our certified CPA will contact you within 24 hours. We have also emailed your confirmation.
               </CardDescription>
             </div>
           </CardHeader>
           <CardContent className="text-center">
-            <Button onClick={onClose} className="w-full">Close</Button>
+            <Button onClick={onClose} className="w-full">
+              {embedded ? "Back" : "Close"}
+            </Button>
           </CardContent>
         </Card>
       </div>
@@ -77,7 +108,7 @@ export function CPAContact({ onClose }: CPAContactProps) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
+    <div className={wrapperClass}>
       <Card className="w-full max-w-2xl my-8">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -90,13 +121,30 @@ export function CPAContact({ onClose }: CPAContactProps) {
                 <CardDescription>Expert tax planning and compliance support</CardDescription>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="size-5" />
-            </Button>
+            {!embedded && (
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="size-5" />
+              </Button>
+            )}
           </div>
         </CardHeader>
 
         <CardContent>
+          <div className="mb-5 grid gap-3 sm:grid-cols-3">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
+              <p className="font-medium text-[#0F172A] flex items-center gap-2"><Mail className="size-4" /> Email</p>
+              <p className="text-[#0F172A] mt-1 truncate">{CONTACT_EMAIL}</p>
+            </a>
+            <a href={`https://wa.me/${whatsappDigits}`} className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
+              <p className="font-medium text-[#0F172A] flex items-center gap-2"><MessageSquare className="size-4" /> WhatsApp</p>
+              <p className="text-[#0F172A] mt-1 truncate">{CONTACT_WHATSAPP}</p>
+            </a>
+            <a href={CONTACT_CALENDLY_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
+              <p className="font-medium text-[#0F172A] flex items-center gap-2"><Calendar className="size-4" /> Schedule Call</p>
+              <p className="text-[#0F172A] mt-1">Open calendar</p>
+            </a>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -137,6 +185,33 @@ export function CPAContact({ onClose }: CPAContactProps) {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="whatsappNumber">WhatsApp Number (optional)</Label>
+                <Input
+                  id="whatsappNumber"
+                  type="tel"
+                  value={formData.whatsappNumber}
+                  onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+                  placeholder="+62 812 3456 7890"
+                />
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="preferredContact">Preferred Contact Method *</Label>
+                <Select value={formData.preferredContact} onValueChange={(value) => setFormData({ ...formData, preferredContact: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select contact method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="email">Email</SelectItem>
+                    <SelectItem value="phone">Phone Call</SelectItem>
+                    <SelectItem value="whatsapp">WhatsApp</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="country">Country of Residence *</Label>
                 <Select
                   value={formData.country}
@@ -171,6 +246,27 @@ export function CPAContact({ onClose }: CPAContactProps) {
                     placeholder="Type your country"
                   />
                 )}
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="preferredDate">Preferred Date (optional)</Label>
+                <Input
+                  id="preferredDate"
+                  type="date"
+                  value={formData.preferredDate}
+                  onChange={(e) => setFormData({ ...formData, preferredDate: e.target.value })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="preferredTime">Preferred Time (optional)</Label>
+                <Input
+                  id="preferredTime"
+                  type="time"
+                  value={formData.preferredTime}
+                  onChange={(e) => setFormData({ ...formData, preferredTime: e.target.value })}
+                />
               </div>
             </div>
 
@@ -212,7 +308,7 @@ export function CPAContact({ onClose }: CPAContactProps) {
 
             <div className="flex gap-3 pt-4">
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-                Cancel
+                {embedded ? "Back" : "Cancel"}
               </Button>
               <Button type="submit" className="flex-1" disabled={submitting}>
                 {submitting ? "Submitting..." : "Submit Request"}
@@ -227,8 +323,3 @@ export function CPAContact({ onClose }: CPAContactProps) {
     </div>
   );
 }
-
-
-
-
-

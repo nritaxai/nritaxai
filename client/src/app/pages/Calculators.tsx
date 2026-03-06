@@ -20,7 +20,7 @@ interface CalculatorsProps {
 }
 
 export function Calculators(_props: CalculatorsProps) {
-  const [activeCalc, setActiveCalc] = useState<CalculatorType>(null)
+  const [activeCalc, setActiveCalc] = useState<CalculatorType>('residency')
 
   return (
     <div className="min-h-screen">
@@ -133,16 +133,6 @@ export function Calculators(_props: CalculatorsProps) {
         {activeCalc === 'income' && <IncomeTaxCalculator />}
         {activeCalc === 'dtaa' && <DTAACalculator />}
       </motion.div>
-
-      {!activeCalc && (
-        <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
-          <Calculator className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-gray-700 mb-2">Select a Calculator</h3>
-          <p className="text-gray-500">
-            Choose one of the calculators above to get started with your tax calculations
-          </p>
-        </div>
-      )}
 
       <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <div className="flex items-start gap-3">

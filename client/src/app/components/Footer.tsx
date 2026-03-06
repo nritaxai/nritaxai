@@ -6,7 +6,7 @@ import { renderTextWithShortForms } from "../utils/shortForms";
 const quickLinks = [
   { label: "AI Tax Assistant", to: "/chat" },
   { label: "Tax Calculators", to: "/calculators" },
-  { label: "DTAA Guide", to: "/home#updates" },
+  { label: "DTAA Guide", to: "/home#tax-updates" },
 ] as const;
 
 const legalLinks = [
@@ -116,9 +116,10 @@ export function Footer() {
               </div>
             </div>
           </div>
-          <p className="text-center text-xs text-slate-500">Â© 2026 NRITAX.AI. All rights reserved.</p>
+          <p className="text-center text-xs text-slate-500">© 2026 NRITAX.AI. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
 }
+

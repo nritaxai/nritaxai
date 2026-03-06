@@ -10,13 +10,12 @@ export function ShortFormLink({ shortForm, fullForm, className = "" }: ShortForm
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <button
-          type="button"
-          className={`cursor-pointer underline decoration-dotted underline-offset-2 hover:text-blue-600 ${className}`}
+        <span
+          className={`inline cursor-help underline decoration-dotted underline-offset-2 hover:text-blue-600 ${className}`}
           aria-label={`${shortForm} full form`}
         >
           {shortForm}
-        </button>
+        </span>
       </TooltipTrigger>
       <TooltipContent sideOffset={6} className="w-auto max-w-xs border border-[#E2E8F0] bg-white p-3 text-sm text-[#0F172A] shadow-md">
         <p>
