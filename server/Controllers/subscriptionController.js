@@ -51,6 +51,53 @@ const resolvePlanMeta = ({ plan }) => {
   return { planName: mappedPlan };
 };
 
+const normalizeText = (value) => String(value || "").trim();
+const normalizeUpper = (value) => normalizeText(value).toUpperCase();
+
+const normalizeCountryKey = (value) => normalizeText(value).toLowerCase();
+
+const normalizeStateKey = (value) => normalizeText(value).toLowerCase();
+
+const INDIA_COUNTRY_KEYS = new Set(["india", "in", "bharat"]);
+const KARNATAKA_STATE_KEYS = new Set(["karnataka", "ka"]);
+
+const resolveTaxClassification = ({ billingCountry, billingState }) => {
+  const countryKey = normalizeCountryKey(billingCountry);
+  const stateKey = normalizeStateKey(billingState);
+  const isIndia = INDIA_COUNTRY_KEYS.has(countryKey);
+
+  if (!isIndia) {
+    return {
+      taxType: "EXPORT_OF_SERVICE",
+      gstMode: "NONE",
+      cgstRate: 0,
+      sgstRate: 0,
+      igstRate: 0,
+      totalTaxRate: 0,
+    };
+  }
+
+  if (KARNATAKA_STATE_KEYS.has(stateKey)) {
+    return {
+      taxType: "DOMESTIC_INTRA_STATE",
+      gstMode: "CGST_SGST",
+      cgstRate: 9,
+      sgstRate: 9,
+      igstRate: 0,
+      totalTaxRate: 18,
+    };
+  }
+
+  return {
+    taxType: "DOMESTIC_INTER_STATE",
+    gstMode: "IGST",
+    cgstRate: 0,
+    sgstRate: 0,
+    igstRate: 18,
+    totalTaxRate: 18,
+  };
+};
+
 const hmacSha256 = (payload, secret) =>
   crypto.createHmac("sha256", secret).update(payload).digest("hex");
 
@@ -177,6 +224,20 @@ export const createSubscription = async (req, res) => {
 
     const discountPaise = Math.round((baseAmountInPaise * discountPercent) / 100);
     const amountInPaise = Math.max(100, baseAmountInPaise - discountPaise);
+    const billingCountry = normalizeText(req.body?.billingCountry);
+    const billingState = normalizeText(req.body?.billingState);
+    const countryCode = normalizeText(req.body?.countryCode);
+    const organization = normalizeText(req.body?.organization);
+    const gstVatNumber = normalizeUpper(req.body?.gstVatNumber);
+    const referralUserCode = normalizeUpper(req.body?.referralUserCode);
+    const tax = resolveTaxClassification({ billingCountry, billingState });
+
+    if (countryCode && !/^\+\d{1,4}$/.test(countryCode)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid country code format. Use +NN format.",
+      });
+    }
 
     const user = await User.findById(req.user._id);
     if (!user) {
@@ -193,8 +254,20 @@ export const createSubscription = async (req, res) => {
         userEmail: user.email,
         plan: meta.planName,
         billing,
+        billingCountry: billingCountry || "UNKNOWN",
+        billingState: billingState || "NA",
+        countryCode: countryCode || "NA",
+        organization: organization || "NA",
+        gstVatNumber: gstVatNumber || "NA",
+        referralUserCode: referralUserCode || "NA",
         promoCode: promoCode || "NONE",
         discountPercent: String(discountPercent),
+        taxType: tax.taxType,
+        gstMode: tax.gstMode,
+        cgstRate: String(tax.cgstRate),
+        sgstRate: String(tax.sgstRate),
+        igstRate: String(tax.igstRate),
+        totalTaxRate: String(tax.totalTaxRate),
       },
     });
 
@@ -211,6 +284,7 @@ export const createSubscription = async (req, res) => {
       discountPercent,
       baseAmount: baseAmountInPaise,
       discountAmount: discountPaise,
+      tax,
     });
   } catch (error) {
     const razorpayMessage = getRazorpayErrorMessage(error);

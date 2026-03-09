@@ -26,6 +26,7 @@ type PromoCode = {
 type UserPayload = {
   name?: string;
   email?: string;
+  countryOfResidence?: string;
 };
 
 const PROMO_CODES: PromoCode[] = [
@@ -49,6 +50,45 @@ const PLAN_META: Record<
 
 const normalizePlan = (value: string | null): PlanType => {
   return "pro";
+};
+
+const normalizeGeoKey = (value: string) => value.trim().toLowerCase();
+const isIndiaCountry = (value: string) => ["india", "in", "bharat"].includes(normalizeGeoKey(value));
+const isValidCountryCode = (value: string) => /^\+\d{1,4}$/.test(value.trim());
+const stripLeadingCountryCode = (phoneValue: string, countryCodeValue: string) => {
+  const raw = String(phoneValue || "").trimStart();
+  const code = String(countryCodeValue || "").trim();
+  if (!raw || !code) return phoneValue;
+  if (raw.startsWith(code)) {
+    return raw.slice(code.length).trimStart();
+  }
+  return phoneValue;
+};
+const COUNTRY_CODE_OPTIONS = [
+  { code: "+91", label: "India (+91)" },
+  { code: "+1", label: "United States/Canada (+1)" },
+  { code: "+65", label: "Singapore (+65)" },
+  { code: "+62", label: "Indonesia (+62)" },
+  { code: "+44", label: "United Kingdom (+44)" },
+  { code: "+971", label: "UAE (+971)" },
+];
+
+const resolveCountryCodeByCountry = (country: string) => {
+  const key = normalizeGeoKey(country);
+  if (["india", "in", "bharat"].includes(key)) return "+91";
+  if (["united states", "usa", "us", "america", "canada", "ca"].includes(key)) return "+1";
+  if (["singapore", "sg"].includes(key)) return "+65";
+  if (["indonesia", "id"].includes(key)) return "+62";
+  if (["united kingdom", "uk", "great britain"].includes(key)) return "+44";
+  if (["uae", "united arab emirates", "dubai", "abu dhabi"].includes(key)) return "+971";
+  return "";
+};
+
+const buildReferralCode = (user: Record<string, unknown>) => {
+  const raw = String(user?._id || user?.id || user?.email || "").toUpperCase();
+  const cleaned = raw.replace(/[^A-Z0-9]/g, "");
+  const base = cleaned.slice(-8).padStart(8, "0");
+  return `NRI${base}`;
 };
 
 const loadRazorpayScript = async () => {
@@ -80,7 +120,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [fullName, setFullName] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
   const [company, setCompany] = useState<string>("");
+  const [countryCode, setCountryCode] = useState<string>("auto");
   const [gstNumber, setGstNumber] = useState<string>("");
+  const [referralUserCode, setReferralUserCode] = useState<string>("");
+  const [billingCountry, setBillingCountry] = useState<string>("");
+  const [billingState, setBillingState] = useState<string>("");
   const [isAuthenticated, setIsAuthenticated] = useState(
     Boolean(localStorage.getItem("token"))
   );
@@ -112,12 +156,21 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const countryCurrency = resolveCurrencyByCountry(userCountry);
   const displayCurrency =
     currencyOverride === "auto" ? countryCurrency : resolveCurrencyByCode(currencyOverride);
+  const isIndiaBilling = isIndiaCountry(billingCountry);
+  const autoCountryCode = resolveCountryCodeByCountry(billingCountry || userCountry);
+  const selectedCountryCode = countryCode === "auto" ? autoCountryCode : countryCode;
   const formatDisplayAmount = (inrValue: number) =>
     formatCurrency(convertInrToCurrency(inrValue, displayCurrency), displayCurrency);
 
   React.useEffect(() => {
     localStorage.setItem("pricing_currency_override", currencyOverride);
   }, [currencyOverride]);
+
+  React.useEffect(() => {
+    if (!isIndiaBilling && currencyOverride === "INR") {
+      setCurrencyOverride("auto");
+    }
+  }, [isIndiaBilling, currencyOverride]);
 
   React.useEffect(() => {
     const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("token")));
@@ -147,11 +200,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
       const storedUser = JSON.parse(storedUserRaw) as UserPayload;
       setFullName((prev) => prev || storedUser.name || "");
       setEmail((prev) => prev || storedUser.email || "");
+      const countryFromStorage = String(storedUser.countryOfResidence || "").trim();
+      if (countryFromStorage) {
+        setBillingCountry((prev) => prev || countryFromStorage);
+      }
+      setReferralUserCode((prev) => prev || buildReferralCode(storedUser as unknown as Record<string, unknown>));
       setHasPrefilledUser(true);
     } catch {
       // Ignore malformed localStorage payload.
     }
-  }, [isAuthenticated, hasPrefilledUser]);
+  }, [isAuthenticated, hasPrefilledUser, countryCode]);
 
   React.useEffect(() => {
     if (appliedPromo?.code === "SANDBOXY25" && billing !== "yearly") {
@@ -206,6 +264,36 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
       return;
     }
 
+    if (!billingCountry.trim()) {
+      setCheckoutError("Please enter billing country.");
+      return;
+    }
+
+    if (!selectedCountryCode.trim()) {
+      setCheckoutError("Please select country code.");
+      return;
+    }
+
+    if (!isValidCountryCode(selectedCountryCode)) {
+      setCheckoutError("Invalid country code selected.");
+      return;
+    }
+
+    if (isIndiaBilling && !billingState.trim()) {
+      setCheckoutError("Please enter billing state for India billing.");
+      return;
+    }
+
+    if (selectedCountryCode.trim() === "+91" && gstNumber.trim() && !/^\d/.test(gstNumber.trim())) {
+      setCheckoutError("For India (+91), GST number should start with digits.");
+      return;
+    }
+
+    if (!isIndiaBilling && displayCurrency.code === "INR") {
+      setCheckoutError("For non-India billing country, currency cannot be INR.");
+      return;
+    }
+
     if (promo.trim() && !appliedPromo) {
       setCheckoutError("Please apply a valid promo code before continuing.");
       return;
@@ -229,7 +317,17 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
       const { data } = await axios.post(
         buildApiUrl("/api/subscription/create-subscription"),
-        { plan, billing, promoCode: appliedPromo?.code || null },
+        {
+          plan,
+          billing,
+          promoCode: appliedPromo?.code || null,
+          billingCountry: billingCountry.trim(),
+          billingState: billingState.trim(),
+          countryCode: selectedCountryCode.trim(),
+          organization: company.trim(),
+          gstVatNumber: gstNumber.trim(),
+          referralUserCode: referralUserCode.trim(),
+        },
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -509,14 +607,16 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                   <input
                     type="tel"
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (555) 123-4567"
+                    onChange={(e) =>
+                      setPhone(stripLeadingCountryCode(e.target.value, selectedCountryCode))
+                    }
+                    placeholder="Enter phone number"
                     className="w-full h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Company (optional)</label>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Organization (optional)</label>
                   <input
                     type="text"
                     value={company}
@@ -527,9 +627,56 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 </div>
               </div>
 
-              {displayCurrency.code === "INR" && (
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">GST Number (optional)</label>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Country Code *</label>
+                  <Select value={countryCode} onValueChange={setCountryCode}>
+                    <SelectTrigger className="bg-[#F7FAFC] border-[#E2E8F0] h-11">
+                      <SelectValue placeholder="Select country code" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">
+                        {autoCountryCode ? `Auto (${autoCountryCode})` : "Auto (based on Billing Country)"}
+                      </SelectItem>
+                      {COUNTRY_CODE_OPTIONS.map((item) => (
+                        <SelectItem key={item.code} value={item.code}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">
+                    Billing State {isIndiaBilling ? "*" : "(optional)"}
+                  </label>
+                  <input
+                    type="text"
+                    value={billingState}
+                    onChange={(e) => setBillingState(e.target.value)}
+                    placeholder={isIndiaBilling ? "Karnataka" : "State/Province"}
+                    className="w-full h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Billing Country *</label>
+                  <input
+                    type="text"
+                    value={billingCountry}
+                    onChange={(e) => setBillingCountry(e.target.value)}
+                    placeholder="India"
+                    className="w-full h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
+                  />
+                </div>
+                <div />
+              </div>
+
+              {isIndiaBilling && (
+                <div>
+                  <label className="block text-sm font-medium text-[#0F172A] mb-1.5">GST or VAT Number (optional)</label>
                   <input
                     type="text"
                     value={gstNumber}
@@ -538,9 +685,23 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                     maxLength={15}
                     className="w-full h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
                   />
-                  <p className="mt-1 text-xs text-[#0F172A]">Shown only for INR billing format.</p>
+                  <p className="mt-1 text-xs text-[#0F172A]">Shown for India billing.</p>
                 </div>
               )}
+
+              <div>
+                <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Referral User Code</label>
+                <input
+                  type="text"
+                  value={referralUserCode}
+                  onChange={(e) => setReferralUserCode(e.target.value.toUpperCase())}
+                  placeholder="Auto-generated referral code"
+                  className="w-full h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
+                />
+                <p className="mt-1 text-xs text-[#0F172A]">
+                  This code is unique per user and tied to active subscription context.
+                </p>
+              </div>
 
               <div className="rounded-xl border border-[#E2E8F0] bg-[#F7FAFC] p-4">
                 <label className="block text-sm font-medium text-[#0F172A] mb-2">Promo Code</label>
