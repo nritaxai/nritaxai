@@ -110,8 +110,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isIosNativeApp = IS_IOS_NATIVE_APP;
-  const isSandboxPromoMode =
-    import.meta.env.DEV || import.meta.env.VITE_PROMO_MODE === "sandbox";
 
   const [plan, setPlan] = useState<PlanType>(normalizePlan(searchParams.get("plan")));
   const [billing, setBilling] = useState<BillingType>("monthly");
@@ -220,13 +218,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   }, [billing, appliedPromo]);
 
   const handleApplyPromo = () => {
-    if (!isSandboxPromoMode) {
-      setPromoError("Promo codes are disabled in live mode. Sandbox only.");
-      setPromoMessage("");
-      setAppliedPromo(null);
-      return;
-    }
-
     const normalized = promo.trim().toUpperCase();
     if (!normalized) {
       setPromoError("Please enter a promo code.");
@@ -722,13 +713,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 {promoError && <p className="text-sm text-red-600 mt-2">{promoError}</p>}
 
                 <div className="mt-3 text-xs text-[#0F172A] space-y-1">
-                  <p className="font-medium text-[#0F172A]">Sandbox promo codes (test only)</p>
+                  <p className="font-medium text-[#0F172A]">Available promo codes</p>
                   <p>SANDBOX10, SANDBOX20, SANDBOXY25, SANDBOX15</p>
-                  {!isSandboxPromoMode && (
-                    <p className="text-[#2563eb]">
-                      Disabled in live mode. Set `VITE_PROMO_MODE=sandbox` to enable.
-                    </p>
-                  )}
                 </div>
               </div>
 
