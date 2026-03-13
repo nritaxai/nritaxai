@@ -100,7 +100,7 @@ export const TaxReportPDF = ({ userName, reportData }: Props) => (
       <View style={styles.header}>
         <Image
           style={styles.logo}
-          src="/logo.png"  // Replace with hosted URL if needed
+          src="/logo-transparent.png"
         />
         <Text>NRITAX AI Report</Text>
       </View>
