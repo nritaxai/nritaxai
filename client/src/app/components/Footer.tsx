@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { AlertTriangle, BadgeCheck, Lock, Mail, Shield } from "lucide-react";
+import { AlertTriangle, Lock, Mail, Shield } from "lucide-react";
 
 import { renderTextWithShortForms } from "../utils/shortForms";
 
@@ -108,10 +108,6 @@ export function Footer() {
               <div className="flex items-center gap-1.5">
                 <Shield className="size-4" />
                 <span>{renderTextWithShortForms("SSL Secured")}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <BadgeCheck className="size-4" />
-                <span>{renderTextWithShortForms("ICAI Affiliated")}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <Lock className="size-4" />
