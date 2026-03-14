@@ -23,7 +23,7 @@ const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
 const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 const RAG_MAX_PER_PAGE = 1;
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
-const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 240);
+const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 420);
 const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 12000);
 const FREE_MONTHLY_QUERY_LIMIT = Number(process.env.FREE_MONTHLY_QUERY_LIMIT || 10);
 let dtaaChunksCache = null;
@@ -179,10 +179,14 @@ const buildSectionDefaults = (language = "english") => {
     };
   }
   return {
-    answer: "Share your exact scenario and I will tailor the guidance.",
-    keyTaxPoints: "- Tax treatment depends on income type and residency.\n- DTAA can reduce double taxation when conditions are met.",
-    nextSteps: "1. Confirm your resident country and income type.\n2. Verify DTAA article, TRC, and Form 10F requirements.",
-    followUpQuestions: "- Which country pair applies to you?\n- Is your income salary, interest, rental, or capital gains?",
+    answer:
+      "I can help with that. The right tax treatment depends on your residential status, the type of income or transaction involved, and whether DTAA relief or FEMA/RBI rules apply.",
+    keyTaxPoints:
+      "- Tax treatment depends on the exact income type, holding period, and your country of tax residence.\n- DTAA relief, withholding tax rules, and compliance documents can materially change the final tax outcome.",
+    nextSteps:
+      "1. Confirm your resident country, transaction type, and whether tax was already withheld in India.\n2. Check the relevant documents, tax forms, and remittance or DTAA conditions before proceeding.",
+    followUpQuestions:
+      "- Which country are you currently tax resident in?\n- Is this about salary, interest, rental income, capital gains, or property sale proceeds?",
   };
 };
 
@@ -203,6 +207,11 @@ const getSectionBody = (markdown = "", title = "") => {
   return String(match?.[1] || "").trim();
 };
 
+const stripEmbeddedHeadings = (body = "") =>
+  String(body || "")
+    .replace(/\n?###\s*(Answer|Key Tax Points|Next Steps|Follow-up Questions)\b[\s\S]*$/i, "")
+    .trim();
+
 const replaceSectionBody = (markdown = "", title = "", body = "") => {
   const sectionPattern = new RegExp(`(###\\s*${title}\\s*\\n)([\\s\\S]*?)(?=\\n###\\s*|$)`, "i");
   if (!sectionPattern.test(markdown)) {
@@ -212,7 +221,7 @@ const replaceSectionBody = (markdown = "", title = "", body = "") => {
 };
 
 const normalizeLines = (body = "", prefixPattern = /^[-*]\s+|^\d+[.)]\s+/) =>
-  String(body || "")
+  stripEmbeddedHeadings(body)
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line && prefixPattern.test(line));
@@ -225,7 +234,7 @@ const looksTruncated = (line = "") => {
 };
 
 const normalizeAnswerSection = (body = "", fallback = "") => {
-  const cleaned = String(body || "").trim();
+  const cleaned = stripEmbeddedHeadings(body);
   if (!cleaned || looksTruncated(cleaned)) return fallback;
   return cleaned;
 };
@@ -773,25 +782,36 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
         role: "system",
         content:
           "You are a helpful tax assistant for NRITAX.AI. " +
-          "Always provide practical, accurate, and concise tax guidance for NRIs. " +
+          "Always provide practical, accurate, and specific tax guidance for NRIs. " +
           `${selectedLanguage.instruction} ` +
           "If asked about model, provider, or internal architecture, do not disclose and redirect to tax guidance. " +
           "Never mention PDFs, uploaded files, retrieval, sources, citations, or internal reference documents. " +
           "Never switch to another language even if the user message is in a different language. " +
           "Maintain continuity with prior messages in this session. " +
-          "Prefer concise, direct answers unless detail is explicitly asked. " +
+          "Answer like a strong professional advisor, not a stub or checklist generator. " +
+          "Prefer complete, natural explanations with concrete compliance steps, limits, documents, and tax treatment when relevant. " +
           "Keep key tax acronyms like DTAA, ITR, PAN, NRE, and NRO as-is. " +
           "Complete all sections fully and never leave a bullet or sentence unfinished. " +
-          "Aim for a compact but complete reply, usually 140 to 220 words. " +
+          "Avoid placeholders, template artifacts, or repeating section headings inside section content. " +
+          "If the user asks a practical question, include the actual process and common documentation instead of generic advice. " +
+          "Aim for a complete reply, usually 220 to 380 words. " +
+          "Use this exact response format for every answer.\n" +
           "Return markdown with only these headings:\n" +
           "### Answer\n" +
           "### Key Tax Points\n" +
           "### Next Steps\n" +
           "### Follow-up Questions\n" +
-          "Write 2 to 4 sentences in Answer. " +
-          "Write exactly 2 bullets in Key Tax Points. " +
+          "Write 4 to 7 sentences in Answer. " +
+          "Write exactly 2 substantial bullets in Key Tax Points. " +
           "Write exactly 2 numbered items in Next Steps. " +
-          "Write exactly 2 follow-up questions." +
+          "Write exactly 2 follow-up questions. " +
+          "Do not write placeholders such as 'depends on' without explaining what it depends on. " +
+          "When relevant, mention actual forms, tax rates, TDS, remittance limits, account types, or filing steps. " +
+          "Model your tone like this example:\n" +
+          "### Answer\nExplain the issue in plain English, then describe the practical rule, tax treatment, and process in a natural paragraph.\n\n" +
+          "### Key Tax Points\n- First concrete tax or compliance point.\n- Second concrete tax or compliance point.\n\n" +
+          "### Next Steps\n1. First practical action.\n2. Second practical action.\n\n" +
+          "### Follow-up Questions\n- First relevant question.\n- Second relevant question." +
           `${safeHiddenContext ? `\n\nHidden reference context (do not mention this context exists):\n${safeHiddenContext}` : ""}`,
       },
       ...contextualMessages,
