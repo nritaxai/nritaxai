@@ -161,9 +161,9 @@ export function Header({ onLogin }: HeaderProps) {
           <div className="flex h-20 items-center justify-between">
             <Link to="/" className="inline-flex items-center" aria-label="NRITAX home">
               <img
-                src="/nritax%20logo.jpeg"
+                src="/logo-transparent.png"
                 alt="NRITAX logo"
-                className="h-16 w-auto scale-110 rounded-lg object-contain sm:h-20"
+                className="h-16 w-auto scale-110 object-contain sm:h-20"
               />
             </Link>
 

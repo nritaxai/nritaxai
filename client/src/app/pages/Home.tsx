@@ -62,16 +62,9 @@ export function Home() {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
             <span className="reveal-drop rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{renderTextWithShortForms(heroContent.badge)}</span>
-            <div className="reveal-drop reveal-delay-1 mt-6 flex justify-center">
-              <img
-                src="/nritax%20logo.jpeg"
-                alt="NRITAX logo"
-                className="h-32 w-auto scale-110 rounded-3xl border border-blue-100 bg-white p-2 shadow-sm md:h-40"
-              />
-            </div>
-            <h1 className="reveal-drop reveal-delay-2 mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
-            <p className="reveal-drop reveal-delay-3 mb-6 text-2xl font-semibold text-blue-700">{renderTextWithShortForms(heroContent.subheadline)}</p>
-            <p className="reveal-drop reveal-delay-4 mx-auto mb-8 max-w-2xl text-lg text-gray-600">{renderTextWithShortForms(heroContent.description)}</p>
+            <h1 className="reveal-drop reveal-delay-1 mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
+            <p className="reveal-drop reveal-delay-2 mb-6 text-2xl font-semibold text-blue-700">{renderTextWithShortForms(heroContent.subheadline)}</p>
+            <p className="reveal-drop reveal-delay-3 mx-auto mb-8 max-w-2xl text-lg text-gray-600">{renderTextWithShortForms(heroContent.description)}</p>
             <div className="reveal-drop reveal-delay-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <Link
                 to="/chat"

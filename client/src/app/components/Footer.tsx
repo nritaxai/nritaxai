@@ -24,9 +24,9 @@ export function Footer() {
           <div>
             <div className="mb-4 flex items-center">
               <img
-                src="/nritax%20logo.jpeg"
+                src="/logo-transparent.png"
                 alt="NRITAX logo"
-                className="h-16 w-auto scale-110 rounded-lg object-contain"
+                className="h-16 w-auto scale-110 object-contain"
               />
             </div>
             <p className="mb-3 text-sm font-medium text-slate-300">
