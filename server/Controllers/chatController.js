@@ -23,7 +23,7 @@ const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
 const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 const RAG_MAX_PER_PAGE = 1;
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
-const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 420);
+const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 900);
 const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 12000);
 const FREE_MONTHLY_QUERY_LIMIT = Number(process.env.FREE_MONTHLY_QUERY_LIMIT || 10);
 let dtaaChunksCache = null;
@@ -287,7 +287,12 @@ const repairStructuredSections = (markdown = "", language = "english") => {
 const ensureStructuredSections = (text = "", language = "english") => {
   const defaults = buildSectionDefaults(language);
   let out = String(text || "").trim();
-  if (!out) out = `### Answer\n${defaults.answer}`;
+  const hasKnownHeadings = /###\s*(Answer|Key Tax Points|Next Steps|Follow-up Questions)\b/i.test(out);
+  if (!out) {
+    out = `### Answer\n${defaults.answer}`;
+  } else if (!hasKnownHeadings) {
+    out = `### Answer\n${out}`;
+  }
   out = upsertSection(out, "Answer", defaults.answer);
   out = upsertSection(out, "Key Tax Points", defaults.keyTaxPoints);
   out = upsertSection(out, "Next Steps", defaults.nextSteps);
@@ -963,13 +968,6 @@ export const chatWithAI = async (req, res) => {
 
     if (usageWindowUpdated) {
       await userDoc.save();
-    }
-
-    if (isFreePlan && Number(userDoc?.usage?.queriesUsed || 0) >= FREE_MONTHLY_QUERY_LIMIT) {
-      return res.status(429).json({
-        error: "Free usage limit reached for this month. Upgrade to PRO for unlimited access.",
-        usage: buildUsagePayload(userDoc),
-      });
     }
 
     const cacheKey = getResponseCacheKey({

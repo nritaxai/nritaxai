@@ -35,9 +35,6 @@ const getWelcomeMessage = (language: string, userName: string) => {
   return templates[language] || templates.english;
 };
 
-const hasProSections = (text: string) =>
-  /###\s*Pro Answer/i.test(text) && /###\s*Tax Position/i.test(text);
-
 const stripBoldMarkers = (text: string) =>
   String(text || "")
     .replace(/\*\*/g, "")
@@ -54,38 +51,6 @@ const stripBoldMarkers = (text: string) =>
 const ensureVisibleReply = (text: string) => {
   const cleaned = stripBoldMarkers(text);
   return cleaned || "No reply was returned. Please try again.";
-};
-
-const toProDisplayFormat = (text: string) => {
-  const raw = stripBoldMarkers(text).trim();
-  if (!raw) return raw;
-  if (hasProSections(raw)) return raw;
-
-  return [
-    "### Pro Answer",
-    raw,
-    "",
-    "### Tax Position",
-    "- Guidance is based on your current question and session context.",
-    "- Treaty-specific points should be validated for your resident country.",
-    "",
-    "### Why This Matters",
-    "- Correct NRI tax treatment avoids overpayment and notices.",
-    "- Proper documentation helps claim DTAA benefits smoothly.",
-    "",
-    "### Action Checklist",
-    "1. Confirm your residential status for the relevant financial year.",
-    "2. Classify income source (salary, interest, rental, capital gains).",
-    "3. Check DTAA article mapping and required proofs (TRC, Form 10F, PAN).",
-    "",
-    "### Caution / When to Consult a CA",
-    "- Consult a CA if multi-country income, large capital gains, or treaty conflicts are involved.",
-    "",
-    "### Starter Questions You Can Ask Next",
-    "- Which ITR form should I file as an NRI?",
-    "- How is NRE vs NRO interest taxed?",
-    "- Which DTAA article applies to my income type?",
-  ].join("\n");
 };
 
 interface AIChatProps {
@@ -563,7 +528,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
                       ol: ({ children }) => <ol className="list-decimal pl-5 mb-2">{children}</ol>,
                     }}
                   >
-                    {toProDisplayFormat(message.content)}
+                    {ensureVisibleReply(message.content)}
                   </ReactMarkdown>
                 ) : (
                   message.content
