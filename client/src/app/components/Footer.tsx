@@ -26,7 +26,7 @@ export function Footer() {
               <img
                 src="/logo-transparent.png"
                 alt="NRITAX logo"
-                className="h-16 w-auto scale-110 object-contain"
+                className="h-20 w-auto scale-110 object-contain sm:h-24"
               />
             </div>
             <p className="mb-3 text-sm font-medium text-slate-300">

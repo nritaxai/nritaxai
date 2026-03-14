@@ -1,11 +1,15 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { format, isValid, parseISO, startOfToday } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import { cn } from "./ui/utils";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Calendar, CheckCircle2, Mail, MessageSquare, UserCheck, X } from "lucide-react";
+import { Calendar as CalendarIcon, CheckCircle2, ChevronDown, Clock3, Mail, MessageSquare, UserCheck, X } from "lucide-react";
+import { Calendar } from "./ui/calendar";
+import { ScrollArea } from "./ui/scroll-area";
 import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
@@ -29,6 +33,28 @@ const INITIAL_FORM_DATA = {
 };
 
 const WEBHOOK_URL = "https://n8n.caloganathan.com/webhook/consultation-booking";
+const AVAILABLE_TIME_SLOTS = [
+  "09:00",
+  "09:30",
+  "10:00",
+  "10:30",
+  "11:00",
+  "11:30",
+  "12:00",
+  "12:30",
+  "13:00",
+  "13:30",
+  "14:00",
+  "14:30",
+  "15:00",
+  "15:30",
+  "16:00",
+  "16:30",
+  "17:00",
+  "17:30",
+  "18:00",
+] as const;
+const isSunday = (date: Date) => date.getDay() === 0;
 
 export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const [submitted, setSubmitted] = useState(false);
@@ -36,6 +62,17 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
+  const [datePickerMessage, setDatePickerMessage] = useState("");
+
+  const today = useMemo(() => startOfToday(), []);
+  const selectedDate = useMemo(() => {
+    if (!formData.preferredDate) return undefined;
+    const parsed = parseISO(formData.preferredDate);
+    return isValid(parsed) ? parsed : undefined;
+  }, [formData.preferredDate]);
+  const formattedPreferredDate = selectedDate ? format(selectedDate, "PP") : "";
 
   const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
@@ -68,6 +105,32 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
       setErrorMessage("Please provide your WhatsApp number for WhatsApp contact preference.");
       setLoading(false);
       return;
+    }
+
+    if (formData.preferredDate) {
+      if (!selectedDate) {
+        setErrorMessage("Please select a valid booking date.");
+        setLoading(false);
+        return;
+      }
+
+      if (selectedDate < today) {
+        setErrorMessage("Please choose a date from today onwards.");
+        setLoading(false);
+        return;
+      }
+
+      if (selectedDate.getDay() === 0) {
+        setErrorMessage("Bookings are not available on Sundays. Please choose another day.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    if (formData.preferredTime && !AVAILABLE_TIME_SLOTS.includes(formData.preferredTime as typeof AVAILABLE_TIME_SLOTS[number])) {
+        setErrorMessage("Please choose a time between 09:00 and 18:00.");
+        setLoading(false);
+        return;
     }
 
     const payload = {
@@ -198,7 +261,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               <p className="text-[#0F172A] mt-1 truncate">{CONTACT_WHATSAPP}</p>
             </a>
             <a href={CONTACT_CALENDLY_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
-              <p className="font-medium text-[#0F172A] flex items-center gap-2"><Calendar className="size-4" /> Schedule Call</p>
+              <p className="font-medium text-[#0F172A] flex items-center gap-2"><CalendarIcon className="size-4" /> Schedule Call</p>
               <p className="text-[#0F172A] mt-1">Open calendar</p>
             </a>
           </div>
@@ -308,24 +371,113 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="space-y-2">
+              <div className="relative space-y-2">
                 <Label htmlFor="preferredDate">Preferred Date (optional)</Label>
-                <Input
+                <Button
                   id="preferredDate"
-                  type="date"
-                  value={formData.preferredDate}
-                  onChange={(e) => setFormData({ ...formData, preferredDate: e.target.value })}
-                />
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsDatePickerOpen((prev) => !prev);
+                    setIsTimePickerOpen(false);
+                  }}
+                  className={cn(
+                    "h-11 w-full justify-between px-3 text-left font-normal",
+                    !formattedPreferredDate && "text-slate-500",
+                  )}
+                >
+                  <span>{formattedPreferredDate || "Select a date"}</span>
+                  <CalendarIcon className="size-4 text-slate-500" />
+                </Button>
+                {isDatePickerOpen && (
+                  <div className="absolute left-0 top-full z-30 mt-2 rounded-md border bg-white p-2 shadow-lg">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (!date) return;
+                      if (isSunday(date)) {
+                        setDatePickerMessage("Sundays are unavailable; pick another day and then select a time between 09:00 and 18:00.");
+                        return;
+                      }
+
+                      setFormData((prev) => ({
+                        ...prev,
+                        preferredDate: format(date, "yyyy-MM-dd"),
+                        preferredTime: prev.preferredDate === format(date, "yyyy-MM-dd") ? prev.preferredTime : "",
+                      }));
+                      setDatePickerMessage("");
+                      setErrorMessage("");
+                      setIsDatePickerOpen(false);
+                      setIsTimePickerOpen(false);
+                    }}
+                    onDayClick={(date, modifiers) => {
+                      if (isSunday(date)) {
+                        setDatePickerMessage("Sundays are unavailable; pick another day and then select a time between 09:00 and 18:00.");
+                        return;
+                      }
+
+                      if (!modifiers.disabled) {
+                        setDatePickerMessage("");
+                      }
+                    }}
+                    disabled={[{ before: today }]}
+                    modifiers={{ blockedSunday: isSunday }}
+                    modifiersClassNames={{ blockedSunday: "text-muted-foreground opacity-50" }}
+                    captionLayout="dropdown"
+                  />
+                  </div>
+                )}
+                {datePickerMessage && <p className="text-xs text-slate-500">{datePickerMessage}</p>}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="preferredTime">Preferred Time (optional)</Label>
-                <Input
-                  id="preferredTime"
-                  type="time"
-                  value={formData.preferredTime}
-                  onChange={(e) => setFormData({ ...formData, preferredTime: e.target.value })}
-                />
-              </div>
+            <div className="relative space-y-2">
+              <Label htmlFor="preferredTime">Preferred Time (optional)</Label>
+              <Button
+                id="preferredTime"
+                type="button"
+                variant="outline"
+                disabled={!formData.preferredDate}
+                onClick={() => {
+                  if (!formData.preferredDate) return;
+                  setIsTimePickerOpen((prev) => !prev);
+                  setIsDatePickerOpen(false);
+                }}
+                className={cn(
+                  "h-11 w-full justify-between px-3 text-left font-normal",
+                  !formData.preferredTime && "text-slate-500",
+                )}
+              >
+                <span>{formData.preferredTime || "Select a time slot"}</span>
+                <div className="flex items-center gap-2">
+                  <Clock3 className="size-4 text-slate-500" />
+                  <ChevronDown className="size-4 text-slate-500" />
+                </div>
+              </Button>
+              {isTimePickerOpen && formData.preferredDate && (
+                <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-md border bg-white shadow-lg">
+                  <ScrollArea className="h-64 w-full">
+                    <div className="grid gap-1 p-2">
+                      {AVAILABLE_TIME_SLOTS.map((slot) => (
+                        <Button
+                          key={slot}
+                          type="button"
+                          variant={formData.preferredTime === slot ? "default" : "ghost"}
+                          className="justify-start rounded-sm"
+                          onClick={() => {
+                            setFormData({ ...formData, preferredTime: slot });
+                            setErrorMessage("");
+                            setIsTimePickerOpen(false);
+                          }}
+                        >
+                          {slot}
+                        </Button>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </div>
+              )}
+              <p className="text-xs text-slate-500">Time slots are available only from 09:00 to 18:00.</p>
+            </div>
             </div>
 
             <div className="space-y-2">

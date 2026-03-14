@@ -163,7 +163,7 @@ export function Header({ onLogin }: HeaderProps) {
               <img
                 src="/logo-transparent.png"
                 alt="NRITAX logo"
-                className="h-16 w-auto scale-110 object-contain sm:h-20"
+                className="h-20 w-auto scale-110 object-contain sm:h-24"
               />
             </Link>
 
