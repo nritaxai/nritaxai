@@ -1,10 +1,9 @@
 import dotenv from "dotenv";
 import fetch from "node-fetch";
-import { AI_API_KEY, AI_BASE_URL, AI_PROVIDER_NAME, CHAT_MODEL } from "./aiClient.js";
 
 dotenv.config();
 
-// Primary AI: provider-backed chat with NRI tax constraint
+// Primary AI: OpenRouter with NRI tax constraint
 export const generateChatResponse = async (userMessages) => {
   // System prompt to constrain AI to NRI tax
   const systemMessage = {
@@ -16,17 +15,19 @@ export const generateChatResponse = async (userMessages) => {
   const messages = [systemMessage, ...userMessages];
 
   try {
-    // Call the provider's OpenAI-compatible chat API with streaming enabled
+    // Call OpenRouter API with streaming enabled
     const response = await fetch(
-      `${AI_BASE_URL}/chat/completions`,
+      "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${AI_API_KEY}`,
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
           "Content-Type": "application/json",
+          "HTTP-Referer": "https://nritax.ai",
+          "X-Title": "NRITAX AI",
         },
         body: JSON.stringify({
-          model: CHAT_MODEL,
+          model: "openai/gpt-4o-mini",
           messages: messages,
           temperature: 0,
           stream: true,
@@ -36,7 +37,7 @@ export const generateChatResponse = async (userMessages) => {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(errorText || `${AI_PROVIDER_NAME} API error`);
+      throw new Error(errorText || "OpenRouter API error");
     }
 
     let answer = "";
@@ -81,7 +82,7 @@ export const generateChatResponse = async (userMessages) => {
 
     return answer;
   } catch (error) {
-    console.error(`${AI_PROVIDER_NAME} Error:`, error.message);
+    console.error("OpenRouter Error:", error.message);
     return await fallbackResponse(userMessages);
   }
 };

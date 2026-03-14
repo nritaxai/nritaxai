@@ -3,16 +3,14 @@ dotenv.config();
 
 import fs from "fs";
 import path from "path";
+import OpenAI from "openai";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
-import {
-  aiClient,
-  AI_PROVIDER_NAME,
-  AI_REQUEST_TIMEOUT_MS,
-  CHAT_MODEL,
-  RAG_EMBEDDING_MODEL,
-  extractAiText,
-} from "../Config/aiClient.js";
+
+const client = new OpenAI({
+  apiKey: process.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 
 const MAX_CONTEXT_MESSAGES = Number(process.env.CHAT_CONTEXT_MESSAGES || 2);
 const MAX_STORED_MESSAGES = 100;
@@ -22,9 +20,11 @@ const RAG_TOP_K = Number(process.env.RAG_TOP_K || 2);
 const RAG_LEXICAL_CANDIDATES = Number(process.env.RAG_LEXICAL_CANDIDATES || 8);
 const RAG_LEXICAL_MIN_SCORE = 1.05;
 const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
+const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 const RAG_MAX_PER_PAGE = 1;
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
 const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 240);
+const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 12000);
 const FREE_MONTHLY_QUERY_LIMIT = Number(process.env.FREE_MONTHLY_QUERY_LIMIT || 10);
 let dtaaChunksCache = null;
 let dtaaTokenIndexCache = null;
@@ -36,7 +36,11 @@ const RESPONSE_CACHE_MAX_ITEMS = Number(process.env.RESPONSE_CACHE_MAX_ITEMS || 
 const CHAT_DISABLE_PDF_DIR_FALLBACK = String(process.env.CHAT_DISABLE_PDF_DIR_FALLBACK || "true").toLowerCase() === "true";
 const responseCache = new Map();
 
-const DEFAULT_CHAT_MODEL = CHAT_MODEL;
+const modelMap = {
+  "gpt-4o-mini": "openai/gpt-4o-mini",
+  "gpt-4o": "openai/gpt-4o",
+};
+const DEFAULT_CHAT_MODEL = modelMap["gpt-4o-mini"];
 
 const STORAGE_DIR = path.resolve("storage");
 const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
@@ -443,7 +447,7 @@ const rerankWithEmbeddings = async (question, lexicalCandidates) => {
 
   try {
     const inputs = [question, ...lexicalCandidates.map((chunk) => chunk.text)];
-    const emb = await aiClient.embeddings.create({
+    const emb = await client.embeddings.create({
       model: RAG_EMBEDDING_MODEL,
       input: inputs,
     });
@@ -759,11 +763,11 @@ const loadSessionMessages = async ({
 
 const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
   const safeHiddenContext = String(hiddenContext || "").trim();
-  const response = await aiClient.chat.completions.create({
+  const response = await client.chat.completions.create({
     model,
     temperature: 0,
     max_tokens: CHAT_MAX_TOKENS,
-    timeout: AI_REQUEST_TIMEOUT_MS,
+    timeout: OPENROUTER_TIMEOUT_MS,
     messages: [
       {
         role: "system",
@@ -794,7 +798,10 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
     ],
   });
 
-  const replyText = extractAiText(response?.choices?.[0]?.message?.content);
+  const replyText =
+    typeof response?.choices?.[0]?.message?.content === "string"
+      ? response.choices[0].message.content.trim()
+      : "";
 
   return (
     replyText ||
@@ -1042,7 +1049,7 @@ export const chatWithAI = async (req, res) => {
     setCachedResponse(cacheKey, reply, rawLanguage);
     return await finalizeReply(reply);
   } catch (error) {
-    console.error(`${AI_PROVIDER_NAME} Error:`, error);
+    console.error("OpenRouter Error:", error);
 
     const fallbackReplyByLanguage = {
       english:
@@ -1056,7 +1063,7 @@ export const chatWithAI = async (req, res) => {
     };
     return res.status(200).json({
       reply: fallbackReplyByLanguage[requestLanguage] || fallbackReplyByLanguage.english,
-      warning: `${AI_PROVIDER_NAME} temporarily unavailable. Fallback response returned.`,
+      warning: "OpenRouter temporarily unavailable. Fallback response returned.",
     });
   }
 };
