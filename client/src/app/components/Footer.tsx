@@ -22,13 +22,12 @@ export function Footer() {
       <div className="mx-auto max-w-6xl px-4 py-16 md:px-6">
         <div className="mb-12 grid grid-cols-1 gap-8 md:grid-cols-4">
           <div>
-            <div className="mb-4 flex items-center gap-3">
+            <div className="mb-4 flex items-center">
               <img
                 src="/nritax%20logo.jpeg"
                 alt="NRITAX logo"
-                className="h-12 w-auto rounded-md object-contain"
+                className="h-16 w-auto scale-110 rounded-lg object-contain"
               />
-              <span className="text-lg font-bold text-white">NRITAX.AI</span>
             </div>
             <p className="mb-3 text-sm font-medium text-slate-300">
               {renderTextWithShortForms("World's First AI-Powered NRI Tax Platform")}

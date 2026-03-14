@@ -66,7 +66,7 @@ export function Home() {
               <img
                 src="/nritax%20logo.jpeg"
                 alt="NRITAX logo"
-                className="h-24 w-auto rounded-2xl border border-blue-100 bg-white p-2 shadow-sm md:h-28"
+                className="h-32 w-auto scale-110 rounded-3xl border border-blue-100 bg-white p-2 shadow-sm md:h-40"
               />
             </div>
             <h1 className="reveal-drop reveal-delay-2 mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
