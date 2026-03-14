@@ -10,7 +10,7 @@ import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { TaxReportPDF } from "./TaxReportPDF";
-import { buildApiUrl, getSubscriptionStatus } from "../../utils/api";
+import { buildApiUrl, clearStoredAuth, getSubscriptionStatus } from "../../utils/api";
 
 const getStoredUserName = () => {
   try {
@@ -50,6 +50,11 @@ const stripBoldMarkers = (text: string) =>
     .replace(/[ \t]+$/gm, "")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+
+const ensureVisibleReply = (text: string) => {
+  const cleaned = stripBoldMarkers(text);
+  return cleaned || "No reply was returned. Please try again.";
+};
 
 const toProDisplayFormat = (text: string) => {
   const raw = stripBoldMarkers(text).trim();
@@ -104,6 +109,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
     },
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [sessionMessage, setSessionMessage] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const chatContentRef = useRef<HTMLDivElement>(null);
@@ -264,7 +270,13 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
     }
     getSubscriptionStatus()
       .then((data: any) => setSubscription(data?.subscription ?? null))
-      .catch(() => setSubscription(null));
+      .catch((error: any) => {
+        setSubscription(null);
+        if (error?.response?.status === 401) {
+          clearStoredAuth();
+          setSessionMessage("Your session expired. Please sign in again.");
+        }
+      });
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -353,10 +365,12 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
         }
       );
 
-      const aiReply = stripBoldMarkers(response.data.reply);
+      const aiReply = ensureVisibleReply(response.data.reply);
       setMessages((prev) => [...prev, { role: "ai", content: aiReply }]);
     } catch (error: any) {
       if (error.response?.status === 401) {
+        clearStoredAuth();
+        setSessionMessage("Your session expired. Please sign in again.");
         onRequireLogin();
       }
       const errorMessage =
@@ -364,7 +378,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
           ? "Please sign in again to continue."
           : error.response?.data?.error || "Something went wrong. Please try again.";
 
-      setMessages((prev) => [...prev, { role: "ai", content: stripBoldMarkers(errorMessage) }]);
+      setMessages((prev) => [...prev, { role: "ai", content: ensureVisibleReply(errorMessage) }]);
     } finally {
       setIsTyping(false);
     }
@@ -450,6 +464,11 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
               </div>
             )}
           </div>
+          {sessionMessage ? (
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {sessionMessage}
+            </p>
+          ) : null}
 
           {isAuthenticated && (
           <div className="flex flex-col md:flex-row md:items-center gap-2 mt-4">
@@ -628,8 +647,8 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
             Any data shared during interactions is used solely to provide accurate and relevant responses.
           </p>
           <p className="mt-2">
-            The chatbot does not store, share, or sell personal data to third parties.
-            Conversations may be monitored anonymously to improve performance.
+            Chat prompts may be processed by secure third-party AI infrastructure to generate responses.
+            Conversations may be monitored or logged in a limited way to improve reliability and performance.
           </p>
           <p className="mt-2">
             Please do not share sensitive information such as passwords, financial details, or identification numbers.

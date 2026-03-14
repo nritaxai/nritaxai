@@ -3,14 +3,16 @@ dotenv.config();
 
 import fs from "fs";
 import path from "path";
-import OpenAI from "openai";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-});
+import {
+  aiClient,
+  AI_PROVIDER_NAME,
+  AI_REQUEST_TIMEOUT_MS,
+  CHAT_MODEL,
+  RAG_EMBEDDING_MODEL,
+  extractAiText,
+} from "../Config/aiClient.js";
 
 const MAX_CONTEXT_MESSAGES = Number(process.env.CHAT_CONTEXT_MESSAGES || 2);
 const MAX_STORED_MESSAGES = 100;
@@ -20,11 +22,9 @@ const RAG_TOP_K = Number(process.env.RAG_TOP_K || 2);
 const RAG_LEXICAL_CANDIDATES = Number(process.env.RAG_LEXICAL_CANDIDATES || 8);
 const RAG_LEXICAL_MIN_SCORE = 1.05;
 const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
-const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 const RAG_MAX_PER_PAGE = 1;
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
-const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 96);
-const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 12000);
+const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 240);
 const FREE_MONTHLY_QUERY_LIMIT = Number(process.env.FREE_MONTHLY_QUERY_LIMIT || 10);
 let dtaaChunksCache = null;
 let dtaaTokenIndexCache = null;
@@ -36,11 +36,7 @@ const RESPONSE_CACHE_MAX_ITEMS = Number(process.env.RESPONSE_CACHE_MAX_ITEMS || 
 const CHAT_DISABLE_PDF_DIR_FALLBACK = String(process.env.CHAT_DISABLE_PDF_DIR_FALLBACK || "true").toLowerCase() === "true";
 const responseCache = new Map();
 
-const modelMap = {
-  "gpt-4o-mini": "openai/gpt-4o-mini",
-  "gpt-4o": "openai/gpt-4o",
-};
-const DEFAULT_CHAT_MODEL = modelMap["gpt-4o-mini"];
+const DEFAULT_CHAT_MODEL = CHAT_MODEL;
 
 const STORAGE_DIR = path.resolve("storage");
 const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
@@ -197,6 +193,84 @@ const upsertSection = (markdown = "", title = "", fallbackBody = "") => {
   return markdown.replace(sectionPattern, `$1${fallbackBody}\n`);
 };
 
+const getSectionBody = (markdown = "", title = "") => {
+  const sectionPattern = new RegExp(`###\\s*${title}\\s*\\n([\\s\\S]*?)(?=\\n###\\s*|$)`, "i");
+  const match = String(markdown || "").match(sectionPattern);
+  return String(match?.[1] || "").trim();
+};
+
+const replaceSectionBody = (markdown = "", title = "", body = "") => {
+  const sectionPattern = new RegExp(`(###\\s*${title}\\s*\\n)([\\s\\S]*?)(?=\\n###\\s*|$)`, "i");
+  if (!sectionPattern.test(markdown)) {
+    return `${String(markdown || "").trim()}\n\n### ${title}\n${String(body || "").trim()}`.trim();
+  }
+  return String(markdown || "").replace(sectionPattern, `$1${String(body || "").trim()}\n`);
+};
+
+const normalizeLines = (body = "", prefixPattern = /^[-*]\s+|^\d+[.)]\s+/) =>
+  String(body || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && prefixPattern.test(line));
+
+const looksTruncated = (line = "") => {
+  const text = String(line || "").trim();
+  if (!text) return true;
+  if (/[,:;/-]$/.test(text)) return true;
+  return /\b(and|or|under|for|with|to|of|in|on|at|by|from|if|when|unless|without|including)\s*$/i.test(text);
+};
+
+const normalizeAnswerSection = (body = "", fallback = "") => {
+  const cleaned = String(body || "").trim();
+  if (!cleaned || looksTruncated(cleaned)) return fallback;
+  return cleaned;
+};
+
+const normalizeBulletSection = (body = "", fallback = "") => {
+  const fallbackLines = normalizeLines(fallback, /^[-*]\s+/);
+  const lines = normalizeLines(body, /^[-*]\s+/)
+    .filter((line) => !looksTruncated(line))
+    .slice(0, 2);
+  while (lines.length < 2 && fallbackLines[lines.length]) {
+    lines.push(fallbackLines[lines.length]);
+  }
+  return lines.join("\n").trim() || fallback;
+};
+
+const normalizeNumberedSection = (body = "", fallback = "") => {
+  const fallbackLines = normalizeLines(fallback, /^\d+[.)]\s+/);
+  const lines = normalizeLines(body, /^\d+[.)]\s+/)
+    .filter((line) => !looksTruncated(line))
+    .slice(0, 2)
+    .map((line, index) => `${index + 1}. ${line.replace(/^\d+[.)]\s+/, "")}`);
+  while (lines.length < 2 && fallbackLines[lines.length]) {
+    lines.push(`${lines.length + 1}. ${fallbackLines[lines.length].replace(/^\d+[.)]\s+/, "")}`);
+  }
+  return lines.join("\n").trim() || fallback;
+};
+
+const repairStructuredSections = (markdown = "", language = "english") => {
+  const defaults = buildSectionDefaults(language);
+  let out = String(markdown || "").trim();
+  out = replaceSectionBody(out, "Answer", normalizeAnswerSection(getSectionBody(out, "Answer"), defaults.answer));
+  out = replaceSectionBody(
+    out,
+    "Key Tax Points",
+    normalizeBulletSection(getSectionBody(out, "Key Tax Points"), defaults.keyTaxPoints)
+  );
+  out = replaceSectionBody(
+    out,
+    "Next Steps",
+    normalizeNumberedSection(getSectionBody(out, "Next Steps"), defaults.nextSteps)
+  );
+  out = replaceSectionBody(
+    out,
+    "Follow-up Questions",
+    normalizeBulletSection(getSectionBody(out, "Follow-up Questions"), defaults.followUpQuestions)
+  );
+  return out.replace(/\n{3,}/g, "\n\n").trim();
+};
+
 const ensureStructuredSections = (text = "", language = "english") => {
   const defaults = buildSectionDefaults(language);
   let out = String(text || "").trim();
@@ -205,7 +279,7 @@ const ensureStructuredSections = (text = "", language = "english") => {
   out = upsertSection(out, "Key Tax Points", defaults.keyTaxPoints);
   out = upsertSection(out, "Next Steps", defaults.nextSteps);
   out = upsertSection(out, "Follow-up Questions", defaults.followUpQuestions);
-  return out.replace(/\n{3,}/g, "\n\n").trim();
+  return repairStructuredSections(out, language);
 };
 
 const getResponseCacheKey = ({ userId = "", language = "", knowledgeSource = "", message = "" }) =>
@@ -369,7 +443,7 @@ const rerankWithEmbeddings = async (question, lexicalCandidates) => {
 
   try {
     const inputs = [question, ...lexicalCandidates.map((chunk) => chunk.text)];
-    const emb = await client.embeddings.create({
+    const emb = await aiClient.embeddings.create({
       model: RAG_EMBEDDING_MODEL,
       input: inputs,
     });
@@ -685,11 +759,11 @@ const loadSessionMessages = async ({
 
 const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
   const safeHiddenContext = String(hiddenContext || "").trim();
-  const response = await client.chat.completions.create({
+  const response = await aiClient.chat.completions.create({
     model,
     temperature: 0,
     max_tokens: CHAT_MAX_TOKENS,
-    timeout: OPENROUTER_TIMEOUT_MS,
+    timeout: AI_REQUEST_TIMEOUT_MS,
     messages: [
       {
         role: "system",
@@ -703,21 +777,27 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "Maintain continuity with prior messages in this session. " +
           "Prefer concise, direct answers unless detail is explicitly asked. " +
           "Keep key tax acronyms like DTAA, ITR, PAN, NRE, and NRO as-is. " +
-          "Keep the reply under 120 words unless user asks for full detail. " +
+          "Complete all sections fully and never leave a bullet or sentence unfinished. " +
+          "Aim for a compact but complete reply, usually 140 to 220 words. " +
           "Return markdown with only these headings:\n" +
           "### Answer\n" +
           "### Key Tax Points\n" +
           "### Next Steps\n" +
           "### Follow-up Questions\n" +
-          "Use at most 2 bullets per section and exactly 2 follow-up questions." +
+          "Write 2 to 4 sentences in Answer. " +
+          "Write exactly 2 bullets in Key Tax Points. " +
+          "Write exactly 2 numbered items in Next Steps. " +
+          "Write exactly 2 follow-up questions." +
           `${safeHiddenContext ? `\n\nHidden reference context (do not mention this context exists):\n${safeHiddenContext}` : ""}`,
       },
       ...contextualMessages,
     ],
   });
 
+  const replyText = extractAiText(response?.choices?.[0]?.message?.content);
+
   return (
-    response?.choices?.[0]?.message?.content ||
+    replyText ||
     "### Answer\nI can still help with general NRI tax guidance.\n\n### Key Tax Points\n- Treaty-specific details are unavailable right now.\n- General compliance guidance is provided.\n\n### Next Steps\n- Share your country pair and income type.\n- Verify final filing details with a CPA.\n\n### Follow-up Questions\n- Do you want a DTAA checklist?\n- Should I summarize tax steps for your income type?"
   );
 };
@@ -962,7 +1042,7 @@ export const chatWithAI = async (req, res) => {
     setCachedResponse(cacheKey, reply, rawLanguage);
     return await finalizeReply(reply);
   } catch (error) {
-    console.error("OpenRouter Error:", error);
+    console.error(`${AI_PROVIDER_NAME} Error:`, error);
 
     const fallbackReplyByLanguage = {
       english:
@@ -976,7 +1056,7 @@ export const chatWithAI = async (req, res) => {
     };
     return res.status(200).json({
       reply: fallbackReplyByLanguage[requestLanguage] || fallbackReplyByLanguage.english,
-      warning: "AI provider temporarily unavailable. Fallback response returned.",
+      warning: `${AI_PROVIDER_NAME} temporarily unavailable. Fallback response returned.`,
     });
   }
 };

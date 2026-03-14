@@ -1,12 +1,7 @@
 import fs from "fs";
 import path from "path";
 import pdfParse from "pdf-parse";
-import OpenAI from "openai";
-
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-});
+import { aiClient, PDF_QA_MODEL, extractAiText } from "../Config/aiClient.js";
 
 const STORAGE_DIR = path.resolve("storage");
 const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
@@ -278,8 +273,8 @@ export const askPdf = async (req, res) => {
 
     const context = matches.map((m) => `[${m.file} p.${m.page}] ${m.text}`).join("\n\n");
 
-    const response = await client.chat.completions.create({
-      model: "openai/gpt-4o-mini",
+    const response = await aiClient.chat.completions.create({
+      model: PDF_QA_MODEL,
       temperature: 0,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
@@ -287,7 +282,7 @@ export const askPdf = async (req, res) => {
       ],
     });
 
-    const answer = response?.choices?.[0]?.message?.content?.trim();
+    const answer = extractAiText(response?.choices?.[0]?.message?.content);
     return res.status(200).json({
       answer: answer || "I don't know based on the provided PDFs.",
     });

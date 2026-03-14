@@ -6,6 +6,14 @@ export const buildApiUrl = (path: string) => `${API_URL}${path}`;
 export const getStoredAuthToken = () =>
   typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
+export const clearStoredAuth = () => {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem("token");
+  localStorage.removeItem("user");
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new Event("auth-changed"));
+};
+
 export const getAuthHeaders = () => {
   const token = getStoredAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

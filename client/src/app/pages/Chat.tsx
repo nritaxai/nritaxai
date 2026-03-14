@@ -8,7 +8,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { Bot, Send, Languages, Sparkles, Mic, MicOff, Download, Trash2 } from "lucide-react";
-import { buildApiUrl, getSubscriptionStatus } from "../../utils/api";
+import { buildApiUrl, clearStoredAuth, getSubscriptionStatus } from "../../utils/api";
 import { AuthGateCard } from "../components/AuthGateCard";
 
 interface ChatProps {
@@ -40,6 +40,18 @@ const stripBoldMarkers = (text: string) =>
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
+const ensureVisibleReply = (text: string) => {
+  const cleaned = stripBoldMarkers(text);
+  return cleaned || "No reply was returned. Please try again.";
+};
+
+const normalizeMessage = (message: unknown): { role: "user" | "ai"; content: string } | null => {
+  if (!message || typeof message !== "object") return null;
+  const role = (message as { role?: string }).role === "user" ? "user" : "ai";
+  const content = ensureVisibleReply((message as { content?: unknown }).content as string);
+  return { role, content };
+};
+
 export function Chat({ onRequireLogin }: ChatProps) {
   const navigate = useNavigate();
   const [userName, setUserName] = useState(getStoredUserName());
@@ -60,6 +72,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
     }
   ]);
   const [isTyping, setIsTyping] = useState(false);
+  const [providerWarning, setProviderWarning] = useState("");
+  const [sessionMessage, setSessionMessage] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const chatContentRef = useRef<HTMLDivElement>(null);
@@ -238,7 +252,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
     }
     getSubscriptionStatus()
       .then((data: any) => setSubscription(data?.subscription ?? null))
-      .catch(() => setSubscription(null));
+      .catch((error: any) => {
+        setSubscription(null);
+        if (error?.response?.status === 401) {
+          clearStoredAuth();
+          setSessionMessage("Your session expired. Please sign in again.");
+        }
+      });
   }, [isAuthenticated]);
 
   useEffect(() => {
@@ -278,15 +298,14 @@ export function Chat({ onRequireLogin }: ChatProps) {
         if (isCancelled) return;
         const history = Array.isArray(response.data?.messages) ? response.data.messages : [];
         if (history.length) {
-          setMessages(
-            history.map((item: any) => ({
-              role: item.role,
-              content: stripBoldMarkers(item.content),
-            }))
-          );
+          const normalizedHistory = history
+            .map((item: unknown) => normalizeMessage(item))
+            .filter(Boolean) as Array<{ role: "user" | "ai"; content: string }>;
+          setMessages(normalizedHistory.length ? normalizedHistory : [{ role: "ai", content: welcomeMessage }]);
           return;
         }
       } catch {
+        setProviderWarning("");
       }
 
       if (!isCancelled) {
@@ -336,21 +355,25 @@ export function Chat({ onRequireLogin }: ChatProps) {
         { message: userMessage, language, knowledgeSource },
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      setProviderWarning(typeof response.data?.warning === "string" ? response.data.warning : "");
 
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: stripBoldMarkers(response.data.reply) },
+        { role: "ai", content: ensureVisibleReply(response.data.reply) },
       ]);
     } catch (error: any) {
       if (error.response?.status === 401) {
+        clearStoredAuth();
+        setSessionMessage("Your session expired. Please sign in again.");
         onRequireLogin();
         return;
       }
+      setProviderWarning("");
       setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          content: stripBoldMarkers(error.response?.data?.error || "AI service unavailable. Please try again."),
+          content: ensureVisibleReply(error.response?.data?.error || "AI service unavailable. Please try again."),
         },
       ]);
     } finally {
@@ -458,9 +481,19 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </div>
                   <Badge className="border border-[#CBD5E1] bg-[#E2E8F0] text-[#0F172A]">
                     <span className="mr-2 size-2 animate-pulse rounded-full bg-green-600"></span>
-                    Online
+                    Ready
                   </Badge>
                 </div>
+                {providerWarning ? (
+                  <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    {providerWarning}
+                  </p>
+                ) : null}
+                {sessionMessage ? (
+                  <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                    {sessionMessage}
+                  </p>
+                ) : null}
                 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-4">
                   <Languages className="size-4 text-[#0F172A]" />

@@ -42,6 +42,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
     message: string;
     type: "success" | "error";
   } | null>(null);
+  const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -360,34 +361,36 @@ export function LoginModal({ onClose }: LoginModalProps) {
                   >
                     Continue with Apple
                   </Button>
-                  <GoogleLogin
-                   text="signin_with"
-                    onSuccess={async (credentialResponse) => {
-                      try {
-                        if (!credentialResponse.credential) {
-                          throw new Error("Missing Google credential");
-                        }
+                  {canUseGoogleAuth ? (
+                    <GoogleLogin
+                     text="signin_with"
+                      onSuccess={async (credentialResponse) => {
+                        try {
+                          if (!credentialResponse.credential) {
+                            throw new Error("Missing Google credential");
+                          }
 
-                        const response = await googleLoginUser(
-                          credentialResponse.credential
-                        );
-                        const user = resolveAuthUser(response);
-                        handleAuthSuccess(
-                          response,
-                          `Welcome ${user?.name || "User"}!`
-                        );
-                      } catch (err: any) {
-                        setPopup({
-                          message: err.response?.data?.message || "Google login failed",
-                          type: "error",
-                        });
-                        setTimeout(() => setPopup(null), 2000);
-                      }
-                    }}
-                    onError={() => {
-                      showGoogleOriginMismatchHint("login");
-                    }}
-                  />
+                          const response = await googleLoginUser(
+                            credentialResponse.credential
+                          );
+                          const user = resolveAuthUser(response);
+                          handleAuthSuccess(
+                            response,
+                            `Welcome ${user?.name || "User"}!`
+                          );
+                        } catch (err: any) {
+                          setPopup({
+                            message: err.response?.data?.message || "Google login failed",
+                            type: "error",
+                          });
+                          setTimeout(() => setPopup(null), 2000);
+                        }
+                      }}
+                      onError={() => {
+                        showGoogleOriginMismatchHint("login");
+                      }}
+                    />
+                  ) : null}
                 </div>
 
               </form>
@@ -515,35 +518,37 @@ export function LoginModal({ onClose }: LoginModalProps) {
                   >
                     Continue with Apple
                   </Button>
-                  <GoogleLogin
-                    text="signup_with"
-                    onSuccess={async (credentialResponse) => {
-                      try {
-                        if (!credentialResponse.credential) {
-                          throw new Error("Missing Google credential");
+                  {canUseGoogleAuth ? (
+                    <GoogleLogin
+                      text="signup_with"
+                      onSuccess={async (credentialResponse) => {
+                        try {
+                          if (!credentialResponse.credential) {
+                            throw new Error("Missing Google credential");
+                          }
+
+                          const response = await googleLoginUser(
+                            credentialResponse.credential
+                          );
+                          const user = resolveAuthUser(response);
+                          handleAuthSuccess(
+                            response,
+                            `Account created successfully! Welcome ${user?.name || "User"}`
+                          );
+                        } catch (err: any) {
+                          setPopup({
+                            message: err.response?.data?.message || "Google signup failed",
+                            type: "error",
+                          });
+
+                          setTimeout(() => setPopup(null), 2000);
                         }
-
-                        const response = await googleLoginUser(
-                          credentialResponse.credential
-                        );
-                        const user = resolveAuthUser(response);
-                        handleAuthSuccess(
-                          response,
-                          `Account created successfully! Welcome ${user?.name || "User"}`
-                        );
-                      } catch (err: any) {
-                        setPopup({
-                          message: err.response?.data?.message || "Google signup failed",
-                          type: "error",
-                        });
-
-                        setTimeout(() => setPopup(null), 2000);
-                      }
-                    }}
-                    onError={() => {
-                      showGoogleOriginMismatchHint("signup");
-                    }}
-                  />
+                      }}
+                      onError={() => {
+                        showGoogleOriginMismatchHint("signup");
+                      }}
+                    />
+                  ) : null}
                 </div>
                 <p className="text-xs text-[#E2E8F0] text-center">
                   By signing up, you agree to our Terms of Service and Privacy Policy
