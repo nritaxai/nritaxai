@@ -159,7 +159,12 @@ export function Header({ onLogin }: HeaderProps) {
       <div className="sticky top-0 border-b border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between">
-            <Link to="/" className="inline-flex items-center" aria-label="NRITAX home">
+            <Link to="/" className="inline-flex items-center gap-3" aria-label="NRITAX home">
+              <img
+                src="/nritax%20logo.jpeg"
+                alt="NRITAX logo"
+                className="h-12 w-auto rounded-md object-contain"
+              />
               <span className="flex flex-col leading-none text-slate-900">
                 <span className="text-xl font-bold tracking-wide">NRITAX</span>
                 <span className="text-xs font-semibold tracking-[0.35em]">AI</span>
