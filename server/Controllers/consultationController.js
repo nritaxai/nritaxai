@@ -1,4 +1,5 @@
-﻿import ConsultationRequest from "../Models/consultationRequestModel.js";
+import ConsultationRequest from "../Models/consultationRequestModel.js";
+import { CONSULTATION_WEBHOOK_URL } from "../Config/consultation.js";
 import { sendEmail } from "../src/utils/emailService.js";
 
 const sanitize = (value) => (typeof value === "string" ? value.trim() : "");
@@ -11,21 +12,59 @@ const isValidPhone = (phone) => /^[\d+()\-\s]{7,20}$/.test(String(phone || ""));
 
 const getAdminEmail = () => sanitize(process.env.ADMIN_EMAIL) || DEFAULT_ADMIN_EMAIL;
 
+const parseWebhookResponse = async (response) => {
+  const rawText = await response.text();
+
+  if (!rawText || rawText.trim() === "") {
+    return {
+      data: null,
+      message: "",
+      rawText: "",
+    };
+  }
+
+  try {
+    const data = JSON.parse(rawText);
+    return {
+      data,
+      message:
+        typeof data?.message === "string"
+          ? data.message
+          : typeof data?.status === "string"
+          ? data.status
+          : "",
+      rawText,
+    };
+  } catch {
+    return {
+      data: null,
+      message: rawText.trim(),
+      rawText,
+    };
+  }
+};
+
 export const submitConsultationRequest = async (req, res) => {
   try {
     const name = sanitize(req.body?.name);
     const email = sanitize(req.body?.email).toLowerCase();
     const phone = sanitize(req.body?.phone);
+    const whatsapp = sanitize(req.body?.whatsapp);
+    const contactMethod = sanitize(req.body?.contactMethod);
     const country = sanitize(req.body?.country);
+    const preferredDate = sanitize(req.body?.preferredDate);
+    const preferredTime = sanitize(req.body?.preferredTime);
     const service = sanitize(req.body?.service);
-    const taxQuery = sanitize(req.body?.taxQuery);
+    const queryDetails = sanitize(req.body?.queryDetails);
+    const source = sanitize(req.body?.source) || "Website Consultation Form";
+    const submittedAt = sanitize(req.body?.submittedAt) || new Date().toISOString();
 
-    const date = sanitize(req.body?.date) || "To be confirmed";
-    const time = sanitize(req.body?.time) || "To be confirmed";
-    const timezone = sanitize(req.body?.timezone) || "Asia/Kolkata";
-    const notes = sanitize(req.body?.notes) || taxQuery;
+    const date = preferredDate || "To be confirmed";
+    const time = preferredTime || "To be confirmed";
+    const timezone = "Asia/Kolkata";
+    const notes = queryDetails;
 
-    if (!name || !email || !phone || !country || !service || !taxQuery) {
+    if (!name || !email || !phone || !country || !service || !queryDetails) {
       return res.status(400).json({
         success: false,
         message: "Please fill all required fields.",
@@ -54,9 +93,62 @@ export const submitConsultationRequest = async (req, res) => {
       phone,
       country,
       service,
-      taxQuery,
+      taxQuery: queryDetails,
       notificationRecipient: adminEmail,
     });
+
+    const webhookPayload = {
+      name: name || "",
+      email: email || "",
+      phone: phone || "",
+      whatsapp: whatsapp || "",
+      contactMethod: contactMethod || "",
+      country: country || "",
+      preferredDate: preferredDate || "",
+      preferredTime: preferredTime || "",
+      service: service || "",
+      queryDetails: queryDetails || "",
+      source,
+      submittedAt,
+    };
+
+    let webhookResult = null;
+
+    try {
+      console.info(
+        `[consultation] Forwarding submission to webhook: ${CONSULTATION_WEBHOOK_URL}`
+      );
+
+      const webhookResponse = await fetch(CONSULTATION_WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+        },
+        body: JSON.stringify(webhookPayload),
+      });
+
+      webhookResult = await parseWebhookResponse(webhookResponse);
+
+      if (!webhookResponse.ok) {
+        throw new Error(
+          webhookResult?.message ||
+            `Consultation webhook failed with status ${webhookResponse.status}`
+        );
+      }
+    } catch (error) {
+      console.error("Consultation webhook proxy error:", error);
+      requestDoc.notificationStatus = "failed";
+      requestDoc.notificationError = `webhook:${String(
+        error?.message || error || "unknown"
+      )}`;
+      await requestDoc.save();
+
+      return res.status(502).json({
+        success: false,
+        message: error?.message || "Failed to submit consultation request.",
+      });
+    }
 
     const bookingId = String(requestDoc._id);
     const emailErrors = [];
@@ -96,6 +188,8 @@ export const submitConsultationRequest = async (req, res) => {
           <p><strong>Name:</strong> ${name}</p>
           <p><strong>Email:</strong> ${email}</p>
           <p><strong>Phone:</strong> ${phone}</p>
+          <p><strong>WhatsApp:</strong> ${whatsapp || "Not provided"}</p>
+          <p><strong>Preferred Contact Method:</strong> ${contactMethod || "Not provided"}</p>
           <p><strong>Date:</strong> ${date}</p>
           <p><strong>Time:</strong> ${time}</p>
           <p><strong>Timezone:</strong> ${timezone}</p>
@@ -124,7 +218,8 @@ export const submitConsultationRequest = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Consultation request submitted successfully.",
+      message:
+        webhookResult?.message || "Consultation request submitted successfully.",
       requestId: requestDoc._id,
       email: {
         confirmationSent,

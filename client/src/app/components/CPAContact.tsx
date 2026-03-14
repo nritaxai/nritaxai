@@ -6,7 +6,6 @@ import { Label } from "./ui/label";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Calendar, CheckCircle2, Mail, MessageSquare, UserCheck, X } from "lucide-react";
-import { submitConsultationRequest } from "../../utils/api";
 import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
@@ -15,60 +14,118 @@ interface CPAContactProps {
   embedded?: boolean;
 }
 
+const INITIAL_FORM_DATA = {
+  name: "",
+  email: "",
+  phone: "",
+  whatsapp: "",
+  contactMethod: "email",
+  country: "",
+  customCountry: "",
+  queryDetails: "",
+  service: "",
+  preferredDate: "",
+  preferredTime: "",
+};
+
+const WEBHOOK_URL = "https://n8n.caloganathan.com/webhook/consultation-booking";
+
 export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const [submitted, setSubmitted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    phone: "",
-    whatsappNumber: "",
-    preferredContact: "email",
-    country: "",
-    customCountry: "",
-    taxQuery: "",
-    service: "",
-    preferredDate: "",
-    preferredTime: "",
-  });
+  const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [formData, setFormData] = useState(INITIAL_FORM_DATA);
 
   const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
+    setLoading(true);
+    setSuccessMessage("");
+    setErrorMessage("");
 
     const country = formData.country === "other" ? formData.customCountry.trim() : formData.country;
     if (!country) {
-      setError("Please select your country of residence.");
+      setErrorMessage("Please select your country of residence.");
+      setLoading(false);
       return;
     }
 
-    if (formData.preferredContact === "whatsapp" && !formData.whatsappNumber.trim()) {
-      setError("Please provide your WhatsApp number for WhatsApp contact preference.");
+    if (!formData.service.trim()) {
+      setErrorMessage("Please select the service required.");
+      setLoading(false);
       return;
     }
 
-    setSubmitting(true);
+    if (!formData.queryDetails.trim()) {
+      setErrorMessage("Please enter your tax query details.");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.contactMethod === "whatsapp" && !formData.whatsapp.trim()) {
+      setErrorMessage("Please provide your WhatsApp number for WhatsApp contact preference.");
+      setLoading(false);
+      return;
+    }
+
+    const payload = {
+      name: formData.name.trim() || "",
+      email: formData.email.trim() || "",
+      phone: formData.phone.trim() || "",
+      whatsapp: formData.whatsapp.trim() || "",
+      contactMethod: formData.contactMethod || "",
+      country: country || "",
+      preferredDate: formData.preferredDate || "",
+      preferredTime: formData.preferredTime || "",
+      service: formData.service.trim() || "",
+      queryDetails: formData.queryDetails.trim() || "",
+      source: "Website Consultation Form",
+      submittedAt: new Date().toISOString(),
+    };
+
     try {
-      await submitConsultationRequest({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        country,
-        service: formData.service.trim(),
-        taxQuery: formData.taxQuery.trim(),
-        preferredContact: formData.preferredContact,
-        whatsappNumber: formData.whatsappNumber.trim(),
-        date: formData.preferredDate,
-        time: formData.preferredTime,
+      const response = await fetch(WEBHOOK_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
       });
+
+      const rawText = await response.text();
+      let result: { message?: string } | null = null;
+
+      if (rawText && rawText.trim() !== "") {
+        try {
+          result = JSON.parse(rawText);
+        } catch (parseError) {
+          console.error("Invalid webhook response:", rawText, parseError);
+          throw new Error("Server returned an invalid response");
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result?.message || `Webhook request failed with status ${response.status}`
+        );
+      }
+
+      const message = result?.message || "Consultation request submitted successfully";
+
+      setSuccessMessage(message);
+      setFormData(INITIAL_FORM_DATA);
       setSubmitted(true);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to submit consultation request. Please try again.");
+    } catch (error: any) {
+      console.error("Consultation submit error:", error);
+      setErrorMessage(
+        error?.message === "Failed to fetch"
+          ? "Network or CORS error while submitting the consultation request"
+          : error?.message || "Failed to submit consultation request"
+      );
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -94,7 +151,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               </div>
               <CardTitle className="text-2xl">Request Submitted!</CardTitle>
               <CardDescription className="mt-2">
-                Our certified CPA will contact you within 24 hours. We have also emailed your confirmation.
+                {successMessage || "Our certified CPA will contact you within 24 hours. We have also emailed your confirmation."}
               </CardDescription>
             </div>
           </CardHeader>
@@ -186,12 +243,12 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="whatsappNumber">WhatsApp Number (optional)</Label>
+                <Label htmlFor="whatsapp">WhatsApp Number (optional)</Label>
                 <Input
-                  id="whatsappNumber"
+                  id="whatsapp"
                   type="tel"
-                  value={formData.whatsappNumber}
-                  onChange={(e) => setFormData({ ...formData, whatsappNumber: e.target.value })}
+                  value={formData.whatsapp}
+                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
                   placeholder="+62 812 3456 7890"
                 />
               </div>
@@ -199,8 +256,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="preferredContact">Preferred Contact Method *</Label>
-                <Select value={formData.preferredContact} onValueChange={(value) => setFormData({ ...formData, preferredContact: value })}>
+                <Label htmlFor="contactMethod">Preferred Contact Method *</Label>
+                <Select value={formData.contactMethod} onValueChange={(value) => setFormData({ ...formData, contactMethod: value })}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select contact method" />
                   </SelectTrigger>
@@ -293,8 +350,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               <Textarea
                 id="taxQuery"
                 required
-                value={formData.taxQuery}
-                onChange={(e) => setFormData({ ...formData, taxQuery: e.target.value })}
+                value={formData.queryDetails}
+                onChange={(e) => setFormData({ ...formData, queryDetails: e.target.value })}
                 placeholder="Please describe your tax situation and specific concerns..."
                 rows={4}
               />
@@ -310,12 +367,15 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               <Button type="button" variant="outline" onClick={onClose} className="flex-1">
                 {embedded ? "Back" : "Cancel"}
               </Button>
-              <Button type="submit" className="flex-1" disabled={submitting}>
-                {submitting ? "Submitting..." : "Submit Request"}
+              <Button type="submit" className="flex-1" disabled={loading}>
+                {loading ? "Submitting..." : "Submit Request"}
               </Button>
             </div>
-            {error && (
-              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+            {successMessage && !submitted && (
+              <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{successMessage}</p>
+            )}
+            {errorMessage && (
+              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p>
             )}
           </form>
         </CardContent>

@@ -134,21 +134,6 @@ export const deleteAccount = async () => {
   return deleteRequest("/api/auth/delete-account");
 };
 
-export const submitConsultationRequest = async (payload: {
-  name: string;
-  email: string;
-  phone: string;
-  country: string;
-  service: string;
-  taxQuery: string;
-  preferredContact?: string;
-  whatsappNumber?: string;
-  date?: string;
-  time?: string;
-}) => {
-  return postRequest("/api/consultations", payload);
-};
-
 export const calculateIncomeTax = async (payload: {
   income: string | number;
   country?: string;
