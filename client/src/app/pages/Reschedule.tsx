@@ -7,10 +7,12 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
-  AVAILABLE_CONSULTATION_TIME_SLOTS,
   buildReschedulePayload,
   CONSULTATION_WEBHOOKS,
+  getAvailableConsultationTimeSlots,
+  getConsultationDateConstraintError,
   getConsultationIdentifierFromSearchParams,
+  getTodayConsultationDate,
   normalizeConsultationDate,
   normalizeConsultationTime,
   postConsultationWebhook,
@@ -32,6 +34,7 @@ export function Reschedule() {
   const [submitted, setSubmitted] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const availableTimeSlots = useMemo(() => getAvailableConsultationTimeSlots(date), [date]);
 
   const validate = () => {
     const nextErrors: FieldErrors = {};
@@ -39,7 +42,17 @@ export function Reschedule() {
     const normalizedTime = normalizeConsultationTime(time);
 
     if (!normalizedDate) nextErrors.date = "Please choose a new consultation date.";
+    if (normalizedDate) {
+      const dateConstraintError = getConsultationDateConstraintError(normalizedDate);
+      if (dateConstraintError) nextErrors.date = dateConstraintError;
+    }
     if (!normalizedTime) nextErrors.time = "Please choose a new time slot.";
+    if (normalizedTime && !availableTimeSlots.includes(normalizedTime as (typeof availableTimeSlots)[number])) {
+      nextErrors.time =
+        availableTimeSlots.length > 0
+          ? "Please choose one of the remaining available time slots."
+          : "No time slots are left for today. Please choose another date.";
+    }
 
     setFieldErrors(nextErrors);
     return {
@@ -134,14 +147,19 @@ export function Reschedule() {
                     <Input
                       id="reschedule-date"
                       type="date"
+                      min={getTodayConsultationDate()}
                       value={date}
                       onChange={(event) => {
                         setDate(event.target.value);
-                        setFieldErrors((prev) => ({ ...prev, date: undefined }));
+                        setTime("");
+                        setFieldErrors((prev) => ({ ...prev, date: undefined, time: undefined }));
                       }}
                       aria-invalid={Boolean(fieldErrors.date)}
                     />
                     {fieldErrors.date ? <p className="text-sm text-red-600">{fieldErrors.date}</p> : null}
+                    {!fieldErrors.date ? (
+                      <p className="text-sm text-slate-500">Choose today or a future date. Sunday bookings are unavailable.</p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -157,7 +175,7 @@ export function Reschedule() {
                         <SelectValue placeholder="Select a time slot" />
                       </SelectTrigger>
                       <SelectContent>
-                        {AVAILABLE_CONSULTATION_TIME_SLOTS.map((slot) => (
+                        {availableTimeSlots.map((slot) => (
                           <SelectItem key={slot} value={slot}>
                             {slot}
                           </SelectItem>
@@ -165,6 +183,9 @@ export function Reschedule() {
                       </SelectContent>
                     </Select>
                     {fieldErrors.time ? <p className="text-sm text-red-600">{fieldErrors.time}</p> : null}
+                    {!fieldErrors.time && availableTimeSlots.length === 0 && date ? (
+                      <p className="text-sm text-slate-500">No time slots are left for today. Please choose another date.</p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -197,4 +218,3 @@ export function Reschedule() {
     </div>
   );
 }
-

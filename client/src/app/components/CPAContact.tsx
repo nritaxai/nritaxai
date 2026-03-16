@@ -13,8 +13,8 @@ import { ScrollArea } from "./ui/scroll-area";
 import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import {
-  AVAILABLE_CONSULTATION_TIME_SLOTS,
   CONSULTATION_WEBHOOKS,
+  getAvailableConsultationTimeSlots,
   normalizeConsultationDate,
   normalizeConsultationTime,
   postConsultationWebhook,
@@ -62,6 +62,14 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
     return isValid(parsed) ? parsed : undefined;
   }, [formData.preferredDate]);
   const formattedPreferredDate = selectedDate ? format(selectedDate, "PP") : "";
+  const availableTimeSlots = useMemo(
+    () => getAvailableConsultationTimeSlots(formData.preferredDate),
+    [formData.preferredDate]
+  );
+  const timeSlotPanelHeight = useMemo(() => {
+    const visibleRows = Math.min(Math.max(availableTimeSlots.length, 1), 5);
+    return visibleRows * 40 + 16;
+  }, [availableTimeSlots]);
 
   const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
@@ -98,9 +106,12 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
     if (
       preferredTime &&
-      !AVAILABLE_CONSULTATION_TIME_SLOTS.includes(preferredTime as (typeof AVAILABLE_CONSULTATION_TIME_SLOTS)[number])
+      !availableTimeSlots.includes(preferredTime as (typeof availableTimeSlots)[number])
     ) {
-      nextErrors.preferredTime = "Choose a valid time between 09:00 and 18:00.";
+      nextErrors.preferredTime =
+        availableTimeSlots.length > 0
+          ? "Choose one of the remaining available slots."
+          : "No slots are left for today. Please choose another date.";
     }
 
     if (formData.contactMethod === "whatsapp" && !trimValue(formData.whatsapp)) {
@@ -350,8 +361,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               </div>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div className="relative space-y-2">
+            <div className="grid items-start gap-4 md:grid-cols-2">
+              <div className="relative self-start space-y-2">
                 <Label htmlFor="preferredDate">Preferred Date *</Label>
                 <Button
                   id="preferredDate"
@@ -370,7 +381,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   <CalendarIcon className="size-4 text-slate-500" />
                 </Button>
                 {isDatePickerOpen && (
-                  <div className="absolute left-0 top-full z-30 mt-2 rounded-md border bg-white p-2 shadow-lg">
+                  <div className="absolute left-0 top-full z-30 rounded-md border bg-white p-2 shadow-lg">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
@@ -416,7 +427,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 {datePickerMessage && <p className="text-xs text-slate-500">{datePickerMessage}</p>}
                 {fieldErrors.preferredDate ? <p className="text-sm text-red-600">{fieldErrors.preferredDate}</p> : null}
               </div>
-            <div className="relative space-y-2">
+            <div className="relative self-start space-y-2">
               <Label htmlFor="preferredTime">Preferred Time *</Label>
               <Button
                 id="preferredTime"
@@ -441,10 +452,10 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 </div>
               </Button>
               {isTimePickerOpen && formData.preferredDate && (
-                <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-md border bg-white shadow-lg">
-                  <ScrollArea className="h-64 w-full">
+                <div className="absolute left-0 top-full z-30 w-full overflow-hidden rounded-md border bg-white shadow-lg">
+                  <ScrollArea className="w-full" style={{ height: `${timeSlotPanelHeight}px` }}>
                     <div className="grid gap-1 p-2">
-                      {AVAILABLE_CONSULTATION_TIME_SLOTS.map((slot) => (
+                      {availableTimeSlots.map((slot) => (
                         <Button
                           key={slot}
                           type="button"
@@ -464,11 +475,16 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                           {slot}
                         </Button>
                       ))}
+                      {availableTimeSlots.length === 0 ? (
+                        <p className="px-2 py-3 text-sm text-slate-500">No slots are available for the rest of today.</p>
+                      ) : null}
                     </div>
                   </ScrollArea>
                 </div>
               )}
-              <p className="text-xs text-slate-500">Time slots are available only from 09:00 to 18:00.</p>
+              <p className="text-xs text-slate-500">
+                Time slots are available only from 09:00 to 18:00, and past slots for today are automatically hidden.
+              </p>
               {fieldErrors.preferredTime ? <p className="text-sm text-red-600">{fieldErrors.preferredTime}</p> : null}
             </div>
             </div>

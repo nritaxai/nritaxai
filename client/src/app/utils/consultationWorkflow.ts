@@ -59,6 +59,18 @@ export const normalizeConsultationDate = (value: string) => {
   return DATE_PATTERN.test(trimmed) ? trimmed : "";
 };
 
+const parseConsultationDate = (value: string) => {
+  const normalized = normalizeConsultationDate(value);
+  if (!normalized) return null;
+
+  const [year, month, day] = normalized.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+export const getTodayConsultationDate = (now = new Date()) =>
+  `${now.getFullYear()}-${`${now.getMonth() + 1}`.padStart(2, "0")}-${`${now.getDate()}`.padStart(2, "0")}`;
+
 export const normalizeConsultationTime = (value: string) => {
   const trimmed = trimValue(value);
   if (!trimmed) return "";
@@ -69,6 +81,35 @@ export const normalizeConsultationTime = (value: string) => {
   const hours = `${date.getHours()}`.padStart(2, "0");
   const minutes = `${date.getMinutes()}`.padStart(2, "0");
   return `${hours}:${minutes}`;
+};
+
+const toMinutes = (time: string) => {
+  const normalized = normalizeConsultationTime(time);
+  if (!normalized) return -1;
+  const [hours, minutes] = normalized.split(":").map(Number);
+  return hours * 60 + minutes;
+};
+
+export const getAvailableConsultationTimeSlots = (date: string, now = new Date()) => {
+  const normalizedDate = normalizeConsultationDate(date);
+  if (!normalizedDate) return [...AVAILABLE_CONSULTATION_TIME_SLOTS];
+
+  const todayIso = getTodayConsultationDate(now);
+  if (normalizedDate !== todayIso) return [...AVAILABLE_CONSULTATION_TIME_SLOTS];
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return AVAILABLE_CONSULTATION_TIME_SLOTS.filter((slot) => toMinutes(slot) > currentMinutes);
+};
+
+export const getConsultationDateConstraintError = (date: string, now = new Date()) => {
+  const parsedDate = parseConsultationDate(date);
+  if (!parsedDate) return "";
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (parsedDate < today) return "Please choose a date from today onwards.";
+  if (parsedDate.getDay() === 0) return "Bookings are not available on Sundays.";
+
+  return "";
 };
 
 const safeParseJson = async (response: Response) => {
@@ -144,4 +185,3 @@ export const buildReschedulePayload = (
 export const buildCancelPayload = (identifier: ConsultationIdentifier) => ({
   [identifier.key]: identifier.value,
 });
-
