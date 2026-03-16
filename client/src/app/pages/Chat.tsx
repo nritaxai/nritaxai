@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "motion/react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
@@ -7,13 +7,38 @@ import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Bot, Send, Languages, Sparkles, Mic, MicOff, Download, Trash2 } from "lucide-react";
+import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download } from "lucide-react";
 import { buildApiUrl, clearStoredAuth, getSubscriptionStatus } from "../../utils/api";
-import { AuthGateCard } from "../components/AuthGateCard";
 
 interface ChatProps {
   onRequireLogin: () => void;
 }
+
+const GUEST_SESSION_STORAGE_KEY = "nritax_guest_chat_session";
+const CHAT_GUEST_HEADER = "x-guest-session-id";
+
+const createGuestSessionId = () =>
+  `guest-${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+
+const getGuestSessionId = () => {
+  if (typeof window === "undefined") return "guest-browser";
+  const existing = localStorage.getItem(GUEST_SESSION_STORAGE_KEY);
+  if (existing) return existing;
+  const nextValue = createGuestSessionId();
+  localStorage.setItem(GUEST_SESSION_STORAGE_KEY, nextValue);
+  return nextValue;
+};
+
+const getChatRequestHeaders = () => {
+  const headers: Record<string, string> = {
+    [CHAT_GUEST_HEADER]: getGuestSessionId(),
+  };
+  const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+};
 
 const getStoredUserName = () => {
   try {
@@ -45,6 +70,17 @@ const ensureVisibleReply = (text: string) => {
   return cleaned || "No reply was returned. Please try again.";
 };
 
+const fallbackReplyByLanguage: Record<string, string> = {
+  english:
+    "### Answer\nI am temporarily unable to access live AI services.\n\n### Key Tax Points\n- Your chat request was received.\n- You can still proceed with general NRI tax planning steps.\n- For urgent cases, consult a CPA.\n\n### Next Steps\n- Re-try your question in 1-2 minutes.\n- If it persists, use CPA Consultation.\n\n### Follow-up Questions\n- Which NRI tax topic should we prioritize?\n- Do you want a checklist for DTAA documents?",
+  hindi:
+    "### Answer\nMain filhaal live AI services access nahi kar paa raha hoon.\n\n### Key Tax Points\n- Aapka chat request receive ho gaya hai.\n- Aap general NRI tax planning steps continue kar sakte hain.\n- Urgent case mein CPA se consult karein.\n\n### Next Steps\n- 1-2 minute baad apna question dobara bhejein.\n- Agar issue continue ho, to CPA Consultation use karein.\n\n### Follow-up Questions\n- Kaunsa NRI tax topic hum pehle cover karein?\n- Kya aapko DTAA documents ka checklist chahiye?",
+  tamil:
+    "### Answer\nNaan ippo live AI services-ai access panna mudiyala.\n\n### Key Tax Points\n- Ungal chat request receive aagiduchu.\n- Neenga general NRI tax planning steps continue panna mudiyum.\n- Urgent case-na CPA kitta consult pannunga.\n\n### Next Steps\n- 1-2 nimidam kazhichu unga kelviya thirumba anuppunga.\n- Issue continue aana CPA Consultation use pannunga.\n\n### Follow-up Questions\n- Endha NRI tax topic-ah first priority kudukkanum?\n- Ungalukku DTAA documents checklist venuma?",
+  indonesian:
+    "### Answer\nLayanan AI langsung sedang tidak tersedia sementara.\n\n### Key Tax Points\n- Pertanyaan Anda sudah diterima.\n- Anda tetap bisa lanjut dengan langkah perencanaan pajak NRI umum.\n- Untuk kasus mendesak, konsultasikan ke CPA.\n\n### Next Steps\n- Coba kirim ulang pertanyaan dalam 1-2 menit.\n- Jika tetap terjadi, gunakan CPA Consultation.\n\n### Follow-up Questions\n- Topik pajak NRI mana yang ingin diprioritaskan?\n- Apakah Anda ingin checklist dokumen DTAA?",
+};
+
 const normalizeMessage = (message: unknown): { role: "user" | "ai"; content: string } | null => {
   if (!message || typeof message !== "object") return null;
   const role = (message as { role?: string }).role === "user" ? "user" : "ai";
@@ -54,6 +90,7 @@ const normalizeMessage = (message: unknown): { role: "user" | "ai"; content: str
 
 export function Chat({ onRequireLogin }: ChatProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [userName, setUserName] = useState(getStoredUserName());
   const [question, setQuestion] = useState("");
   const [language, setLanguage] = useState("english");
@@ -80,6 +117,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
   const baseQuestionRef = useRef("");
+  const starterMessageHandledRef = useRef(false);
 
   const getWelcomeMessage = () => welcomeByLanguage[language] || welcomeByLanguage.english;
 
@@ -106,18 +144,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
   };
 
   const clearChat = async () => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const welcomeMessage = getWelcomeMessage();
-    if (!token) {
-      setMessages([{ role: "ai", content: welcomeMessage }]);
-      return;
-    }
 
     try {
       await axios.post(
         buildApiUrl("/api/chat/clear"),
         { language, knowledgeSource },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getChatRequestHeaders() }
       );
     } catch {
     }
@@ -275,24 +308,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
   useEffect(() => {
     const welcomeMessage = getWelcomeMessage();
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-
-    if (!isAuthenticated || !token) {
-      setMessages((prev) => {
-        if (!prev.length) return [{ role: "ai", content: welcomeMessage }];
-        const [first, ...rest] = prev;
-        if (first.role === "ai") return [{ ...first, content: welcomeMessage }, ...rest];
-        return [{ role: "ai", content: welcomeMessage }, ...prev];
-      });
-      return;
-    }
 
     let isCancelled = false;
     const loadHistory = async () => {
       try {
         const response = await axios.get(buildApiUrl("/api/chat/history"), {
           params: { language, knowledgeSource },
-          headers: { Authorization: `Bearer ${token}` },
+          headers: getChatRequestHeaders(),
         });
 
         if (isCancelled) return;
@@ -317,32 +339,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
     return () => {
       isCancelled = true;
     };
-  }, [language, isAuthenticated, knowledgeSource, userName]);
-
-  if (!isAuthenticated) {
-    return (
-      <AuthGateCard
-        title="Login to access AI Tax Chat"
-        description="Sign in to start chat sessions, save history, and use premium AI guidance."
-        onRequireLogin={onRequireLogin}
-      />
-    );
-  }
+  }, [language, knowledgeSource, userName]);
 
   const submitQuestion = async (forcedQuestion?: string) => {
     const effectiveQuestion = typeof forcedQuestion === "string" ? forcedQuestion.trim() : question.trim();
     if (!effectiveQuestion) return;
-
-    if (!isAuthenticated) {
-      onRequireLogin();
-      return;
-    }
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      onRequireLogin();
-      return;
-    }
 
     const userMessage = effectiveQuestion;
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
@@ -353,9 +354,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
       const response = await axios.post(
         buildApiUrl("/api/chat"),
         { message: userMessage, language, knowledgeSource },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: getChatRequestHeaders() }
       );
-      setProviderWarning(typeof response.data?.warning === "string" ? response.data.warning : "");
+      setProviderWarning("");
 
       setMessages((prev) => [
         ...prev,
@@ -365,15 +366,15 @@ export function Chat({ onRequireLogin }: ChatProps) {
       if (error.response?.status === 401) {
         clearStoredAuth();
         setSessionMessage("Your session expired. Please sign in again.");
-        onRequireLogin();
-        return;
       }
-      setProviderWarning("");
       setMessages((prev) => [
         ...prev,
         {
           role: "ai",
-          content: ensureVisibleReply(error.response?.data?.error || "AI service unavailable. Please try again."),
+          content: ensureVisibleReply(
+            fallbackReplyByLanguage[language] ||
+              fallbackReplyByLanguage.english
+          ),
         },
       ]);
     } finally {
@@ -399,6 +400,20 @@ export function Chat({ onRequireLogin }: ChatProps) {
     });
     void submitQuestion(selectedQuestion);
   };
+
+  useEffect(() => {
+    if (starterMessageHandledRef.current) return;
+    const starterMessage = location.state && typeof location.state === "object"
+      ? (location.state as { starterMessage?: unknown }).starterMessage
+      : undefined;
+
+    if (typeof starterMessage !== "string" || !starterMessage.trim()) return;
+
+    starterMessageHandledRef.current = true;
+    setQuestion(starterMessage);
+    void submitQuestion(starterMessage);
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.pathname, location.state, navigate]);
 
   // const handleSubmit = (e: React.FormEvent) => {
   //   e.preventDefault();
@@ -558,40 +573,31 @@ export function Chat({ onRequireLogin }: ChatProps) {
               </CardContent>
 
               <CardFooter className="sticky bottom-0 flex-shrink-0 border-t border-[#E2E8F0] bg-[#1d4ed8]/92 backdrop-blur">
-                {!isAuthenticated ? (
-                  <div className="w-full py-3 text-center">
-                    <p className="mb-2 text-[#0F172A]">Please log in to use AI Chat.</p>
-                    <Button type="button" onClick={onRequireLogin}>
-                      Login / Sign Up
-                    </Button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
-                    <Textarea
-                      ref={questionInputRef}
-                      placeholder="Ask about DTAA, NRI taxes, tax planning, ITR filing..."
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                      onKeyDown={handleQuestionKeyDown}
-                      className="min-h-[44px] max-h-32 resize-none border-[#E2E8F0] bg-[#F7FAFC]/90"
-                      rows={1}
-                    />
-                    <Button
-                      type="button"
-                      size="icon"
-                      variant={isListening ? "destructive" : "outline"}
-                      className="h-10 w-10 flex-shrink-0 border-[#E2E8F0]"
-                      onClick={toggleVoiceInput}
-                      disabled={!speechSupported}
-                      title={speechSupported ? "Voice input" : "Voice input not supported in this browser"}
-                    >
-                      {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
-                    </Button>
-                    <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95">
-                      <Send className="size-5" />
-                    </Button>
-                  </form>
-                )}
+                <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
+                  <Textarea
+                    ref={questionInputRef}
+                    placeholder="Ask about DTAA, NRI taxes, tax planning, ITR filing..."
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyDown={handleQuestionKeyDown}
+                    className="min-h-[44px] max-h-32 resize-none border-[#E2E8F0] bg-[#F7FAFC]/90"
+                    rows={1}
+                  />
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant={isListening ? "destructive" : "outline"}
+                    className="h-10 w-10 flex-shrink-0 border-[#E2E8F0]"
+                    onClick={toggleVoiceInput}
+                    disabled={!speechSupported}
+                    title={speechSupported ? "Voice input" : "Voice input not supported in this browser"}
+                  >
+                    {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                  </Button>
+                  <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95">
+                    <Send className="size-5" />
+                  </Button>
+                </form>
               </CardFooter>
               {isListening && (
                 <p className="px-6 pb-4 text-xs text-red-600">Listening... tap mic again to stop.</p>
@@ -611,7 +617,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Starter Questions</CardTitle>
-                <CardDescription>Click to ask</CardDescription>
+                <CardDescription>Click to ask Nexa</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {[

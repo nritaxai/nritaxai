@@ -4,27 +4,36 @@ dotenv.config();
 import fs from "fs";
 import path from "path";
 import OpenAI from "openai";
+import pdfParse from "pdf-parse";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
+
+const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 20000);
+const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
+  timeout: OPENROUTER_TIMEOUT_MS,
+  maxRetries: 0,
+  defaultHeaders: {
+    "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://nritax.ai",
+    "X-Title": process.env.OPENROUTER_APP_NAME || "NRITAX AI",
+  },
 });
 
 const MAX_CONTEXT_MESSAGES = Number(process.env.CHAT_CONTEXT_MESSAGES || 2);
 const MAX_STORED_MESSAGES = 100;
 const chatSessionMemory = new Map();
 const chatSessionStore = new Map();
-const RAG_TOP_K = Number(process.env.RAG_TOP_K || 2);
-const RAG_LEXICAL_CANDIDATES = Number(process.env.RAG_LEXICAL_CANDIDATES || 8);
+const RAG_TOP_K = Number(process.env.RAG_TOP_K || 4);
+const RAG_LEXICAL_CANDIDATES = Number(process.env.RAG_LEXICAL_CANDIDATES || 12);
 const RAG_LEXICAL_MIN_SCORE = 1.05;
 const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
 const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
-const RAG_MAX_PER_PAGE = 1;
+const RAG_MAX_PER_PAGE = Number(process.env.RAG_MAX_PER_PAGE || 2);
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
-const CHAT_MAX_TOKENS = Number(process.env.CHAT_MAX_TOKENS || 900);
-const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 12000);
+const CHAT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || 1400), 900);
 const FREE_MONTHLY_QUERY_LIMIT = Number(process.env.FREE_MONTHLY_QUERY_LIMIT || 10);
 let dtaaChunksCache = null;
 let dtaaTokenIndexCache = null;
@@ -35,16 +44,18 @@ const RESPONSE_CACHE_TTL_MS = Number(process.env.RESPONSE_CACHE_TTL_MS || 120000
 const RESPONSE_CACHE_MAX_ITEMS = Number(process.env.RESPONSE_CACHE_MAX_ITEMS || 500);
 const CHAT_DISABLE_PDF_DIR_FALLBACK = String(process.env.CHAT_DISABLE_PDF_DIR_FALLBACK || "true").toLowerCase() === "true";
 const responseCache = new Map();
+const GUEST_SESSION_HEADER = "x-guest-session-id";
 
 const modelMap = {
   "gpt-4o-mini": "openai/gpt-4o-mini",
   "gpt-4o": "openai/gpt-4o",
 };
-const DEFAULT_CHAT_MODEL = modelMap["gpt-4o-mini"];
+const DEFAULT_CHAT_MODEL = modelMap[String(process.env.CHAT_MODEL || "gpt-4o").toLowerCase()] || modelMap["gpt-4o"];
 
 const STORAGE_DIR = path.resolve("storage");
 const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
 const INDEX_PATH = path.join(STORAGE_DIR, "pdf_index.json");
+const ROOT_DIR = path.resolve(".");
 
 const isSameMonthYear = (a, b) =>
   a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth();
@@ -140,6 +151,73 @@ const QUERY_EXPANSIONS = {
 };
 
 const compact = (text = "") => text.toLowerCase().replace(/[^a-z0-9]/g, "");
+const sanitizeGuestSessionId = (value = "") =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]/g, "")
+    .slice(0, 80);
+
+const getSessionActorId = (req) => {
+  const userId = req.user?._id?.toString?.();
+  if (userId) return userId;
+
+  const guestSessionId = sanitizeGuestSessionId(req.headers?.[GUEST_SESSION_HEADER]);
+  if (guestSessionId) return `guest:${guestSessionId}`;
+
+  return "guest:anonymous";
+};
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const extractOpenRouterErrorMessage = (error) => {
+  const status = error?.status || error?.response?.status;
+  const message =
+    error?.error?.message ||
+    error?.response?.data?.error?.message ||
+    error?.response?.data?.message ||
+    error?.message ||
+    "Unknown OpenRouter error";
+
+  return {
+    status: Number.isFinite(Number(status)) ? Number(status) : null,
+    message: String(message),
+  };
+};
+
+const isRetryableOpenRouterError = (error) => {
+  const { status, message } = extractOpenRouterErrorMessage(error);
+  if (status && [408, 409, 429, 500, 502, 503, 504].includes(status)) return true;
+
+  const normalizedMessage = message.toLowerCase();
+  return (
+    normalizedMessage.includes("timeout") ||
+    normalizedMessage.includes("timed out") ||
+    normalizedMessage.includes("socket hang up") ||
+    normalizedMessage.includes("connection") ||
+    normalizedMessage.includes("network") ||
+    normalizedMessage.includes("overloaded")
+  );
+};
+
+const createChatCompletionWithRetry = async (payload) => {
+  let lastError = null;
+
+  for (let attempt = 0; attempt <= OPENROUTER_MAX_RETRIES; attempt += 1) {
+    try {
+      return await client.chat.completions.create(payload);
+    } catch (error) {
+      lastError = error;
+      if (attempt === OPENROUTER_MAX_RETRIES || !isRetryableOpenRouterError(error)) {
+        throw error;
+      }
+      await sleep(600 * (attempt + 1));
+    }
+  }
+
+  throw lastError;
+};
+
 const sanitizeAiReply = (text = "") =>
   String(text)
     .replace(/\*\*/g, "")
@@ -322,6 +400,11 @@ const setCachedResponse = (cacheKey, reply, language = "english") => {
   if (oldestKey) responseCache.delete(oldestKey);
 };
 
+const ensureStorage = () => {
+  if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
+  if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+};
+
 const buildQueryVariants = (question = "") => {
   const base = question.trim();
   if (!base) return [];
@@ -360,6 +443,41 @@ const chunkText = (text, size = 900, overlap = 150) => {
     start += Math.max(1, size - overlap);
   }
   return chunks;
+};
+
+const extractPageTexts = async (buffer) => {
+  const pageTexts = [];
+  let pageCounter = 0;
+
+  await pdfParse(buffer, {
+    pagerender: async (pageData) => {
+      pageCounter += 1;
+      const textContent = await pageData.getTextContent();
+      const text = textContent.items.map((item) => item.str).join(" ").replace(/\s+/g, " ").trim();
+      if (text) pageTexts.push({ page: pageCounter, text });
+      return text;
+    },
+  });
+
+  return pageTexts;
+};
+
+const indexPdfBuffer = async (buffer, fileName) => {
+  const pageTexts = await extractPageTexts(buffer);
+  const rows = [];
+
+  pageTexts.forEach(({ page, text }) => {
+    const chunks = chunkText(text);
+    chunks.forEach((chunk) => {
+      rows.push({
+        file: fileName,
+        page,
+        text: chunk,
+      });
+    });
+  });
+
+  return rows;
 };
 
 const getIndexedCandidateIndices = (queryTokens = [], tokenIndex = null, maxCandidates = RAG_INDEX_MAX_CANDIDATES) => {
@@ -551,7 +669,59 @@ const loadIndexChunks = () => {
   }
 };
 
+const saveIndexChunks = (rows = []) => {
+  ensureStorage();
+  fs.writeFileSync(INDEX_PATH, JSON.stringify(rows, null, 2), "utf8");
+};
+
+const getBootstrapPdfFiles = () => {
+  const directories = [ROOT_DIR, PDF_DIR];
+  const found = new Map();
+
+  directories.forEach((dirPath) => {
+    if (!fs.existsSync(dirPath)) return;
+    const files = fs
+      .readdirSync(dirPath, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"));
+
+    files.forEach((entry) => {
+      const absolutePath = path.join(dirPath, entry.name);
+      if (!found.has(absolutePath)) {
+        found.set(absolutePath, entry.name);
+      }
+    });
+  });
+
+  return Array.from(found.entries()).map(([absolutePath, fileName]) => ({
+    absolutePath,
+    fileName,
+  }));
+};
+
+const bootstrapIndexFromLocalPdfs = async () => {
+  const pdfFiles = getBootstrapPdfFiles();
+  if (!pdfFiles.length) return [];
+
+  const allRows = [];
+  for (const pdfFile of pdfFiles) {
+    try {
+      const buffer = fs.readFileSync(pdfFile.absolutePath);
+      const rows = await indexPdfBuffer(buffer, pdfFile.fileName);
+      allRows.push(...rows);
+    } catch (error) {
+      console.error(`Failed to index local PDF ${pdfFile.fileName}:`, error?.message || error);
+    }
+  }
+
+  if (allRows.length) {
+    saveIndexChunks(allRows);
+  }
+
+  return allRows;
+};
+
 const loadDtaaChunks = async () => {
+  ensureStorage();
   const hasIndexFile = fs.existsSync(INDEX_PATH);
   const indexMtime = hasIndexFile ? fs.statSync(INDEX_PATH).mtimeMs : null;
 
@@ -576,6 +746,14 @@ const loadDtaaChunks = async () => {
     }
   }
 
+  const bootstrapped = await bootstrapIndexFromLocalPdfs();
+  if (bootstrapped.length > 0) {
+    dtaaChunksCache = bootstrapped.map((row, idx) => preprocessChunk(row, idx));
+    dtaaTokenIndexCache = buildTokenIndex(dtaaChunksCache);
+    dtaaIndexMtimeCache = fs.existsSync(INDEX_PATH) ? fs.statSync(INDEX_PATH).mtimeMs : indexMtime;
+    return dtaaChunksCache;
+  }
+
   // Avoid expensive cold-start scans/parsing from arbitrary folders on chat requests.
   if (CHAT_DISABLE_PDF_DIR_FALLBACK) {
     dtaaChunksCache = [];
@@ -593,6 +771,7 @@ const dtaaNoAnswerByLanguage = {
   hindi: "इसका भरोसेमंद उत्तर देने के लिए पर्याप्त जानकारी नहीं है।",
   indonesian: "Saya tidak memiliki informasi yang cukup untuk menjawab itu dengan yakin.",
 };
+
 
 const ragFallbackDisclaimerByLanguage = {
   english:
@@ -777,7 +956,7 @@ const loadSessionMessages = async ({
 
 const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
   const safeHiddenContext = String(hiddenContext || "").trim();
-  const response = await client.chat.completions.create({
+  const response = await createChatCompletionWithRetry({
     model,
     temperature: 0,
     max_tokens: CHAT_MAX_TOKENS,
@@ -794,26 +973,37 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "Never switch to another language even if the user message is in a different language. " +
           "Maintain continuity with prior messages in this session. " +
           "Answer like a strong professional advisor, not a stub or checklist generator. " +
-          "Prefer complete, natural explanations with concrete compliance steps, limits, documents, and tax treatment when relevant. " +
+          "Write answers in a rich explanatory style similar to a high-quality professional tax advisor. " +
+          "Prefer complete, natural explanations with concrete compliance steps, limits, documents, tax treatment, process flow, and practical examples when relevant. " +
           "Keep key tax acronyms like DTAA, ITR, PAN, NRE, and NRO as-is. " +
           "Complete all sections fully and never leave a bullet or sentence unfinished. " +
           "Avoid placeholders, template artifacts, or repeating section headings inside section content. " +
-          "If the user asks a practical question, include the actual process and common documentation instead of generic advice. " +
-          "Aim for a complete reply, usually 220 to 380 words. " +
+          "If the user asks a practical question, include the actual process, common documentation, filing flow, and the reason each step matters instead of generic advice. " +
+          "If the user asks for documents, eligibility, forms, rates, exemptions, or DTAA relief, explicitly list them in a clean structured way. " +
+          "Use your general model knowledge for the main explanation and practical guidance. " +
+          "If hidden reference context is provided, use it only as supporting reference material for directly relevant treaty, statutory, or document details. " +
+          "Do not overfit the whole answer to the hidden reference context unless it is clearly on point. " +
+          "Do not invent treaty rules, forms, rates, eligibility conditions, or document requirements that are not supported by the hidden reference context or clearly established Indian tax practice. " +
+          "If the hidden reference context is partial or unclear, say so carefully and give conservative guidance rather than a confident unsupported answer. " +
+          "When useful, include mini-subheadings inside the Answer section such as 'Documents Required', 'How It Works', 'Example', or 'Important Note'. " +
+          "Aim for a complete reply, usually 320 to 520 words. " +
           "Use this exact response format for every answer.\n" +
           "Return markdown with only these headings:\n" +
           "### Answer\n" +
           "### Key Tax Points\n" +
           "### Next Steps\n" +
           "### Follow-up Questions\n" +
-          "Write 4 to 7 sentences in Answer. " +
+          "Write 6 to 12 sentences in Answer. " +
+          "Inside the Answer section, you may use short markdown subheadings like '#### Documents Required' or '#### Example' if they improve clarity. " +
           "Write exactly 2 substantial bullets in Key Tax Points. " +
           "Write exactly 2 numbered items in Next Steps. " +
           "Write exactly 2 follow-up questions. " +
           "Do not write placeholders such as 'depends on' without explaining what it depends on. " +
           "When relevant, mention actual forms, tax rates, TDS, remittance limits, account types, or filing steps. " +
+          "Do not give vague one-paragraph answers when the user is asking for a practical checklist or explanation. " +
+          "For question types like 'what documents are required', give a clearly organized document list with brief explanations for each item. " +
           "Model your tone like this example:\n" +
-          "### Answer\nExplain the issue in plain English, then describe the practical rule, tax treatment, and process in a natural paragraph.\n\n" +
+          "### Answer\nExplain the issue in plain English, then describe the practical rule, tax treatment, process, and examples in a natural multi-part explanation.\n\n" +
           "### Key Tax Points\n- First concrete tax or compliance point.\n- Second concrete tax or compliance point.\n\n" +
           "### Next Steps\n1. First practical action.\n2. Second practical action.\n\n" +
           "### Follow-up Questions\n- First relevant question.\n- Second relevant question." +
@@ -840,7 +1030,7 @@ export const getChatHistory = async (req, res) => {
     const rawKnowledgeSource =
       typeof req.query?.knowledgeSource === "string" ? req.query.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "general" ? "general" : "dtaa";
-    const userId = req.user?._id?.toString?.() || "guest";
+    const userId = getSessionActorId(req);
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
 
     const messages = await loadSessionMessages({
@@ -862,9 +1052,9 @@ export const clearChatHistory = async (req, res) => {
     const rawKnowledgeSource =
       typeof req.body?.knowledgeSource === "string" ? req.body.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "general" ? "general" : "dtaa";
-    const userId = req.user?._id?.toString?.() || "guest";
+    const userId = getSessionActorId(req);
 
-    if (userId !== "guest") {
+    if (!userId.startsWith("guest:")) {
       await ChatHistory.findOneAndUpdate(
         { user: userId, language: rawLanguage, knowledgeSource },
         { $set: { messages: [] } },
@@ -893,7 +1083,7 @@ export const chatWithAI = async (req, res) => {
       typeof req.body?.knowledgeSource === "string" ? req.body.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "dtaa" ? "dtaa" : "general";
     const model = DEFAULT_CHAT_MODEL;
-    const userId = req.user?._id?.toString?.() || "guest";
+    const userId = getSessionActorId(req);
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
     const sessionMessages = await loadSessionMessages({
       userId,
@@ -955,19 +1145,19 @@ export const chatWithAI = async (req, res) => {
       });
     }
 
-    const userDoc = await User.findById(req.user?._id).select("subscription usage");
-    if (!userDoc) {
+    const isGuestUser = userId.startsWith("guest:");
+    const userDoc = isGuestUser ? null : await User.findById(req.user?._id).select("subscription usage");
+    if (!isGuestUser && !userDoc) {
       return res.status(404).json({
         error: "User not found",
       });
     }
 
-    const usageWindowUpdated = normalizeUsageWindow(userDoc);
-    const userPlan = String(userDoc?.subscription?.plan || "FREE").toUpperCase();
-    const isFreePlan = userPlan === "FREE";
-
-    if (usageWindowUpdated) {
-      await userDoc.save();
+    if (userDoc) {
+      const usageWindowUpdated = normalizeUsageWindow(userDoc);
+      if (usageWindowUpdated) {
+        await userDoc.save();
+      }
     }
 
     const cacheKey = getResponseCacheKey({
@@ -981,7 +1171,7 @@ export const chatWithAI = async (req, res) => {
       return res.status(200).json({
         reply: ensureStructuredSections(sanitizeAiReply(repeatedReply), rawLanguage),
         cached: true,
-        usage: buildUsagePayload(userDoc),
+        usage: userDoc ? buildUsagePayload(userDoc) : null,
       });
     }
     const cachedReply = getCachedResponse(cacheKey);
@@ -989,18 +1179,20 @@ export const chatWithAI = async (req, res) => {
       return res.status(200).json({
         reply: ensureStructuredSections(sanitizeAiReply(cachedReply), rawLanguage),
         cached: true,
-        usage: buildUsagePayload(userDoc),
+        usage: userDoc ? buildUsagePayload(userDoc) : null,
       });
     }
 
     const finalizeReply = async (reply, extra = {}) => {
-      userDoc.usage.queriesUsed = Number(userDoc.usage.queriesUsed || 0) + 1;
-      await userDoc.save();
       const cleanedReply = ensureStructuredSections(sanitizeAiReply(reply), rawLanguage);
+      if (userDoc) {
+        userDoc.usage.queriesUsed = Number(userDoc.usage.queriesUsed || 0) + 1;
+        await userDoc.save();
+      }
       return res.status(200).json({
         reply: cleanedReply,
         ...extra,
-        usage: buildUsagePayload(userDoc),
+        usage: userDoc ? buildUsagePayload(userDoc) : null,
       });
     };
 
@@ -1081,7 +1273,6 @@ export const chatWithAI = async (req, res) => {
     };
     return res.status(200).json({
       reply: fallbackReplyByLanguage[requestLanguage] || fallbackReplyByLanguage.english,
-      warning: "OpenRouter temporarily unavailable. Fallback response returned.",
     });
   }
 };
