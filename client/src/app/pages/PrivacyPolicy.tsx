@@ -1,3 +1,7 @@
+import { useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+
+import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 
 const sections = [
@@ -50,21 +54,46 @@ const sections = [
   },
   {
     title: "7. Contact",
-    points: [
-      "For privacy questions or requests, contact: support@nritax.ai",
-    ],
+    points: ["For privacy questions or requests, contact: support@nritax.ai"],
   },
 ];
 
+type PrivacyLocationState = {
+  fromHero?: boolean;
+  fromSite?: boolean;
+  returnTo?: string;
+};
+
 export function PrivacyPolicy() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = (location.state ?? {}) as PrivacyLocationState;
+  const isFromHero = state.fromHero === true;
+  const isFromSite = state.fromSite === true;
+  const returnTo = useMemo(() => {
+    const nextPath = state.returnTo || "/";
+    return nextPath.startsWith("/") ? nextPath : "/";
+  }, [state.returnTo]);
+
+  useEffect(() => {
+    if (isFromHero || isFromSite) return;
+    navigate("/", { replace: true });
+  }, [isFromHero, isFromSite, navigate]);
+
+  const handlePolicyAcknowledged = () => {
+    navigate(returnTo, { replace: true, state: { privacyReviewed: true } });
+  };
+
+  if (!isFromHero && !isFromSite) {
+    return null;
+  }
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]">
         <CardHeader className="space-y-3">
           <CardTitle className="text-3xl text-[#0F172A] sm:text-4xl">Privacy Policy</CardTitle>
-          <CardDescription className="text-base text-[#0F172A]">
-            Effective date: March 4, 2026
-          </CardDescription>
+          <CardDescription className="text-base text-[#0F172A]">Effective date: March 4, 2026</CardDescription>
           <p className="text-sm text-[#0F172A]">
             This Privacy Policy explains how NRITAX.AI collects, uses, and protects information when you use our platform.
           </p>
@@ -80,10 +109,37 @@ export function PrivacyPolicy() {
               </ul>
             </section>
           ))}
+
+          <div className="rounded-xl border border-[#DBEAFE] bg-white p-4">
+            {isFromHero ? (
+              <>
+                <p className="text-sm text-[#0F172A]">
+                  After reviewing this policy, confirm below to return and enable the acknowledgment checkbox on the hero page.
+                </p>
+                <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <Button type="button" variant="outline" onClick={() => navigate(returnTo, { replace: true })}>
+                    Back
+                  </Button>
+                  <Button type="button" onClick={handlePolicyAcknowledged}>
+                    I Have Read the Privacy Policy
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-[#0F172A]">
+                  You are viewing the standard site privacy policy page from the website footer.
+                </p>
+                <div className="mt-4">
+                  <Button type="button" variant="outline" onClick={() => navigate(-1)}>
+                    Back
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
         </CardContent>
       </Card>
     </main>
   );
 }
-
-

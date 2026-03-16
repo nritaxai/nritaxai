@@ -10,7 +10,7 @@ const quickLinks = [
 ] as const;
 
 const legalLinks = [
-  { label: "Privacy Policy", to: "/privacy-policy" },
+  { label: "Privacy Policy", to: "/privacy-policy", state: { fromSite: true } },
   { label: "Terms of Service", to: "/terms-and-conditions" },
   { label: "Disclaimer", to: "/disclaimer" },
   { label: "Refund Policy", to: "/refund-policy" },
@@ -39,7 +39,7 @@ export function Footer() {
             <ul className="space-y-3">
               {quickLinks.map((item) => (
                 <li key={item.label}>
-                  <Link className="text-sm text-slate-400 transition-colors hover:text-white" to={item.to}>
+                  <Link className="text-sm text-slate-400 transition-colors hover:text-white" to={item.to} state={item.state}>
                     {renderTextWithShortForms(item.label)}
                   </Link>
                 </li>

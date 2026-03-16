@@ -8,22 +8,22 @@ import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
 import { TigerBotAvatar } from "./components/TigerBotAvatar";
 import { Button } from "./components/ui/button";
+import { Chat } from "./pages/Chat";
+import { Home } from "./pages/Home";
+import { HeroPage } from "./pages/HeroPage";
+import { Pricing } from "./pages/Pricing";
+import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { buildApiUrl } from "../utils/api";
 const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
-const Pricing = lazy(() => import("./pages/Pricing").then((m) => ({ default: m.Pricing })));
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
 const Profile = lazy(() => import("./pages/Profile").then((m) => ({ default: m.Profile })));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
-const Chat = lazy(() => import("./pages/Chat").then((m) => ({ default: m.Chat })));
 const Consult = lazy(() => import("./pages/Consult").then((m) => ({ default: m.Consult })));
 const Reschedule = lazy(() => import("./pages/Reschedule").then((m) => ({ default: m.Reschedule })));
 const Cancel = lazy(() => import("./pages/Cancel").then((m) => ({ default: m.Cancel })));
-const HomePage = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
-const HeroPage = lazy(() => import("./pages/HeroPage").then((m) => ({ default: m.HeroPage })));
 const Builder = lazy(() => import("./pages/Builder").then((m) => ({ default: m.Builder })));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
-const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy").then((m) => ({ default: m.PrivacyPolicy })));
 const AboutUs = lazy(() => import("./pages/AboutUs").then((m) => ({ default: m.AboutUs })));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions").then((m) => ({ default: m.TermsAndConditions })));
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy").then((m) => ({ default: m.RefundPolicy })));
@@ -237,7 +237,7 @@ export default function App() {
             <Route path="/" element={<HeroPage />} />
             <Route path="/Hero" element={<HeroPage />} />
             <Route path="/hero" element={<HeroPage />} />
-            <Route path="/home" element={withPageScaffold(<HomePage />)} />
+            <Route path="/home" element={withPageScaffold(<Home />)} />
 
             <Route
               path="/calculators"
