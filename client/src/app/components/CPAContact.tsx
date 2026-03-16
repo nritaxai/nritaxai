@@ -12,6 +12,15 @@ import { Calendar } from "./ui/calendar";
 import { ScrollArea } from "./ui/scroll-area";
 import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 import { renderTextWithShortForms } from "../utils/shortForms";
+import {
+  AVAILABLE_CONSULTATION_TIME_SLOTS,
+  CONSULTATION_WEBHOOKS,
+  normalizeConsultationDate,
+  normalizeConsultationTime,
+  postConsultationWebhook,
+  trimValue,
+  isValidEmail,
+} from "../utils/consultationWorkflow";
 
 interface CPAContactProps {
   onClose: () => void;
@@ -32,35 +41,15 @@ const INITIAL_FORM_DATA = {
   preferredTime: "",
 };
 
-const WEBHOOK_URL = "https://n8n.caloganathan.com/webhook/consultation-booking";
-const AVAILABLE_TIME_SLOTS = [
-  "09:00",
-  "09:30",
-  "10:00",
-  "10:30",
-  "11:00",
-  "11:30",
-  "12:00",
-  "12:30",
-  "13:00",
-  "13:30",
-  "14:00",
-  "14:30",
-  "15:00",
-  "15:30",
-  "16:00",
-  "16:30",
-  "17:00",
-  "17:30",
-  "18:00",
-] as const;
 const isSunday = (date: Date) => date.getDay() === 0;
+type FormFieldKey = "name" | "email" | "phone" | "country" | "preferredDate" | "preferredTime" | "service";
 
 export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FormFieldKey, string>>>({});
   const [formData, setFormData] = useState(INITIAL_FORM_DATA);
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
@@ -76,117 +65,92 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
   const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
+  const setFieldValue = (key: keyof typeof INITIAL_FORM_DATA, value: string) => {
+    setFormData((prev) => ({ ...prev, [key]: value }));
+    if (key in fieldErrors) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as FormFieldKey];
+        return next;
+      });
+    }
+    if (errorMessage) setErrorMessage("");
+  };
+
+  const validateForm = () => {
+    const nextErrors: Partial<Record<FormFieldKey, string>> = {};
+    const country = formData.country === "other" ? trimValue(formData.customCountry) : trimValue(formData.country);
+    const preferredDate = normalizeConsultationDate(formData.preferredDate);
+    const preferredTime = normalizeConsultationTime(formData.preferredTime);
+
+    if (!trimValue(formData.name)) nextErrors.name = "Full name is required.";
+    if (!isValidEmail(formData.email)) nextErrors.email = "Enter a valid email address.";
+    if (!trimValue(formData.phone)) nextErrors.phone = "Phone number is required.";
+    if (!country) nextErrors.country = "Country is required.";
+    if (!preferredDate) nextErrors.preferredDate = "Consultation date is required.";
+    if (!preferredTime) nextErrors.preferredTime = "Time slot is required.";
+    if (!trimValue(formData.service)) nextErrors.service = "Service selection is required.";
+
+    if (preferredDate && selectedDate) {
+      if (selectedDate < today) nextErrors.preferredDate = "Please choose a date from today onwards.";
+      if (selectedDate.getDay() === 0) nextErrors.preferredDate = "Bookings are not available on Sundays.";
+    }
+
+    if (
+      preferredTime &&
+      !AVAILABLE_CONSULTATION_TIME_SLOTS.includes(preferredTime as (typeof AVAILABLE_CONSULTATION_TIME_SLOTS)[number])
+    ) {
+      nextErrors.preferredTime = "Choose a valid time between 09:00 and 18:00.";
+    }
+
+    if (formData.contactMethod === "whatsapp" && !trimValue(formData.whatsapp)) {
+      setErrorMessage("Please provide your WhatsApp number for WhatsApp contact preference.");
+    }
+
+    setFieldErrors(nextErrors);
+    return { isValid: Object.keys(nextErrors).length === 0, country, preferredDate, preferredTime };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
-
-    const country = formData.country === "other" ? formData.customCountry.trim() : formData.country;
-    if (!country) {
-      setErrorMessage("Please select your country of residence.");
+    const { isValid, country, preferredDate, preferredTime } = validateForm();
+    if (!trimValue(formData.queryDetails)) {
+      setErrorMessage("Please describe your tax situation and concerns.");
       setLoading(false);
       return;
     }
-
-    if (!formData.service.trim()) {
-      setErrorMessage("Please select the service required.");
+    if (!isValid || (formData.contactMethod === "whatsapp" && !trimValue(formData.whatsapp))) {
       setLoading(false);
       return;
-    }
-
-    if (!formData.queryDetails.trim()) {
-      setErrorMessage("Please enter your tax query details.");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.contactMethod === "whatsapp" && !formData.whatsapp.trim()) {
-      setErrorMessage("Please provide your WhatsApp number for WhatsApp contact preference.");
-      setLoading(false);
-      return;
-    }
-
-    if (formData.preferredDate) {
-      if (!selectedDate) {
-        setErrorMessage("Please select a valid booking date.");
-        setLoading(false);
-        return;
-      }
-
-      if (selectedDate < today) {
-        setErrorMessage("Please choose a date from today onwards.");
-        setLoading(false);
-        return;
-      }
-
-      if (selectedDate.getDay() === 0) {
-        setErrorMessage("Bookings are not available on Sundays. Please choose another day.");
-        setLoading(false);
-        return;
-      }
-    }
-
-    if (formData.preferredTime && !AVAILABLE_TIME_SLOTS.includes(formData.preferredTime as typeof AVAILABLE_TIME_SLOTS[number])) {
-        setErrorMessage("Please choose a time between 09:00 and 18:00.");
-        setLoading(false);
-        return;
     }
 
     const payload = {
-      name: formData.name.trim() || "",
-      email: formData.email.trim() || "",
-      phone: formData.phone.trim() || "",
-      whatsapp: formData.whatsapp.trim() || "",
-      contactMethod: formData.contactMethod || "",
-      country: country || "",
-      preferredDate: formData.preferredDate || "",
-      preferredTime: formData.preferredTime || "",
-      service: formData.service.trim() || "",
-      queryDetails: formData.queryDetails.trim() || "",
-      source: "Website Consultation Form",
-      submittedAt: new Date().toISOString(),
+      name: trimValue(formData.name),
+      email: trimValue(formData.email),
+      phone: trimValue(formData.phone),
+      whatsapp: trimValue(formData.whatsapp),
+      contactMethod: trimValue(formData.contactMethod),
+      country,
+      date: preferredDate,
+      time: preferredTime,
+      service: trimValue(formData.service),
+      queryDetails: trimValue(formData.queryDetails),
     };
 
     try {
-      const response = await fetch(WEBHOOK_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const rawText = await response.text();
-      let result: { message?: string } | null = null;
-
-      if (rawText && rawText.trim() !== "") {
-        try {
-          result = JSON.parse(rawText);
-        } catch (parseError) {
-          console.error("Invalid webhook response:", rawText, parseError);
-          throw new Error("Server returned an invalid response");
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error(
-          result?.message || `Webhook request failed with status ${response.status}`
-        );
-      }
-
-      const message = result?.message || "Consultation request submitted successfully";
+      const result = await postConsultationWebhook<{ message?: string }>(CONSULTATION_WEBHOOKS.booking, payload);
+      const message = trimValue(result?.message) || "Consultation request submitted successfully.";
 
       setSuccessMessage(message);
       setFormData(INITIAL_FORM_DATA);
+      setFieldErrors({});
       setSubmitted(true);
     } catch (error: any) {
-      console.error("Consultation submit error:", error);
-      setErrorMessage(
-        error?.message === "Failed to fetch"
-          ? "Network or CORS error while submitting the consultation request"
-          : error?.message || "Failed to submit consultation request"
-      );
+      setErrorMessage(error?.message || "Failed to submit consultation request.");
     } finally {
       setLoading(false);
     }
@@ -274,9 +238,12 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   id="name"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  onChange={(e) => setFieldValue("name", e.target.value)}
                   placeholder="Your full name"
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  aria-describedby={fieldErrors.name ? "name-error" : undefined}
                 />
+                {fieldErrors.name ? <p id="name-error" className="text-sm text-red-600">{fieldErrors.name}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -286,9 +253,12 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   type="email"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => setFieldValue("email", e.target.value)}
                   placeholder="your.email@example.com"
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={fieldErrors.email ? "email-error" : undefined}
                 />
+                {fieldErrors.email ? <p id="email-error" className="text-sm text-red-600">{fieldErrors.email}</p> : null}
               </div>
             </div>
 
@@ -300,9 +270,12 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   type="tel"
                   required
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => setFieldValue("phone", e.target.value)}
                   placeholder="+1 234 567 8900"
+                  aria-invalid={Boolean(fieldErrors.phone)}
+                  aria-describedby={fieldErrors.phone ? "phone-error" : undefined}
                 />
+                {fieldErrors.phone ? <p id="phone-error" className="text-sm text-red-600">{fieldErrors.phone}</p> : null}
               </div>
 
               <div className="space-y-2">
@@ -311,7 +284,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   id="whatsapp"
                   type="tel"
                   value={formData.whatsapp}
-                  onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+                  onChange={(e) => setFieldValue("whatsapp", e.target.value)}
                   placeholder="+62 812 3456 7890"
                 />
               </div>
@@ -320,7 +293,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="contactMethod">Preferred Contact Method *</Label>
-                <Select value={formData.contactMethod} onValueChange={(value) => setFormData({ ...formData, contactMethod: value })}>
+                <Select value={formData.contactMethod} onValueChange={(value) => setFieldValue("contactMethod", value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select contact method" />
                   </SelectTrigger>
@@ -336,15 +309,21 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 <Label htmlFor="country">Country of Residence *</Label>
                 <Select
                   value={formData.country}
-                  onValueChange={(value) =>
+                  onValueChange={(value) => {
                     setFormData((prev) => ({
                       ...prev,
                       country: value,
                       customCountry: value === "other" ? prev.customCountry : "",
-                    }))
-                  }
+                    }));
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.country;
+                      return next;
+                    });
+                    if (errorMessage) setErrorMessage("");
+                  }}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-invalid={Boolean(fieldErrors.country)}>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
@@ -363,16 +342,17 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                     id="customCountry"
                     required
                     value={formData.customCountry}
-                    onChange={(e) => setFormData({ ...formData, customCountry: e.target.value })}
+                    onChange={(e) => setFieldValue("customCountry", e.target.value)}
                     placeholder="Type your country"
                   />
                 )}
+                {fieldErrors.country ? <p className="text-sm text-red-600">{fieldErrors.country}</p> : null}
               </div>
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="relative space-y-2">
-                <Label htmlFor="preferredDate">Preferred Date (optional)</Label>
+                <Label htmlFor="preferredDate">Preferred Date *</Label>
                 <Button
                   id="preferredDate"
                   type="button"
@@ -401,14 +381,19 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                         return;
                       }
 
-                      setFormData((prev) => ({
-                        ...prev,
-                        preferredDate: format(date, "yyyy-MM-dd"),
-                        preferredTime: prev.preferredDate === format(date, "yyyy-MM-dd") ? prev.preferredTime : "",
-                      }));
-                      setDatePickerMessage("");
-                      setErrorMessage("");
-                      setIsDatePickerOpen(false);
+                        setFormData((prev) => ({
+                          ...prev,
+                          preferredDate: format(date, "yyyy-MM-dd"),
+                          preferredTime: prev.preferredDate === format(date, "yyyy-MM-dd") ? prev.preferredTime : "",
+                        }));
+                        setFieldErrors((prev) => {
+                          const next = { ...prev };
+                          delete next.preferredDate;
+                          return next;
+                        });
+                        setDatePickerMessage("");
+                        setErrorMessage("");
+                        setIsDatePickerOpen(false);
                       setIsTimePickerOpen(false);
                     }}
                     onDayClick={(date, modifiers) => {
@@ -429,9 +414,10 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   </div>
                 )}
                 {datePickerMessage && <p className="text-xs text-slate-500">{datePickerMessage}</p>}
+                {fieldErrors.preferredDate ? <p className="text-sm text-red-600">{fieldErrors.preferredDate}</p> : null}
               </div>
             <div className="relative space-y-2">
-              <Label htmlFor="preferredTime">Preferred Time (optional)</Label>
+              <Label htmlFor="preferredTime">Preferred Time *</Label>
               <Button
                 id="preferredTime"
                 type="button"
@@ -446,6 +432,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   "h-11 w-full justify-between px-3 text-left font-normal",
                   !formData.preferredTime && "text-slate-500",
                 )}
+                aria-invalid={Boolean(fieldErrors.preferredTime)}
               >
                 <span>{formData.preferredTime || "Select a time slot"}</span>
                 <div className="flex items-center gap-2">
@@ -457,7 +444,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-md border bg-white shadow-lg">
                   <ScrollArea className="h-64 w-full">
                     <div className="grid gap-1 p-2">
-                      {AVAILABLE_TIME_SLOTS.map((slot) => (
+                      {AVAILABLE_CONSULTATION_TIME_SLOTS.map((slot) => (
                         <Button
                           key={slot}
                           type="button"
@@ -465,6 +452,11 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                           className="justify-start rounded-sm"
                           onClick={() => {
                             setFormData({ ...formData, preferredTime: slot });
+                            setFieldErrors((prev) => {
+                              const next = { ...prev };
+                              delete next.preferredTime;
+                              return next;
+                            });
                             setErrorMessage("");
                             setIsTimePickerOpen(false);
                           }}
@@ -477,13 +469,14 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 </div>
               )}
               <p className="text-xs text-slate-500">Time slots are available only from 09:00 to 18:00.</p>
+              {fieldErrors.preferredTime ? <p className="text-sm text-red-600">{fieldErrors.preferredTime}</p> : null}
             </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="service">Service Required *</Label>
-              <Select value={formData.service} onValueChange={(value) => setFormData({ ...formData, service: value })}>
-                <SelectTrigger>
+              <Select value={formData.service} onValueChange={(value) => setFieldValue("service", value)}>
+                <SelectTrigger aria-invalid={Boolean(fieldErrors.service)}>
                   <SelectValue placeholder="Select service" />
                 </SelectTrigger>
                 <SelectContent>
@@ -495,6 +488,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+              {fieldErrors.service ? <p className="text-sm text-red-600">{fieldErrors.service}</p> : null}
             </div>
 
             <div className="space-y-2">
@@ -503,7 +497,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 id="taxQuery"
                 required
                 value={formData.queryDetails}
-                onChange={(e) => setFormData({ ...formData, queryDetails: e.target.value })}
+                onChange={(e) => setFieldValue("queryDetails", e.target.value)}
                 placeholder="Please describe your tax situation and specific concerns..."
                 rows={4}
               />

@@ -17,6 +17,8 @@ const Profile = lazy(() => import("./pages/Profile").then((m) => ({ default: m.P
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const Chat = lazy(() => import("./pages/Chat").then((m) => ({ default: m.Chat })));
 const Consult = lazy(() => import("./pages/Consult").then((m) => ({ default: m.Consult })));
+const Reschedule = lazy(() => import("./pages/Reschedule").then((m) => ({ default: m.Reschedule })));
+const Cancel = lazy(() => import("./pages/Cancel").then((m) => ({ default: m.Cancel })));
 const HomePage = lazy(() => import("./pages/Home").then((m) => ({ default: m.Home })));
 const HeroPage = lazy(() => import("./pages/HeroPage").then((m) => ({ default: m.HeroPage })));
 const Builder = lazy(() => import("./pages/Builder").then((m) => ({ default: m.Builder })));
@@ -254,6 +256,8 @@ export default function App() {
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
             <Route path="/consult" element={withPageScaffold(<Consult />)} />
+            <Route path="/reschedule" element={withPageScaffold(<Reschedule />)} />
+            <Route path="/cancel" element={withPageScaffold(<Cancel />)} />
             <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
             <Route path="/about-us" element={withPageScaffold(<AboutUs />)} />
             <Route path="/terms-and-conditions" element={withPageScaffold(<TermsAndConditions />)} />
