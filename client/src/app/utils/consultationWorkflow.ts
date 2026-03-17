@@ -198,13 +198,13 @@ export const getAvailableConsultationTimeSlots = (date: string, timeZone = "Asia
   const normalizedTimeZone = normalizeConsultationTimeZone(timeZone) || "Asia/Kolkata";
   if (!normalizedDate) return [];
 
-  const localSlots = Array.from(
-    new Set(
-      [-1, 0, 1]
-    .flatMap((offset) => {
+  const slotGroups = [-1, 0, 1]
+    .map((offset) => {
       const istDate = shiftDate(normalizedDate, offset);
       const parsedIstDate = parseConsultationDate(istDate);
-      if (!parsedIstDate || parsedIstDate.getDay() === 0) return [];
+      if (!parsedIstDate || parsedIstDate.getDay() === 0) {
+        return { offset, times: [] as string[] };
+      }
 
       const { year, month, day } = {
         year: parsedIstDate.getFullYear(),
@@ -212,18 +212,25 @@ export const getAvailableConsultationTimeSlots = (date: string, timeZone = "Asia
         day: parsedIstDate.getDate(),
       };
 
-      return AVAILABLE_CONSULTATION_TIME_SLOTS.map((slot) => {
+      const times = AVAILABLE_CONSULTATION_TIME_SLOTS.map((slot) => {
         const utcDate = getUtcDateForIstSlot(year, month, day, slot);
         return {
           date: formatDateParts(getDatePartsInTimeZone(utcDate, normalizedTimeZone)),
           time: getTimeInTimeZone(utcDate, normalizedTimeZone),
         };
-      });
+      })
+        .filter((slot) => slot.date === normalizedDate)
+        .map((slot) => slot.time)
+        .sort((left, right) => toMinutes(left) - toMinutes(right));
+
+      return { offset, times };
     })
-    .filter((slot) => slot.date === normalizedDate)
-    .map((slot) => slot.time)
-    )
-  ).sort((left, right) => toMinutes(left) - toMinutes(right));
+    .sort((left, right) => {
+      if (right.times.length !== left.times.length) return right.times.length - left.times.length;
+      return Math.abs(left.offset) - Math.abs(right.offset);
+    });
+
+  const localSlots = slotGroups[0]?.times || [];
 
   const todayIso = getTodayInTimeZone(now, normalizedTimeZone);
   if (normalizedDate !== todayIso) return localSlots;
