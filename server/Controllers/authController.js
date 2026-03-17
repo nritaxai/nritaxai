@@ -497,10 +497,7 @@ export const forgotPassword = async (req, res) => {
     logAuthError("forgot-password", error, { email });
     return res.status(500).json({
       success: false,
-      message:
-        process.env.NODE_ENV === "production"
-          ? "Unable to send password reset email right now."
-          : `Unable to send password reset email right now. ${error?.message || "Unknown mail error."}`,
+      message: `Unable to send password reset email right now. ${error?.message || "Unknown mail error."}`,
     });
   }
 };
