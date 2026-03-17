@@ -26,6 +26,19 @@ export const AVAILABLE_CONSULTATION_TIME_SLOTS = [
   "18:00",
 ] as const;
 
+export const CONSULTATION_TIME_ZONES = [
+  "Asia/Kolkata",
+  "Asia/Dubai",
+  "Asia/Singapore",
+  "Europe/London",
+  "America/New_York",
+  "America/Chicago",
+  "America/Denver",
+  "America/Los_Angeles",
+  "America/Toronto",
+  "Australia/Sydney",
+] as const;
+
 export type ConsultationIdentifier =
   | { key: "token"; value: string }
   | { key: "bookingId"; value: string }
@@ -38,8 +51,9 @@ export type ConsultationBookingPayload = {
   whatsapp: string;
   contactMethod: string;
   country: string;
-  date: string;
-  time: string;
+  preferredDate: string;
+  preferredTime: string;
+  timeZone: string;
   service: string;
   queryDetails: string;
 };
@@ -49,10 +63,28 @@ type JsonRecord = Record<string, unknown>;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^\d{2}:\d{2}$/;
+const IST_OFFSET_MINUTES = 5 * 60 + 30;
+
+const padTimePart = (value: number) => `${value}`.padStart(2, "0");
 
 export const trimValue = (value: unknown) => String(value ?? "").trim();
 
 export const isValidEmail = (value: string) => EMAIL_PATTERN.test(trimValue(value));
+
+export const getBrowserTimeZone = () => {
+  if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {
+    return "";
+  }
+
+  return trimValue(Intl.DateTimeFormat().resolvedOptions().timeZone);
+};
+
+export const getDefaultConsultationTimeZone = () => {
+  const browserTimeZone = getBrowserTimeZone();
+  return CONSULTATION_TIME_ZONES.includes(browserTimeZone as (typeof CONSULTATION_TIME_ZONES)[number])
+    ? browserTimeZone
+    : "Asia/Kolkata";
+};
 
 export const normalizeConsultationDate = (value: string) => {
   const trimmed = trimValue(value);
@@ -83,6 +115,18 @@ export const normalizeConsultationTime = (value: string) => {
   return `${hours}:${minutes}`;
 };
 
+export const normalizeConsultationTimeZone = (value: string) => {
+  const trimmed = trimValue(value);
+  if (!trimmed) return "";
+
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: trimmed }).format(new Date());
+    return trimmed;
+  } catch {
+    return "";
+  }
+};
+
 const toMinutes = (time: string) => {
   const normalized = normalizeConsultationTime(time);
   if (!normalized) return -1;
@@ -90,15 +134,91 @@ const toMinutes = (time: string) => {
   return hours * 60 + minutes;
 };
 
-export const getAvailableConsultationTimeSlots = (date: string, now = new Date()) => {
+const getDatePartsInTimeZone = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const parts = formatter.formatToParts(date);
+  const year = Number(parts.find((part) => part.type === "year")?.value ?? "0");
+  const month = Number(parts.find((part) => part.type === "month")?.value ?? "0");
+  const day = Number(parts.find((part) => part.type === "day")?.value ?? "0");
+  return { year, month, day };
+};
+
+const formatDateParts = ({ year, month, day }: { year: number; month: number; day: number }) =>
+  `${year}-${padTimePart(month)}-${padTimePart(day)}`;
+
+const getTimeInTimeZone = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  return formatter.format(date);
+};
+
+const getUtcDateForIstSlot = (year: number, month: number, day: number, time: string) => {
+  const [hours, minutes] = time.split(":").map(Number);
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes - IST_OFFSET_MINUTES));
+};
+
+const shiftDate = (date: string, dayDelta: number) => {
+  const parsedDate = parseConsultationDate(date);
+  if (!parsedDate) return "";
+  const shifted = new Date(parsedDate);
+  shifted.setDate(shifted.getDate() + dayDelta);
+  return formatDateParts({
+    year: shifted.getFullYear(),
+    month: shifted.getMonth() + 1,
+    day: shifted.getDate(),
+  });
+};
+
+const getCurrentMinutesInTimeZone = (now: Date, timeZone: string) => {
+  const currentTime = getTimeInTimeZone(now, timeZone);
+  return toMinutes(currentTime);
+};
+
+const getTodayInTimeZone = (now: Date, timeZone: string) => formatDateParts(getDatePartsInTimeZone(now, timeZone));
+
+export const getAvailableConsultationTimeSlots = (date: string, timeZone = "Asia/Kolkata", now = new Date()) => {
   const normalizedDate = normalizeConsultationDate(date);
-  if (!normalizedDate) return [...AVAILABLE_CONSULTATION_TIME_SLOTS];
+  const normalizedTimeZone = normalizeConsultationTimeZone(timeZone) || "Asia/Kolkata";
+  if (!normalizedDate) return [];
 
-  const todayIso = getTodayConsultationDate(now);
-  if (normalizedDate !== todayIso) return [...AVAILABLE_CONSULTATION_TIME_SLOTS];
+  const localSlots = [-1, 0, 1]
+    .flatMap((offset) => {
+      const istDate = shiftDate(normalizedDate, offset);
+      const parsedIstDate = parseConsultationDate(istDate);
+      if (!parsedIstDate || parsedIstDate.getDay() === 0) return [];
 
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
-  return AVAILABLE_CONSULTATION_TIME_SLOTS.filter((slot) => toMinutes(slot) > currentMinutes);
+      const { year, month, day } = {
+        year: parsedIstDate.getFullYear(),
+        month: parsedIstDate.getMonth() + 1,
+        day: parsedIstDate.getDate(),
+      };
+
+      return AVAILABLE_CONSULTATION_TIME_SLOTS.map((slot) => {
+        const utcDate = getUtcDateForIstSlot(year, month, day, slot);
+        return {
+          date: formatDateParts(getDatePartsInTimeZone(utcDate, normalizedTimeZone)),
+          time: getTimeInTimeZone(utcDate, normalizedTimeZone),
+        };
+      });
+    })
+    .filter((slot) => slot.date === normalizedDate)
+    .map((slot) => slot.time)
+    .sort((left, right) => toMinutes(left) - toMinutes(right));
+
+  const todayIso = getTodayInTimeZone(now, normalizedTimeZone);
+  if (normalizedDate !== todayIso) return localSlots;
+
+  const currentMinutes = getCurrentMinutesInTimeZone(now, normalizedTimeZone);
+  return localSlots.filter((slot) => toMinutes(slot) > currentMinutes);
 };
 
 export const getConsultationDateConstraintError = (date: string, now = new Date()) => {
@@ -177,11 +297,12 @@ export const buildReschedulePayload = (
   date: string,
   time: string,
 ) => ({
-  [identifier.key]: identifier.value,
+  token: identifier.key === "token" ? identifier.value : "",
   date: normalizeConsultationDate(date),
   time: normalizeConsultationTime(time),
+  timeZone: getBrowserTimeZone(),
 });
 
 export const buildCancelPayload = (identifier: ConsultationIdentifier) => ({
-  [identifier.key]: identifier.value,
+  token: identifier.key === "token" ? identifier.value : "",
 });

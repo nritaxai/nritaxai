@@ -13,14 +13,16 @@ import { ScrollArea } from "./ui/scroll-area";
 import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import {
-  CONSULTATION_WEBHOOKS,
+  CONSULTATION_TIME_ZONES,
+  getBrowserTimeZone,
   getAvailableConsultationTimeSlots,
   normalizeConsultationDate,
   normalizeConsultationTime,
-  postConsultationWebhook,
+  normalizeConsultationTimeZone,
   trimValue,
   isValidEmail,
 } from "../utils/consultationWorkflow";
+import { buildApiUrl } from "../../utils/api";
 
 interface CPAContactProps {
   onClose: () => void;
@@ -37,12 +39,22 @@ const INITIAL_FORM_DATA = {
   customCountry: "",
   queryDetails: "",
   service: "",
+  timeZone: "",
   preferredDate: "",
   preferredTime: "",
 };
 
 const isSunday = (date: Date) => date.getDay() === 0;
-type FormFieldKey = "name" | "email" | "phone" | "country" | "preferredDate" | "preferredTime" | "service";
+type FormFieldKey =
+  | "name"
+  | "email"
+  | "phone"
+  | "country"
+  | "timeZone"
+  | "preferredDate"
+  | "preferredTime"
+  | "service"
+  | "queryDetails";
 
 export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const [submitted, setSubmitted] = useState(false);
@@ -63,13 +75,25 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   }, [formData.preferredDate]);
   const formattedPreferredDate = selectedDate ? format(selectedDate, "PP") : "";
   const availableTimeSlots = useMemo(
-    () => getAvailableConsultationTimeSlots(formData.preferredDate),
-    [formData.preferredDate]
+    () => getAvailableConsultationTimeSlots(formData.preferredDate, formData.timeZone),
+    [formData.preferredDate, formData.timeZone]
   );
   const timeSlotPanelHeight = useMemo(() => {
     const visibleRows = Math.min(Math.max(availableTimeSlots.length, 1), 5);
     return visibleRows * 40 + 16;
   }, [availableTimeSlots]);
+  const browserTimeZone = useMemo(() => getBrowserTimeZone(), []);
+  const timeZoneOptions = useMemo(() => {
+    const normalizedBrowserTimeZone = normalizeConsultationTimeZone(browserTimeZone);
+    if (
+      normalizedBrowserTimeZone &&
+      !CONSULTATION_TIME_ZONES.includes(normalizedBrowserTimeZone as (typeof CONSULTATION_TIME_ZONES)[number])
+    ) {
+      return [normalizedBrowserTimeZone, ...CONSULTATION_TIME_ZONES];
+    }
+
+    return [...CONSULTATION_TIME_ZONES];
+  }, [browserTimeZone]);
 
   const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
@@ -88,6 +112,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   const validateForm = () => {
     const nextErrors: Partial<Record<FormFieldKey, string>> = {};
     const country = formData.country === "other" ? trimValue(formData.customCountry) : trimValue(formData.country);
+    const timeZone = normalizeConsultationTimeZone(formData.timeZone);
     const preferredDate = normalizeConsultationDate(formData.preferredDate);
     const preferredTime = normalizeConsultationTime(formData.preferredTime);
 
@@ -95,9 +120,11 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
     if (!isValidEmail(formData.email)) nextErrors.email = "Enter a valid email address.";
     if (!trimValue(formData.phone)) nextErrors.phone = "Phone number is required.";
     if (!country) nextErrors.country = "Country is required.";
+    if (!timeZone) nextErrors.timeZone = "Timezone is required.";
     if (!preferredDate) nextErrors.preferredDate = "Consultation date is required.";
     if (!preferredTime) nextErrors.preferredTime = "Time slot is required.";
     if (!trimValue(formData.service)) nextErrors.service = "Service selection is required.";
+    if (!trimValue(formData.queryDetails)) nextErrors.queryDetails = "Please describe your tax situation and concerns.";
 
     if (preferredDate && selectedDate) {
       if (selectedDate < today) nextErrors.preferredDate = "Please choose a date from today onwards.";
@@ -119,7 +146,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
     }
 
     setFieldErrors(nextErrors);
-    return { isValid: Object.keys(nextErrors).length === 0, country, preferredDate, preferredTime };
+    return { isValid: Object.keys(nextErrors).length === 0, country, timeZone, preferredDate, preferredTime };
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -128,12 +155,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
     setLoading(true);
     setSuccessMessage("");
     setErrorMessage("");
-    const { isValid, country, preferredDate, preferredTime } = validateForm();
-    if (!trimValue(formData.queryDetails)) {
-      setErrorMessage("Please describe your tax situation and concerns.");
-      setLoading(false);
-      return;
-    }
+    const { isValid, country, timeZone, preferredDate, preferredTime } = validateForm();
     if (!isValid || (formData.contactMethod === "whatsapp" && !trimValue(formData.whatsapp))) {
       setLoading(false);
       return;
@@ -146,14 +168,25 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
       whatsapp: trimValue(formData.whatsapp),
       contactMethod: trimValue(formData.contactMethod),
       country,
-      date: preferredDate,
-      time: preferredTime,
+      preferredDate,
+      preferredTime,
+      timeZone,
       service: trimValue(formData.service),
       queryDetails: trimValue(formData.queryDetails),
     };
 
     try {
-      const result = await postConsultationWebhook<{ message?: string }>(CONSULTATION_WEBHOOKS.booking, payload);
+      const response = await fetch(buildApiUrl("/api/consultations"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const result = (await response.json().catch(() => null)) as { message?: string } | null;
+      if (!response.ok) {
+        throw new Error(result?.message || "Failed to submit consultation request.");
+      }
       const message = trimValue(result?.message) || "Consultation request submitted successfully.";
 
       setSuccessMessage(message);
@@ -303,6 +336,51 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label htmlFor="timeZone">Preferred Timezone *</Label>
+                <Select
+                  value={formData.timeZone}
+                  onValueChange={(value) => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      timeZone: value,
+                      preferredDate: "",
+                      preferredTime: "",
+                    }));
+                    setFieldErrors((prev) => {
+                      const next = { ...prev };
+                      delete next.timeZone;
+                      delete next.preferredDate;
+                      delete next.preferredTime;
+                      return next;
+                    });
+                    setDatePickerMessage("");
+                    setErrorMessage("");
+                    setIsDatePickerOpen(false);
+                    setIsTimePickerOpen(false);
+                  }}
+                >
+                  <SelectTrigger id="timeZone" aria-invalid={Boolean(fieldErrors.timeZone)}>
+                    <SelectValue placeholder="Select timezone" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeZoneOptions.map((timeZone) => (
+                      <SelectItem key={timeZone} value={timeZone}>
+                        {timeZone}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {!fieldErrors.timeZone ? (
+                  <p className="text-sm text-slate-500">
+                    {browserTimeZone
+                      ? `Browser detected: ${browserTimeZone}. Select your timezone to continue.`
+                      : "Pick your timezone first to see the matching consultation slots."}
+                  </p>
+                ) : null}
+                {fieldErrors.timeZone ? <p className="text-sm text-red-600">{fieldErrors.timeZone}</p> : null}
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="contactMethod">Preferred Contact Method *</Label>
                 <Select value={formData.contactMethod} onValueChange={(value) => setFieldValue("contactMethod", value)}>
                   <SelectTrigger>
@@ -368,7 +446,9 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   id="preferredDate"
                   type="button"
                   variant="outline"
+                  disabled={!formData.timeZone}
                   onClick={() => {
+                    if (!formData.timeZone) return;
                     setIsDatePickerOpen((prev) => !prev);
                     setIsTimePickerOpen(false);
                   }}
@@ -424,6 +504,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   />
                   </div>
                 )}
+                {!formData.timeZone ? <p className="text-xs text-slate-500">Select a timezone before choosing a date.</p> : null}
                 {datePickerMessage && <p className="text-xs text-slate-500">{datePickerMessage}</p>}
                 {fieldErrors.preferredDate ? <p className="text-sm text-red-600">{fieldErrors.preferredDate}</p> : null}
               </div>
@@ -433,9 +514,9 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 id="preferredTime"
                 type="button"
                 variant="outline"
-                disabled={!formData.preferredDate}
+                disabled={!formData.timeZone || !formData.preferredDate}
                 onClick={() => {
-                  if (!formData.preferredDate) return;
+                  if (!formData.timeZone || !formData.preferredDate) return;
                   setIsTimePickerOpen((prev) => !prev);
                   setIsDatePickerOpen(false);
                 }}
@@ -483,6 +564,9 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 </div>
               )}
               <p className="text-xs text-slate-500">
+                {formData.timeZone
+                  ? `Times shown in ${formData.timeZone}.`
+                  : "Select a timezone to view time slots."}{" "}
                 Time slots are available only from 09:00 to 18:00, and past slots for today are automatically hidden.
               </p>
               {fieldErrors.preferredTime ? <p className="text-sm text-red-600">{fieldErrors.preferredTime}</p> : null}
@@ -516,7 +600,10 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 onChange={(e) => setFieldValue("queryDetails", e.target.value)}
                 placeholder="Please describe your tax situation and specific concerns..."
                 rows={4}
+                aria-invalid={Boolean(fieldErrors.queryDetails)}
+                aria-describedby={fieldErrors.queryDetails ? "query-error" : undefined}
               />
+              {fieldErrors.queryDetails ? <p id="query-error" className="text-sm text-red-600">{fieldErrors.queryDetails}</p> : null}
             </div>
 
             <div className="bg-[#2563eb]/12 border border-[#2563eb]/40 rounded-lg p-4 text-sm">
