@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "../components/ui/button";
@@ -69,24 +69,15 @@ export function PrivacyPolicy() {
   const location = useLocation();
   const state = (location.state ?? {}) as PrivacyLocationState;
   const isFromHero = state.fromHero === true;
-  const isFromSite = state.fromSite === true;
+  const isFromSite = state.fromSite === true || !isFromHero;
   const returnTo = useMemo(() => {
     const nextPath = state.returnTo || "/";
     return nextPath.startsWith("/") ? nextPath : "/";
   }, [state.returnTo]);
 
-  useEffect(() => {
-    if (isFromHero || isFromSite) return;
-    navigate("/", { replace: true });
-  }, [isFromHero, isFromSite, navigate]);
-
   const handlePolicyAcknowledged = () => {
     navigate(returnTo, { replace: true, state: { privacyReviewed: true } });
   };
-
-  if (!isFromHero && !isFromSite) {
-    return null;
-  }
 
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">

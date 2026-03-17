@@ -62,7 +62,7 @@ export function Footer() {
             <ul className="space-y-3">
               {legalLinks.map((item) => (
                 <li key={item.label}>
-                  <Link className="text-sm text-slate-400 transition-colors hover:text-white" to={item.to}>
+                  <Link className="text-sm text-slate-400 transition-colors hover:text-white" to={item.to} state={item.state}>
                     {renderTextWithShortForms(item.label)}
                   </Link>
                 </li>
