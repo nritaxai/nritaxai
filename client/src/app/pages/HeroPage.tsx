@@ -13,23 +13,16 @@ export function HeroPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state ?? {}) as HeroLocationState;
+  const hasStoredAuth = typeof window !== "undefined" && Boolean(localStorage.getItem("token"));
   const [hasViewedPolicy, setHasViewedPolicy] = useState(false);
   const [hasAcceptedPolicy, setHasAcceptedPolicy] = useState(false);
 
   useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-    if (token) {
-      navigate("/home", { replace: true });
-    }
-  }, [navigate]);
-
-  useEffect(() => {
     const reviewedFromPrivacy = state.privacyReviewed === true;
-    setHasViewedPolicy(reviewedFromPrivacy);
-    if (!reviewedFromPrivacy) {
-      setHasAcceptedPolicy(false);
-    }
-  }, [state.privacyReviewed]);
+    const nextHasViewedPolicy = hasStoredAuth || reviewedFromPrivacy;
+    setHasViewedPolicy(nextHasViewedPolicy);
+    setHasAcceptedPolicy(nextHasViewedPolicy);
+  }, [hasStoredAuth, state.privacyReviewed]);
 
   const canEnterWebsite = useMemo(
     () => hasViewedPolicy && hasAcceptedPolicy,
@@ -60,11 +53,11 @@ export function HeroPage() {
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#2563eb]/18 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-[#2563eb]/20 blur-3xl" />
 
-      <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 py-20 text-center sm:py-28">
+      <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 py-16 text-center sm:py-20">
         <img
           src="/logo-transparent.png"
           alt="NRITAX logo"
-          className="reveal-drop mb-7 h-32 w-auto object-contain sm:h-40"
+          className="reveal-drop -ml-3 mb-1 h-32 w-auto object-contain sm:h-36"
         />
 
         <p className="reveal-drop mb-3 rounded-full border border-[#E2E8F0] bg-[#F7FAFC]/75 px-4 py-1 text-xs tracking-wide text-[#2563eb]">
@@ -75,11 +68,11 @@ export function HeroPage() {
           NRITAX<span className="text-[#2563eb]">.AI</span>
         </h1>
 
-        <p className="reveal-drop reveal-delay-2 mt-5 max-w-2xl text-base text-[#0F172A] sm:text-lg">
+        <p className="reveal-drop reveal-delay-2 mt-4 max-w-2xl text-base text-[#0F172A] sm:text-lg">
           Smart NRI tax guidance, instant AI help, and practical next steps in one place.
         </p>
 
-        <div className="reveal-drop reveal-delay-3 mt-10 w-full max-w-2xl rounded-2xl border border-[#DBEAFE] bg-white/90 p-5 text-left shadow-sm backdrop-blur">
+        <div className="reveal-drop reveal-delay-3 mt-8 w-full max-w-2xl rounded-2xl border border-[#DBEAFE] bg-white/90 p-5 text-left shadow-sm backdrop-blur">
           <p className="text-sm font-semibold text-[#0F172A]">Review privacy policy before entering</p>
           <p className="mt-2 text-sm leading-6 text-[#475569]">
             Please open the privacy policy, read it, and confirm your acknowledgment.
@@ -104,7 +97,9 @@ export function HeroPage() {
           </div>
 
           <p id="hero-privacy-help" className="mt-3 text-xs text-[#64748B]">
-            {!hasViewedPolicy
+            {hasStoredAuth
+              ? "You are already signed in. You can continue directly into the website."
+              : !hasViewedPolicy
               ? "Open the Privacy Policy and return here to enable the acknowledgment checkbox."
               : hasAcceptedPolicy
                 ? "Privacy acknowledgement completed. You can now use the hero page buttons."
