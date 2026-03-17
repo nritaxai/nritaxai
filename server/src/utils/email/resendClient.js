@@ -13,4 +13,8 @@ export const getResendClient = () => ({
 });
 
 export const getResendFromAddress = () =>
-  process.env.EMAIL_USER ? `NRITAX <${process.env.EMAIL_USER}>` : "NRITAX <no-reply@nritax.ai>";
+  process.env.RESEND_FROM_EMAIL
+    ? String(process.env.RESEND_FROM_EMAIL).trim()
+    : process.env.EMAIL_USER
+      ? `NRITAX <${process.env.EMAIL_USER}>`
+      : "NRITAX <onboarding@resend.dev>";
