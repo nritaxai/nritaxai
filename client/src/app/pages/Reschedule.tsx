@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import {
   buildReschedulePayload,
   CONSULTATION_WEBHOOKS,
+  formatConsultationTimeLabel,
+  getBrowserTimeZone,
   getAvailableConsultationTimeSlots,
   getConsultationDateConstraintError,
   getConsultationIdentifierFromSearchParams,
@@ -35,6 +37,7 @@ export function Reschedule() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const availableTimeSlots = useMemo(() => getAvailableConsultationTimeSlots(date), [date]);
+  const browserTimeZone = useMemo(() => getBrowserTimeZone(), []);
 
   const validate = () => {
     const nextErrors: FieldErrors = {};
@@ -70,7 +73,11 @@ export function Reschedule() {
 
     const { valid, normalizedDate, normalizedTime } = validate();
     if (!identifier) {
-      setErrorMessage("This reschedule link is missing a valid token, booking reference, or email.");
+      setErrorMessage("This reschedule link is missing a valid token.");
+      return;
+    }
+    if (identifier.key !== "token") {
+      setErrorMessage("This reschedule link is missing a valid token.");
       return;
     }
     if (!valid) return;
@@ -132,12 +139,12 @@ export function Reschedule() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 text-sm text-[#475569]">
-                  {identifier ? (
+                  {identifier && identifier.key === "token" ? (
                     <span>
-                      Reschedule request detected using <strong>{identifier.key}</strong>: {identifier.value}
+                      Reschedule request detected using <strong>token</strong>: {identifier.value}
                     </span>
                   ) : (
-                    <span>Please use a valid reschedule link containing a token, booking reference, or email.</span>
+                    <span>Please use a valid reschedule link containing a token.</span>
                   )}
                 </div>
 
@@ -172,12 +179,14 @@ export function Reschedule() {
                       }}
                     >
                       <SelectTrigger id="reschedule-time" aria-invalid={Boolean(fieldErrors.time)}>
-                        <SelectValue placeholder="Select a time slot" />
+                        <SelectValue placeholder="Select a time slot">
+                          {time ? formatConsultationTimeLabel(time) : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent>
                         {availableTimeSlots.map((slot) => (
                           <SelectItem key={slot} value={slot}>
-                            {slot}
+                            {formatConsultationTimeLabel(slot)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -185,6 +194,13 @@ export function Reschedule() {
                     {fieldErrors.time ? <p className="text-sm text-red-600">{fieldErrors.time}</p> : null}
                     {!fieldErrors.time && availableTimeSlots.length === 0 && date ? (
                       <p className="text-sm text-slate-500">No time slots are left for today. Please choose another date.</p>
+                    ) : null}
+                    {!fieldErrors.time ? (
+                      <p className="text-sm text-slate-500">
+                        {browserTimeZone
+                          ? `Times shown in your timezone (${browserTimeZone}).`
+                          : "Times shown in your local timezone."}
+                      </p>
                     ) : null}
                   </div>
                 </div>
@@ -206,7 +222,7 @@ export function Reschedule() {
                   <Button type="button" variant="outline" onClick={() => navigate(-1)} className="sm:flex-1">
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={loading || !identifier} className="sm:flex-1">
+                  <Button type="submit" disabled={loading || !identifier || identifier.key !== "token"} className="sm:flex-1">
                     {loading ? "Submitting..." : "Reschedule Consultation"}
                   </Button>
                 </div>

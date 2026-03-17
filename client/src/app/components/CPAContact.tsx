@@ -14,6 +14,7 @@ import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../con
 import { renderTextWithShortForms } from "../utils/shortForms";
 import {
   CONSULTATION_TIME_ZONES,
+  formatConsultationTimeLabel,
   getBrowserTimeZone,
   getAvailableConsultationTimeSlots,
   normalizeConsultationDate,
@@ -78,6 +79,9 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
     () => getAvailableConsultationTimeSlots(formData.preferredDate, formData.timeZone),
     [formData.preferredDate, formData.timeZone]
   );
+  const selectedPreferredTimeLabel = formData.preferredTime
+    ? formatConsultationTimeLabel(formData.preferredTime)
+    : "";
   const timeSlotPanelHeight = useMemo(() => {
     const visibleRows = Math.min(Math.max(availableTimeSlots.length, 1), 5);
     return visibleRows * 40 + 16;
@@ -526,7 +530,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 )}
                 aria-invalid={Boolean(fieldErrors.preferredTime)}
               >
-                <span>{formData.preferredTime || "Select a time slot"}</span>
+                <span>{selectedPreferredTimeLabel || "Select a time slot"}</span>
                 <div className="flex items-center gap-2">
                   <Clock3 className="size-4 text-slate-500" />
                   <ChevronDown className="size-4 text-slate-500" />
@@ -553,7 +557,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                             setIsTimePickerOpen(false);
                           }}
                         >
-                          {slot}
+                          {formatConsultationTimeLabel(slot)}
                         </Button>
                       ))}
                       {availableTimeSlots.length === 0 ? (
@@ -567,7 +571,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 {formData.timeZone
                   ? `Times shown in ${formData.timeZone}.`
                   : "Select a timezone to view time slots."}{" "}
-                Time slots are available only from 09:00 to 18:00, and past slots for today are automatically hidden.
+                Consultation hours are converted from 09:00 AM to 06:00 PM IST, and past slots for today are automatically hidden.
               </p>
               {fieldErrors.preferredTime ? <p className="text-sm text-red-600">{fieldErrors.preferredTime}</p> : null}
             </div>

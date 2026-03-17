@@ -151,14 +151,22 @@ const getDatePartsInTimeZone = (date: Date, timeZone: string) => {
 const formatDateParts = ({ year, month, day }: { year: number; month: number; day: number }) =>
   `${year}-${padTimePart(month)}-${padTimePart(day)}`;
 
-const getTimeInTimeZone = (date: Date, timeZone: string) => {
-  const formatter = new Intl.DateTimeFormat("en-GB", {
+const getTimePartsInTimeZone = (date: Date, timeZone: string) => {
+  const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hour: "2-digit",
     minute: "2-digit",
-    hour12: false,
+    hourCycle: "h23",
   });
-  return formatter.format(date);
+  const parts = formatter.formatToParts(date);
+  const hours = Number(parts.find((part) => part.type === "hour")?.value ?? "0");
+  const minutes = Number(parts.find((part) => part.type === "minute")?.value ?? "0");
+  return { hours, minutes };
+};
+
+const getTimeInTimeZone = (date: Date, timeZone: string) => {
+  const { hours, minutes } = getTimePartsInTimeZone(date, timeZone);
+  return `${padTimePart(hours)}:${padTimePart(minutes)}`;
 };
 
 const getUtcDateForIstSlot = (year: number, month: number, day: number, time: string) => {
@@ -179,8 +187,8 @@ const shiftDate = (date: string, dayDelta: number) => {
 };
 
 const getCurrentMinutesInTimeZone = (now: Date, timeZone: string) => {
-  const currentTime = getTimeInTimeZone(now, timeZone);
-  return toMinutes(currentTime);
+  const { hours, minutes } = getTimePartsInTimeZone(now, timeZone);
+  return hours * 60 + minutes;
 };
 
 const getTodayInTimeZone = (now: Date, timeZone: string) => formatDateParts(getDatePartsInTimeZone(now, timeZone));
@@ -190,7 +198,9 @@ export const getAvailableConsultationTimeSlots = (date: string, timeZone = "Asia
   const normalizedTimeZone = normalizeConsultationTimeZone(timeZone) || "Asia/Kolkata";
   if (!normalizedDate) return [];
 
-  const localSlots = [-1, 0, 1]
+  const localSlots = Array.from(
+    new Set(
+      [-1, 0, 1]
     .flatMap((offset) => {
       const istDate = shiftDate(normalizedDate, offset);
       const parsedIstDate = parseConsultationDate(istDate);
@@ -212,13 +222,28 @@ export const getAvailableConsultationTimeSlots = (date: string, timeZone = "Asia
     })
     .filter((slot) => slot.date === normalizedDate)
     .map((slot) => slot.time)
-    .sort((left, right) => toMinutes(left) - toMinutes(right));
+    )
+  ).sort((left, right) => toMinutes(left) - toMinutes(right));
 
   const todayIso = getTodayInTimeZone(now, normalizedTimeZone);
   if (normalizedDate !== todayIso) return localSlots;
 
   const currentMinutes = getCurrentMinutesInTimeZone(now, normalizedTimeZone);
   return localSlots.filter((slot) => toMinutes(slot) > currentMinutes);
+};
+
+export const formatConsultationTimeLabel = (value: string) => {
+  const normalized = normalizeConsultationTime(value);
+  if (!normalized) return trimValue(value);
+
+  const [hours, minutes] = normalized.split(":").map(Number);
+  const date = new Date(Date.UTC(1970, 0, 1, hours, minutes));
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
 };
 
 export const getConsultationDateConstraintError = (date: string, now = new Date()) => {
