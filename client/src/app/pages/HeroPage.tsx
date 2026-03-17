@@ -17,6 +17,13 @@ export function HeroPage() {
   const [hasAcceptedPolicy, setHasAcceptedPolicy] = useState(false);
 
   useEffect(() => {
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    if (token) {
+      navigate("/home", { replace: true });
+    }
+  }, [navigate]);
+
+  useEffect(() => {
     const reviewedFromPrivacy = state.privacyReviewed === true;
     setHasViewedPolicy(reviewedFromPrivacy);
     if (!reviewedFromPrivacy) {
@@ -54,6 +61,12 @@ export function HeroPage() {
       <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-[#2563eb]/20 blur-3xl" />
 
       <div className="relative mx-auto flex max-w-7xl flex-col items-center justify-center px-6 py-20 text-center sm:py-28">
+        <img
+          src="/logo-transparent.png"
+          alt="NRITAX logo"
+          className="reveal-drop mb-7 h-32 w-auto object-contain sm:h-40"
+        />
+
         <p className="reveal-drop mb-3 rounded-full border border-[#E2E8F0] bg-[#F7FAFC]/75 px-4 py-1 text-xs tracking-wide text-[#2563eb]">
           AI Tax Platform for NRIs
         </p>
