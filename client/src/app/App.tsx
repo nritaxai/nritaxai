@@ -28,6 +28,7 @@ const AboutUs = lazy(() => import("./pages/AboutUs").then((m) => ({ default: m.A
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions").then((m) => ({ default: m.TermsAndConditions })));
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy").then((m) => ({ default: m.RefundPolicy })));
 const Disclaimer = lazy(() => import("./pages/Disclaimer").then((m) => ({ default: m.Disclaimer })));
+const ResetPassword = lazy(() => import("./pages/ResetPassword").then((m) => ({ default: m.ResetPassword })));
 function PageScaffold({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-[calc(100dvh-4rem)] bg-gradient-to-b from-gray-50 via-white to-gray-50">
@@ -67,6 +68,14 @@ export default function App() {
 
   useEffect(() => {
     document.documentElement.classList.remove("dark");
+  }, []);
+
+  useEffect(() => {
+    const handleRequireLogin = () => setShowLoginModal(true);
+    window.addEventListener("nritax:require-login", handleRequireLogin as EventListener);
+    return () => {
+      window.removeEventListener("nritax:require-login", handleRequireLogin as EventListener);
+    };
   }, []);
 
   useEffect(() => {
@@ -215,7 +224,8 @@ export default function App() {
     );
   }
 
-  const hasSiteHeader = location.pathname !== "/";
+  const isStandaloneRoute = location.pathname === "/" || location.pathname === "/reset-password";
+  const hasSiteHeader = !isStandaloneRoute;
 
   return (
     <div className="app-shell">
@@ -237,7 +247,7 @@ export default function App() {
             <Route path="/" element={<HeroPage />} />
             <Route path="/Hero" element={<HeroPage />} />
             <Route path="/hero" element={<HeroPage />} />
-            <Route path="/home" element={withPageScaffold(<Home />)} />
+            <Route path="/home" element={withPageScaffold(<Home onRequireLogin={() => setShowLoginModal(true)} />)} />
 
             <Route
               path="/calculators"
@@ -250,12 +260,13 @@ export default function App() {
               element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
             />
             <Route path="/login" element={withPageScaffold(<Login />)} />
+            <Route path="/reset-password" element={withPageScaffold(<ResetPassword />)} />
             <Route path="/profile" element={withPageScaffold(<Profile />)} />
             <Route path="/chat" element={withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
             <Route path="/dashboard" element={withPageScaffold(<AdminDashboard />)} />
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
-            <Route path="/consult" element={withPageScaffold(<Consult />)} />
+            <Route path="/consult" element={withPageScaffold(<Consult onRequireLogin={() => setShowLoginModal(true)} />)} />
             <Route path="/reschedule" element={withPageScaffold(<Reschedule />)} />
             <Route path="/cancel" element={withPageScaffold(<Cancel />)} />
             <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
@@ -267,7 +278,7 @@ export default function App() {
         </Suspense>
       </div>
 
-      <TigerBotAvatar />
+      {!isStandaloneRoute && <TigerBotAvatar />}
 
       {hasSiteHeader && <Footer />}
 

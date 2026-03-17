@@ -87,6 +87,18 @@ export const loginUser = async (loginData: any) => {
   return postRequest("/api/auth/login", loginData);
 };
 
+export const forgotPassword = async (payload: { email: string }) => {
+  return postRequest("/api/auth/forgot-password", payload);
+};
+
+export const resetPassword = async (payload: {
+  token: string;
+  newPassword: string;
+  confirmNewPassword: string;
+}) => {
+  return postRequest("/api/auth/reset-password", payload);
+};
+
 export const googleLoginUser = async (credential: string) => {
   return postRequest("/api/auth/google-login", { credential });
 };

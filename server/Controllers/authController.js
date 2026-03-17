@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { generateToken } from "../Utils/generateToken.js";
 import User from "../Models/userModel.js";
+import { sendEmail } from "../src/utils/emailService.js";
 
 const PROFILE_LANGUAGES = new Set(["english", "hindi", "tamil", "indonesian"]);
 
@@ -175,6 +176,18 @@ const normalizePhone = (value) => {
 const isValidPhone = (value) => {
   if (!value) return true;
   return /^[\d+()\-\s]{7,20}$/.test(value);
+};
+
+const buildPasswordResetUrl = (req, token) => {
+  const configuredBase =
+    sanitizeString(process.env.FRONTEND_URL) ||
+    sanitizeString(process.env.CLIENT_URL) ||
+    sanitizeString(process.env.APP_URL);
+  const originBase = sanitizeString(req.get("origin"));
+  const fallbackBase = "http://localhost:5173";
+  const appBase = configuredBase || originBase || fallbackBase;
+  const normalizedBase = appBase.replace(/\/+$/, "");
+  return `${normalizedBase}/reset-password?token=${encodeURIComponent(token)}`;
 };
 
 const toSafeUser = (userDoc) => {
@@ -429,6 +442,127 @@ export const loginUser = async (req, res) => {
     });
   }
 }
+
+// -------------------------------- Forgot Password --------------------------------------------------------------
+export const forgotPassword = async (req, res) => {
+  const email = sanitizeString(req.body?.email).toLowerCase();
+
+  try {
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter your email address.",
+      });
+    }
+
+    const user = await User.findOne({ email }).select("+resetPasswordToken +resetPasswordExpires");
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: "If an account exists for this email, a password reset link has been sent.",
+      });
+    }
+
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const hashedToken = crypto.createHash("sha256").update(rawToken).digest("hex");
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+    await user.save();
+
+    const resetUrl = buildPasswordResetUrl(req, rawToken);
+    await sendEmail({
+      to: user.email,
+      subject: "Reset your NRITAX password",
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0F172A">
+          <h2 style="margin-bottom:12px;">Reset your password</h2>
+          <p>We received a request to reset your NRITAX account password.</p>
+          <p>
+            <a href="${resetUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;">
+              Reset Password
+            </a>
+          </p>
+          <p>If the button does not work, use this link:</p>
+          <p><a href="${resetUrl}">${resetUrl}</a></p>
+          <p>This link expires in 1 hour. If you did not request this, you can ignore this email.</p>
+        </div>
+      `,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "If an account exists for this email, a password reset link has been sent.",
+    });
+  } catch (error) {
+    logAuthError("forgot-password", error, { email });
+    return res.status(500).json({
+      success: false,
+      message:
+        process.env.NODE_ENV === "production"
+          ? "Unable to send password reset email right now."
+          : `Unable to send password reset email right now. ${error?.message || "Unknown mail error."}`,
+    });
+  }
+};
+
+// -------------------------------- Reset Password --------------------------------------------------------------
+export const resetPassword = async (req, res) => {
+  const token = sanitizeString(req.body?.token);
+  const newPassword = sanitizeString(req.body?.newPassword);
+  const confirmNewPassword = sanitizeString(req.body?.confirmNewPassword);
+
+  try {
+    if (!token || !newPassword || !confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Token, new password, and confirm password are required.",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    if (newPassword !== confirmNewPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Passwords do not match.",
+      });
+    }
+
+    const hashedToken = crypto.createHash("sha256").update(token).digest("hex");
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    }).select("+password +resetPasswordToken +resetPasswordExpires");
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "This password reset link is invalid or has expired.",
+      });
+    }
+
+    user.password = newPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful. Please sign in with your new password.",
+    });
+  } catch (error) {
+    logAuthError("reset-password", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to reset password right now.",
+    });
+  }
+};
 
 // -------------------------------- Get Profile --------------------------------------------------------------
 export const getUserProfile = async (req, res) => {

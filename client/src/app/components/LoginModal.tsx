@@ -12,7 +12,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { X, Eye, EyeOff, Loader2 } from "lucide-react";
-import { appleLoginUser, loginUser, signupUser, googleLoginUser } from "../../utils/api";
+import { appleLoginUser, forgotPassword, loginUser, signupUser, googleLoginUser } from "../../utils/api";
 import { APPLE_AUTH_CONFIG, GOOGLE_AUTH_CONFIG } from "../../config/appConfig";
 import { AuthPopup } from "./AuthPopup";
 
@@ -37,6 +37,8 @@ export function LoginModal({ onClose }: LoginModalProps) {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
 
   const [popup, setPopup] = useState<{
     message: string;
@@ -180,6 +182,31 @@ export function LoginModal({ onClose }: LoginModalProps) {
     }, 800);
   };
 
+  const handleForgotPassword = async () => {
+    setLoginError(null);
+
+    const email = forgotPasswordEmail.trim() || loginData.email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setLoginError("Please enter a valid email address to reset your password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await forgotPassword({ email });
+      setPopup({
+        message: response?.message || "If an account exists, a reset link has been sent to your email.",
+        type: "success",
+      });
+      setForgotPasswordEmail(email);
+      setTimeout(() => setPopup(null), 2600);
+    } catch (err: any) {
+      setLoginError(err?.response?.data?.message || "Unable to send password reset email right now.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ================= LOGIN =================
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -280,7 +307,16 @@ export function LoginModal({ onClose }: LoginModalProps) {
         </CardHeader>
 
         <CardContent>
-          <Tabs defaultValue="login" value={activeTab} onValueChange={(v) => setActiveTab(v as "login" | "signup")} className="w-full">
+          <Tabs
+            defaultValue="login"
+            value={activeTab}
+            onValueChange={(v) => {
+              setActiveTab(v as "login" | "signup");
+              setForgotPasswordMode(false);
+              setLoginError(null);
+            }}
+            className="w-full"
+          >
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -327,6 +363,38 @@ export function LoginModal({ onClose }: LoginModalProps) {
                     )}
                   </button>
                 </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-sm text-[#2563eb] hover:underline"
+                    onClick={() => {
+                      setForgotPasswordMode((prev) => !prev);
+                      setLoginError(null);
+                      setForgotPasswordEmail(loginData.email);
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                {forgotPasswordMode ? (
+                  <div className="rounded-lg border border-[#E2E8F0] bg-[#F7FAFC] p-4 space-y-3">
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-password-email">Reset Email</Label>
+                      <Input
+                        id="forgot-password-email"
+                        type="email"
+                        placeholder="your.email@example.com"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      />
+                    </div>
+                    <Button type="button" variant="outline" className="w-full" disabled={loading} onClick={() => void handleForgotPassword()}>
+                      {loading ? "Sending reset link..." : "Send Reset Link"}
+                    </Button>
+                  </div>
+                ) : null}
 
                 {loginError && activeTab === "login" && (
                   <p className="text-red-500 text-sm">{loginError}</p>
