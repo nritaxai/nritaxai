@@ -7,6 +7,8 @@ import User from "../Models/userModel.js";
 import { sendEmail } from "../src/utils/emailService.js";
 
 const PROFILE_LANGUAGES = new Set(["english", "hindi", "tamil", "indonesian"]);
+const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i;
+const MAX_PROFILE_IMAGE_LENGTH = 2_800_000;
 
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 const APPLE_ISSUER = "https://appleid.apple.com";
@@ -157,8 +159,10 @@ const exchangeAppleAuthorizationCode = async (authorizationCode) => {
   return response.json();
 };
 
-const isValidHttpUrl = (value) => {
+const isValidProfileImage = (value) => {
   if (!value) return true;
+  if (value.length > MAX_PROFILE_IMAGE_LENGTH) return false;
+  if (PROFILE_IMAGE_DATA_URL_PATTERN.test(value)) return true;
   try {
     const parsed = new URL(value);
     return parsed.protocol === "http:" || parsed.protocol === "https:";
@@ -619,10 +623,10 @@ export const updateUserProfile = async (req, res) => {
       });
     }
 
-    if (!isValidHttpUrl(profileImage)) {
+    if (!isValidProfileImage(profileImage)) {
       return res.status(400).json({
         success: false,
-        message: "Profile image must be a valid http/https URL.",
+        message: "Profile image must be a valid image URL or uploaded image file.",
       });
     }
 

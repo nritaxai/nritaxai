@@ -5,7 +5,7 @@ import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Badge } from "./ui/badge";
-import { Bot, Download, Languages, Send, Shield, Mic, MicOff, Trash2 } from "lucide-react";
+import { Bot, Download, Languages, Send, Shield, Mic, MicOff, Trash2, Square } from "lucide-react";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import { PDFDownloadLink } from "@react-pdf/renderer";
@@ -80,6 +80,8 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
   const chatContentRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
   const baseQuestionRef = useRef("");
+  const activeRequestControllerRef = useRef<AbortController | null>(null);
+  const activeRequestIdRef = useRef(0);
   const starterQuestionsByLanguage: Record<string, string[]> = {
     english: [
       "What is NRI tax in simple terms?",
@@ -204,6 +206,12 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
   };
 
   useEffect(() => {
+    return () => {
+      activeRequestControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
     if (!chatContentRef.current) return;
     const node = chatContentRef.current;
     const id = requestAnimationFrame(() => {
@@ -311,6 +319,11 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
     }
 
     const userMessage = effectiveQuestion;
+    const requestId = activeRequestIdRef.current + 1;
+    activeRequestIdRef.current = requestId;
+    activeRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestControllerRef.current = controller;
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setQuestion("");
     setIsTyping(true);
@@ -327,12 +340,18 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
           headers: {
             Authorization: `Bearer ${token}`,
           },
+          signal: controller.signal,
         }
       );
 
+      if (activeRequestIdRef.current !== requestId) return;
       const aiReply = ensureVisibleReply(response.data.reply);
       setMessages((prev) => [...prev, { role: "ai", content: aiReply }]);
     } catch (error: any) {
+      if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
+        return;
+      }
+      if (activeRequestIdRef.current !== requestId) return;
       if (error.response?.status === 401) {
         clearStoredAuth();
         setSessionMessage("Your session expired. Please sign in again.");
@@ -345,8 +364,18 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
 
       setMessages((prev) => [...prev, { role: "ai", content: ensureVisibleReply(errorMessage) }]);
     } finally {
-      setIsTyping(false);
+      if (activeRequestIdRef.current === requestId) {
+        activeRequestControllerRef.current = null;
+        setIsTyping(false);
+      }
     }
+  };
+
+  const handleStopResponse = () => {
+    activeRequestControllerRef.current?.abort();
+    activeRequestControllerRef.current = null;
+    activeRequestIdRef.current += 1;
+    setIsTyping(false);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -383,7 +412,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
                 <Bot className="size-6 text-[#2563eb]" />
               </div>
               <div>
-                <CardTitle>AI Tax Assistant</CardTitle>
+                <CardTitle>YUKTI</CardTitle>
                 <CardDescription className="text-[#0F172A]">Secure guidance for NRI taxes</CardDescription>
               </div>
             </div>
@@ -511,7 +540,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
                 }`}
               >
                 <p className={`mb-1 text-[11px] uppercase tracking-wide ${message.role === "user" ? "text-[#2563eb]" : "text-[#0F172A]"}`}>
-                  {message.role === "user" ? "You" : "NRITAX AI"}
+                  {message.role === "user" ? "You" : "YUKTI"}
                 </p>
                 {message.role === "ai" ? (
                   <ReactMarkdown
@@ -547,13 +576,11 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
               <div className="size-8 shrink-0 rounded-full border border-[#2563eb]/40 bg-[#F7FAFC]/90 text-[#2563eb] flex items-center justify-center text-[10px] font-semibold">
                 AI
               </div>
-              <div className="bg-[#F7FAFC]/95 border border-[#E2E8F0] rounded-2xl px-4 py-3 shadow-sm">
-                <p className="mb-2 text-[11px] uppercase tracking-wide text-[#0F172A]">NRITAX AI</p>
-                <div className="flex gap-1">
-                  <span className="size-2 bg-[#0F172A] rounded-full animate-bounce"></span>
-                  <span className="size-2 bg-[#0F172A] rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                  <span className="size-2 bg-[#0F172A] rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                </div>
+              <div className="rounded-2xl border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md">
+                <p className="mb-2 text-[11px] uppercase tracking-wide text-[#0F172A]">YUKTI</p>
+                <p className="text-sm font-black tracking-[0.18em] text-[#0F172A] [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
+                  <span className="blur-[0.2px]">Thinking.....</span>
+                </p>
               </div>
             </div>
           )}
@@ -583,9 +610,22 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
             >
               {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
             </Button>
-            <Button type="submit" size="icon" className="flex-shrink-0 h-10 w-10 rounded-full">
-              <Send className="size-5" />
-            </Button>
+            {isTyping ? (
+              <Button
+                type="button"
+                size="icon"
+                variant="outline"
+                className="flex-shrink-0 h-10 w-10 rounded-full border-[#0F172A]"
+                onClick={handleStopResponse}
+                title="Interrupt response"
+              >
+                <Square className="size-4 fill-current" />
+              </Button>
+            ) : (
+              <Button type="submit" size="icon" className="flex-shrink-0 h-10 w-10 rounded-full">
+                <Send className="size-5" />
+              </Button>
+            )}
           </form>
         </CardFooter>
         {isListening && (

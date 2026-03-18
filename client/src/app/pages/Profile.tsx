@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { User, Mail, Image as ImageIcon, Save, Pencil, Crown, CalendarDays, Sparkles, LockKeyhole, LogOut, Trash2, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
@@ -53,9 +53,13 @@ const formatDate = (value?: string | null) => {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
+const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024;
+const ALLOWED_PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
+
 export function Profile() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const storedUser = useMemo<ProfileData | null>(() => {
     if (typeof window === "undefined") return null;
     try {
@@ -214,6 +218,10 @@ export function Profile() {
       setError("Phone number format is invalid.");
       return;
     }
+    if (profileImage && !profileImage.startsWith("http://") && !profileImage.startsWith("https://") && !profileImage.startsWith("data:image/")) {
+      setError("Profile image must be a valid image URL or uploaded image file.");
+      return;
+    }
 
     setSaving(true);
     setError("");
@@ -252,6 +260,47 @@ export function Profile() {
       setError(err?.response?.data?.message || "Failed to update profile.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleProfileImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!ALLOWED_PROFILE_IMAGE_TYPES.has(file.type)) {
+      setError("Please choose a PNG, JPG, WEBP, or GIF image.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_PROFILE_IMAGE_BYTES) {
+      setError("Profile image must be 2 MB or smaller.");
+      e.target.value = "";
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = typeof reader.result === "string" ? reader.result : "";
+      if (!result.startsWith("data:image/")) {
+        setError("Selected file could not be processed as an image.");
+        return;
+      }
+      setError("");
+      setProfileImage(result);
+    };
+    reader.onerror = () => {
+      setError("Failed to read the selected image.");
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const clearProfileImage = () => {
+    setProfileImage("");
+    setError("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -437,7 +486,7 @@ export function Profile() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="profileImage">Profile Image URL</Label>
+                    <Label htmlFor="profileImage">Profile Image</Label>
                     <div className="relative">
                       <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
                       <Input
@@ -445,9 +494,27 @@ export function Profile() {
                         value={profileImage}
                         onChange={(e) => setProfileImage(e.target.value)}
                         className="pl-9"
-                        placeholder="https://example.com/avatar.png"
+                        placeholder="Paste an image URL or upload from your device"
                       />
                     </div>
+                    <div className="flex flex-wrap gap-2">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleProfileImageFileChange}
+                      />
+                      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
+                        Choose From Desktop
+                      </Button>
+                      <Button type="button" variant="ghost" onClick={clearProfileImage} disabled={!profileImage}>
+                        Use Default Picture
+                      </Button>
+                    </div>
+                    <p className="text-xs text-[#475569]">
+                      Upload PNG, JPG, WEBP, or GIF up to 2 MB, or paste a public image URL.
+                    </p>
                   </div>
 
                   <div className="grid sm:grid-cols-2 gap-4">

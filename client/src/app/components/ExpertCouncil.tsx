@@ -85,17 +85,6 @@ export function ExpertCouncil() {
             </div>
           ))}
         </div>
-
-        <div className="mt-12 text-center">
-          <a
-            href="https://calendly.com/logan786-jkt/30min"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center rounded-md bg-blue-600 px-8 py-3 font-medium text-white transition-colors hover:bg-blue-700"
-          >
-            Book Expert Consultation
-          </a>
-        </div>
       </div>
     </section>
   );

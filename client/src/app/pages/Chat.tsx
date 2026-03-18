@@ -98,10 +98,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const knowledgeSource = "dtaa";
   const [subscription, setSubscription] = useState<{ plan?: string; status?: string } | null>(null);
   const welcomeByLanguage: Record<string, string> = {
-    english: `Hi${userName ? ` ${userName}` : ""}! I am Nexa, your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
-    tamil: `Vanakkam${userName ? ` ${userName}` : ""}! Naan Nexa, ungal AI chat assistant. DTAA vidhigal, NRI vari kelvigal, matrum vari thittamidhalil naan uthava tayaaraga irukkiren. Indru naan ungalukku eppadi uthavalam?`,
-    hindi: `Namaste${userName ? ` ${userName}` : ""}! Main Nexa, aapka AI chat assistant hoon. DTAA niyamon, NRI tax prashnon, aur tax planning mein main aapki madad kar sakta hoon. Main aaj aapki kaise sahayata kar sakta hoon?`,
-    indonesian: `Halo${userName ? ` ${userName}` : ""}! Saya Nexa, asisten chat AI Anda. Saya siap membantu Anda terkait regulasi DTAA, pertanyaan pajak NRI, dan perencanaan pajak. Bagaimana saya bisa membantu Anda hari ini?`,
+    english: `Hi${userName ? ` ${userName}` : ""}! I am YUKTI, your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
+    tamil: `Vanakkam${userName ? ` ${userName}` : ""}! Naan YUKTI, ungal AI chat assistant. DTAA vidhigal, NRI vari kelvigal, matrum vari thittamidhalil naan uthava tayaaraga irukkiren. Indru naan ungalukku eppadi uthavalam?`,
+    hindi: `Namaste${userName ? ` ${userName}` : ""}! Main YUKTI, aapka AI chat assistant hoon. DTAA niyamon, NRI tax prashnon, aur tax planning mein main aapki madad kar sakta hoon. Main aaj aapki kaise sahayata kar sakta hoon?`,
+    indonesian: `Halo${userName ? ` ${userName}` : ""}! Saya YUKTI, asisten chat AI Anda. Saya siap membantu Anda terkait regulasi DTAA, pertanyaan pajak NRI, dan perencanaan pajak. Bagaimana saya bisa membantu Anda hari ini?`,
   };
   const [messages, setMessages] = useState<Array<{ role: "user" | "ai"; content: string }>>([
     {
@@ -505,7 +505,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
         <CardHeader className="pb-3">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#CBD5E1] bg-[#E2E8F0] px-4 py-2 text-[#0F172A]">
             <Sparkles className="size-4" />
-            <span className="text-sm">AI Assistant</span>
+            <span className="text-sm">YUKTI</span>
           </div>
           <h1 className="mb-2 text-3xl text-[#0F172A] sm:text-4xl">AI Tax Chat</h1>
           <p className="max-w-2xl text-base text-[#0F172A]">
@@ -542,25 +542,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
                       <Bot className="size-6 text-[#0F172A]" />
                     </div>
                     <div>
-                      <CardTitle className="text-[#0F172A]">AI Tax Assistant</CardTitle>
+                      <CardTitle className="text-[#0F172A]">YUKTI</CardTitle>
                       <CardDescription className="text-[#0F172A]">
                         {userName ? `Hi ${userName}` : "Hi"} - Ask anything about NRI taxes and DTAA
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {isTyping ? (
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="shrink-0"
-                        onClick={handleStopResponse}
-                      >
-                        <Square className="mr-2 size-4 fill-current" />
-                        Stop
-                      </Button>
-                    ) : null}
                     <Badge className="border border-[#CBD5E1] bg-[#E2E8F0] text-[#0F172A]">
                       <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
                       {isTyping ? "Generating" : "Ready"}
@@ -628,12 +616,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className="rounded-2xl border border-[#E2E8F0] bg-[#F7FAFC]/90 px-4 py-3">
-                      <div className="flex gap-1">
-                        <span className="size-2 bg-[#0F172A] rounded-full animate-bounce"></span>
-                        <span className="size-2 bg-[#0F172A] rounded-full animate-bounce [animation-delay:0.2s]"></span>
-                        <span className="size-2 bg-[#0F172A] rounded-full animate-bounce [animation-delay:0.4s]"></span>
-                      </div>
+                    <div className="rounded-2xl border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-4 py-3 text-sm font-black tracking-[0.18em] text-[#0F172A] shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
+                      <span className="blur-[0.2px]">Thinking.....</span>
                     </div>
                   </div>
                 )}
@@ -662,14 +646,26 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   >
                     {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
                   </Button>
-                  <Button
-                    type="submit"
-                    size="icon"
-                    disabled={isTyping}
-                    className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <Send className="size-5" />
-                  </Button>
+                  {isTyping ? (
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="outline"
+                      className="h-10 w-10 flex-shrink-0 border-[#E2E8F0] bg-[#F7FAFC]/90"
+                      onClick={handleStopResponse}
+                      title="Interrupt response"
+                    >
+                      <Square className="size-4 fill-current" />
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      size="icon"
+                      className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95"
+                    >
+                      <Send className="size-5" />
+                    </Button>
+                  )}
                 </form>
               </CardFooter>
               {isListening && (
@@ -690,7 +686,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Starter Questions</CardTitle>
-                <CardDescription>Click to ask Nexa</CardDescription>
+                <CardDescription>Click to ask YUKTI</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {[

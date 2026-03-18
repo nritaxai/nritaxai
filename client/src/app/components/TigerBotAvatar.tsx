@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Briefcase, Calculator, CreditCard, MessageSquareText, Send, ShieldCheck, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { getStoredAuthToken } from "../../utils/api";
 
 type ServiceOption = {
   label: string;
@@ -25,7 +26,7 @@ const initialMessages: WidgetMessage[] = [
   {
     role: "bot",
     content:
-      "Hi, I am Nexa. Ask me about this website, our services, pricing, calculators, compliance, or how to contact an expert.",
+      "Hi, I am YUKTI. Ask me about this website, our services, pricing, calculators, compliance, or how to contact an expert.",
   },
 ];
 
@@ -171,7 +172,13 @@ export function TigerBotAvatar() {
   };
 
   const handleServiceSelect = (to: string) => {
+    const requiresAuth = to === "/calculators" || to === "/chat" || to === "/consult";
     setIsOpen(false);
+    if (requiresAuth && !getStoredAuthToken()) {
+      navigate(location.pathname, { replace: true });
+      window.dispatchEvent(new CustomEvent("nritax:require-login"));
+      return;
+    }
     if (location.pathname === to) return;
     navigate(to);
   };
@@ -202,7 +209,7 @@ export function TigerBotAvatar() {
                 <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
               </span>
               <div>
-                <p className="text-lg font-semibold leading-none">Nexa</p>
+                <p className="text-lg font-semibold leading-none">YUKTI</p>
                 <p className="mt-1 text-sm text-[#1F2937]/80">What services do you need?</p>
               </div>
             </div>
@@ -212,15 +219,18 @@ export function TigerBotAvatar() {
                 resetWidgetState();
                 setIsOpen(false);
               }}
-              aria-label="Close Nexa widget"
+              aria-label="Close YUKTI widget"
               className="rounded-full p-1 text-[#0F172A]/75 transition hover:bg-white/30 hover:text-[#0F172A]"
             >
               <X className="size-5" />
             </button>
           </div>
 
-          <div className="max-h-[390px] overflow-y-auto p-3">
-            <div ref={messagesRef} className="max-h-[180px] space-y-3 overflow-y-auto pr-1">
+          <div className="max-h-[390px] overflow-y-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              ref={messagesRef}
+              className="max-h-[180px] space-y-3 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            >
               {messages.map((message, index) => (
                 <div key={`${message.role}-${index}`} className={message.role === "user" ? "flex justify-end" : "flex justify-start"}>
                   <div
@@ -236,7 +246,7 @@ export function TigerBotAvatar() {
               ))}
             </div>
 
-            <div className="mt-3 max-h-[132px] space-y-2 overflow-y-auto pr-1">
+            <div className="mt-3 max-h-[132px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
               {suggestedActions.map((service) => {
                 const Icon = service.icon;
                 return (
@@ -268,7 +278,7 @@ export function TigerBotAvatar() {
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#86D39B] px-4 py-2.5 text-sm font-semibold text-[#0F172A] transition hover:bg-[#72C68A]"
               >
                 <Send className="size-4" />
-                Ask Nexa
+                Ask YUKTI
               </button>
             </form>
           </div>
@@ -278,14 +288,14 @@ export function TigerBotAvatar() {
       <button
         type="button"
         onClick={handleToggleWidget}
-        aria-label="Open Nexa widget"
+        aria-label="Open YUKTI widget"
         className="group flex items-center gap-2 rounded-full border border-[#1E40AF] bg-[#2563EB]/95 p-2 pr-3 text-white shadow-xl backdrop-blur-md transition-transform hover:scale-105 active:scale-95"
       >
         <span className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white text-[#1E3A8A] shadow-md">
           <Bot className="size-6" />
           <span className="absolute -right-0.5 -top-0.5 h-3 w-3 rounded-full bg-green-500 ring-2 ring-white" />
         </span>
-        <span className="text-sm font-semibold text-white">Nexa</span>
+        <span className="text-sm font-semibold text-white">YUKTI</span>
       </button>
     </div>
   );
