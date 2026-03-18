@@ -56,6 +56,15 @@ const formatDate = (value?: string | null) => {
 export function Profile() {
   const navigate = useNavigate();
   const token = localStorage.getItem("token");
+  const storedUser = useMemo<ProfileData | null>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = localStorage.getItem("user");
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -118,6 +127,10 @@ export function Profile() {
       setProfileLoadFailed(false);
     };
 
+    if (storedUser) {
+      applyProfileData(storedUser, null);
+    }
+
     const fetchProfile = async (attempt = 0) => {
       if (!active) return;
       setLoading(attempt === 0);
@@ -150,7 +163,11 @@ export function Profile() {
         }
 
         setProfileLoadFailed(true);
-        setError(profileResponse.reason?.response?.data?.message || "Failed to load profile. Please retry.");
+        setError(
+          profileResponse.reason?.response?.data?.message ||
+            profileResponse.reason?.message ||
+            "Failed to load profile. Please retry."
+        );
       } else {
         const data = profileResponse.value?.data;
         if (!data) {
@@ -180,7 +197,7 @@ export function Profile() {
     return () => {
       active = false;
     };
-  }, [navigate, token]);
+  }, [navigate, storedUser, token]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

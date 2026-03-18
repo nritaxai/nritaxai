@@ -64,7 +64,6 @@ const authRateLimiter = createRateLimiter({
 });
 
 app.use("/api", globalRateLimiter);
-app.use("/api/auth", authRateLimiter);
 
 app.use(
   express.json({

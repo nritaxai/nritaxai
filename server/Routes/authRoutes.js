@@ -10,17 +10,23 @@ import {
   resetPassword,
   updateUserProfile
 } from '../Controllers/authController.js';
+import { createRateLimiter } from "../Middlewares/rateLimit.js";
 import { protect } from '../Middlewares/authMiddleware.js';
 
 const router = express.Router();
+const authRateLimiter = createRateLimiter({
+  windowMs: 60 * 1000,
+  maxRequests: Number(process.env.AUTH_RATE_LIMIT_PER_MIN || 20),
+  message: "Too many auth attempts. Please retry in a minute.",
+});
 
-router.post('/register', registerUser);
-router.post("/login", loginUser);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password", resetPassword);
+router.post('/register', authRateLimiter, registerUser);
+router.post("/login", authRateLimiter, loginUser);
+router.post("/forgot-password", authRateLimiter, forgotPassword);
+router.post("/reset-password", authRateLimiter, resetPassword);
 
-router.post("/google-login", googleLogin);
-router.post("/apple", appleLogin);
+router.post("/google-login", authRateLimiter, googleLogin);
+router.post("/apple", authRateLimiter, appleLogin);
 
 router.get("/profile", protect, getUserProfile);
 
