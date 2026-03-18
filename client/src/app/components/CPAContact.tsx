@@ -7,10 +7,9 @@ import { Label } from "./ui/label";
 import { cn } from "./ui/utils";
 import { Textarea } from "./ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { Calendar as CalendarIcon, CheckCircle2, ChevronDown, Clock3, Mail, MessageSquare, UserCheck, X } from "lucide-react";
+import { Calendar as CalendarIcon, CheckCircle2, ChevronDown, Clock3, UserCheck, X } from "lucide-react";
 import { Calendar } from "./ui/calendar";
 import { ScrollArea } from "./ui/scroll-area";
-import { CONTACT_CALENDLY_URL, CONTACT_EMAIL, CONTACT_WHATSAPP } from "../../config/appConfig";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import {
   CONSULTATION_TIME_ZONES,
@@ -99,8 +98,6 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
     return [...CONSULTATION_TIME_ZONES];
   }, [browserTimeZone]);
-
-  const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -285,21 +282,6 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
         </CardHeader>
 
         <CardContent>
-          <div className="mb-5 grid gap-3 sm:grid-cols-3">
-            <a href={`mailto:${CONTACT_EMAIL}`} className="flex h-full min-h-[110px] flex-col justify-between rounded-lg border border-[#E2E8F0] p-4 text-sm hover:bg-[#F7FAFC]">
-              <p className="font-medium text-[#0F172A] flex items-center gap-2"><Mail className="size-4" /> Email</p>
-              <p className="text-[#0F172A] mt-1 truncate">{CONTACT_EMAIL}</p>
-            </a>
-            <a href={`https://wa.me/${whatsappDigits}`} className="flex h-full min-h-[110px] flex-col justify-between rounded-lg border border-[#E2E8F0] p-4 text-sm hover:bg-[#F7FAFC]">
-              <p className="font-medium text-[#0F172A] flex items-center gap-2"><MessageSquare className="size-4" /> WhatsApp</p>
-              <p className="text-[#0F172A] mt-1 truncate">{CONTACT_WHATSAPP}</p>
-            </a>
-            <a href={CONTACT_CALENDLY_URL} target="_blank" rel="noopener noreferrer" className="flex h-full min-h-[110px] flex-col justify-between rounded-lg border border-[#E2E8F0] p-4 text-sm hover:bg-[#F7FAFC]">
-              <p className="font-medium text-[#0F172A] flex items-center gap-2"><CalendarIcon className="size-4" /> Schedule Call</p>
-              <p className="text-[#0F172A] mt-1">Open calendar</p>
-            </a>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">

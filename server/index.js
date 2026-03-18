@@ -9,6 +9,7 @@ import subscriptionRoute from "./Routes/subscriptionRoutes.js";
 import calculatorRoute from "./Routes/calculatorRoutes.js";
 import pdfRoute from "./Routes/pdfRoutes.js";
 import consultationRoute from "./Routes/consultationRoutes.js";
+import yuktiRoute from "./Routes/yuktiRoutes.js";
 
 dotenv.config();
 
@@ -95,6 +96,7 @@ app.get("/ready", (_req, res) => {
 
 app.use("/api/auth", authRoute);
 app.use("/api/chat", chatRoute);
+app.use("/api/yukti", yuktiRoute);
 app.use("/api/subscription", subscriptionRoute);
 app.use("/api/calculator", calculatorRoute);
 app.use("/api/pdf", pdfRoute);
