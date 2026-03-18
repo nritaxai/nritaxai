@@ -31,6 +31,7 @@ export function Header({ onLogin }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [tickerVisible, setTickerVisible] = useState(true);
   const [user, setUser] = useState<User | null>(null);
+  const [avatarFailed, setAvatarFailed] = useState(false);
 
   const navItems = [
     { to: "/home#features", label: "Features" },
@@ -92,6 +93,10 @@ export function Header({ onLogin }: HeaderProps) {
     };
   }, []);
 
+  useEffect(() => {
+    setAvatarFailed(false);
+  }, [user?.profileImage]);
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -105,6 +110,21 @@ export function Header({ onLogin }: HeaderProps) {
     setTickerVisible(false);
     localStorage.setItem("regulatory-ticker-dismissed", "true");
   };
+
+  const renderUserAvatar = (sizeClass: string, iconSizeClass: string) => (
+    <span className={`inline-flex items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm ${sizeClass}`}>
+      {user?.profileImage && !avatarFailed ? (
+        <img
+          src={user.profileImage}
+          alt={user.name}
+          className="h-full w-full object-cover"
+          onError={() => setAvatarFailed(true)}
+        />
+      ) : (
+        <UserIcon className={`${iconSizeClass} text-slate-500`} />
+      )}
+    </span>
+  );
 
   return (
     <header className="relative z-50">
@@ -216,20 +236,7 @@ export function Header({ onLogin }: HeaderProps) {
                     aria-label="Open profile"
                     title="Open profile"
                   >
-                      <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
-                        {user.profileImage ? (
-                          <img
-                            src={user.profileImage}
-                            alt={user.name}
-                            className="h-full w-full object-cover"
-                            onError={(event) => {
-                              event.currentTarget.style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <UserIcon className="size-5 text-slate-500" />
-                        )}
-                    </span>
+                    {renderUserAvatar("h-11 w-11", "size-5")}
                     <span>Hello, {user.name}</span>
                   </Link>
                   <Button
@@ -300,20 +307,7 @@ export function Header({ onLogin }: HeaderProps) {
                       onClick={() => setMobileMenuOpen(false)}
                       className="flex items-center gap-3 rounded-md px-3 py-2.5 text-base font-medium text-slate-800 transition-colors hover:bg-gray-100 hover:text-blue-700"
                     >
-                      <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
-                        {user.profileImage ? (
-                          <img
-                            src={user.profileImage}
-                            alt={user.name}
-                            className="h-full w-full object-cover"
-                            onError={(event) => {
-                              event.currentTarget.style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <UserIcon className="size-5 text-slate-500" />
-                        )}
-                      </span>
+                      {renderUserAvatar("h-10 w-10", "size-5")}
                       <span>{user.name}</span>
                     </Link>
                     <Button
