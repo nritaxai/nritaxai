@@ -31,8 +31,8 @@ export function Header({ onLogin }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
 
   const navItems = [
-    { to: "/#features", label: "Features" },
-    { to: "/#tax-updates", label: "Tax Updates" },
+    { to: "/home#features", label: "Features" },
+    { to: "/home#tax-updates", label: "Tax Updates" },
     { to: "/chat", label: "AI Chat" },
     { to: "/pricing", label: "Pricing" },
     { to: "/compliance", label: "Compliance" },
@@ -108,7 +108,7 @@ export function Header({ onLogin }: HeaderProps) {
     <header className="relative z-50">
       <div className="border-b border-gray-200 bg-white/95 backdrop-blur-md md:hidden">
         <div className="flex h-20 items-center justify-between px-4">
-          <Link to="/" className="inline-flex items-center" aria-label="NRITAX home">
+          <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
             <img
               src="/logo-transparent.png"
               alt="NRITAX logo"
@@ -180,7 +180,7 @@ export function Header({ onLogin }: HeaderProps) {
       <div className="sticky top-0 border-b border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between">
-            <Link to="/" className="inline-flex items-center" aria-label="NRITAX home">
+            <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
               <img
                 src="/logo-transparent.png"
                 alt="NRITAX logo"
