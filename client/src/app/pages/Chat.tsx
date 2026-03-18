@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "motion/react";
+import { AuthGateCard } from "../components/AuthGateCard";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download } from "lucide-react";
-import { buildApiUrl, clearStoredAuth, getSubscriptionStatus } from "../../utils/api";
+import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square } from "lucide-react";
+import { buildApiUrl, clearStoredAuth, getStoredAuthToken, getSubscriptionStatus } from "../../utils/api";
 
 interface ChatProps {
   onRequireLogin: () => void;
@@ -118,6 +119,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const recognitionRef = useRef<any>(null);
   const baseQuestionRef = useRef("");
   const starterMessageHandledRef = useRef(false);
+  const activeRequestControllerRef = useRef<AbortController | null>(null);
+  const activeRequestIdRef = useRef(0);
 
   const getWelcomeMessage = () => welcomeByLanguage[language] || welcomeByLanguage.english;
 
@@ -144,6 +147,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
   };
 
   const clearChat = async () => {
+    activeRequestControllerRef.current?.abort();
+    activeRequestControllerRef.current = null;
+    setIsTyping(false);
+
     const welcomeMessage = getWelcomeMessage();
 
     try {
@@ -198,7 +205,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
     );
   };
 
-  const isAuthenticated = Boolean(typeof window !== "undefined" && localStorage.getItem("token"));
+  const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
   const hasActivePaidSubscription =
     Boolean(subscription?.plan && subscription.plan !== "FREE" && subscription?.status === "active");
 
@@ -209,6 +216,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
     return () => {
       window.removeEventListener("storage", syncUser);
       window.removeEventListener("auth-changed", syncUser);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      activeRequestControllerRef.current?.abort();
     };
   }, []);
 
@@ -307,6 +320,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
   }, [messages, isTyping]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      setMessages([{ role: "ai", content: getWelcomeMessage() }]);
+      return;
+    }
+
     const welcomeMessage = getWelcomeMessage();
 
     let isCancelled = false;
@@ -342,10 +360,20 @@ export function Chat({ onRequireLogin }: ChatProps) {
   }, [language, knowledgeSource, userName]);
 
   const submitQuestion = async (forcedQuestion?: string) => {
+    if (!isAuthenticated) {
+      onRequireLogin();
+      return;
+    }
+
     const effectiveQuestion = typeof forcedQuestion === "string" ? forcedQuestion.trim() : question.trim();
     if (!effectiveQuestion) return;
 
     const userMessage = effectiveQuestion;
+    const requestId = activeRequestIdRef.current + 1;
+    activeRequestIdRef.current = requestId;
+    activeRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestControllerRef.current = controller;
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
     setQuestion("");
     setIsTyping(true);
@@ -354,8 +382,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
       const response = await axios.post(
         buildApiUrl("/api/chat"),
         { message: userMessage, language, knowledgeSource },
-        { headers: getChatRequestHeaders() }
+        { headers: getChatRequestHeaders(), signal: controller.signal }
       );
+      if (activeRequestIdRef.current !== requestId) return;
       setProviderWarning("");
 
       setMessages((prev) => [
@@ -363,6 +392,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
         { role: "ai", content: ensureVisibleReply(response.data.reply) },
       ]);
     } catch (error: any) {
+      if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
+        return;
+      }
+      if (activeRequestIdRef.current !== requestId) return;
       if (error.response?.status === 401) {
         clearStoredAuth();
         setSessionMessage("Your session expired. Please sign in again.");
@@ -378,8 +411,18 @@ export function Chat({ onRequireLogin }: ChatProps) {
         },
       ]);
     } finally {
-      setIsTyping(false);
+      if (activeRequestIdRef.current === requestId) {
+        activeRequestControllerRef.current = null;
+        setIsTyping(false);
+      }
     }
+  };
+
+  const handleStopResponse = () => {
+    activeRequestControllerRef.current?.abort();
+    activeRequestControllerRef.current = null;
+    activeRequestIdRef.current += 1;
+    setIsTyping(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -402,6 +445,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   };
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     if (starterMessageHandledRef.current) return;
     const starterMessage = location.state && typeof location.state === "object"
       ? (location.state as { starterMessage?: unknown }).starterMessage
@@ -414,6 +458,16 @@ export function Chat({ onRequireLogin }: ChatProps) {
     void submitQuestion(starterMessage);
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
+
+  if (!isAuthenticated) {
+    return (
+      <AuthGateCard
+        title="Login to use AI Tax Chat"
+        description="Please sign in to access AI chat, ask tax questions, and save your conversation history."
+        onRequireLogin={onRequireLogin}
+      />
+    );
+  }
 
   // const handleSubmit = (e: React.FormEvent) => {
   //   e.preventDefault();
@@ -483,7 +537,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             <Card className="flex h-[78dvh] min-h-[460px] max-h-[820px] flex-col rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82">
               <CardHeader className="flex-shrink-0">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3">
                     <div className="rounded-lg border border-[#CBD5E1] bg-[#E2E8F0] p-2">
                       <Bot className="size-6 text-[#0F172A]" />
                     </div>
@@ -494,10 +548,24 @@ export function Chat({ onRequireLogin }: ChatProps) {
                       </CardDescription>
                     </div>
                   </div>
-                  <Badge className="border border-[#CBD5E1] bg-[#E2E8F0] text-[#0F172A]">
-                    <span className="mr-2 size-2 animate-pulse rounded-full bg-green-600"></span>
-                    Ready
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    {isTyping ? (
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={handleStopResponse}
+                      >
+                        <Square className="mr-2 size-4 fill-current" />
+                        Stop
+                      </Button>
+                    ) : null}
+                    <Badge className="border border-[#CBD5E1] bg-[#E2E8F0] text-[#0F172A]">
+                      <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
+                      {isTyping ? "Generating" : "Ready"}
+                    </Badge>
+                  </div>
                 </div>
                 {providerWarning ? (
                   <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -510,7 +578,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </p>
                 ) : null}
                 
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 mt-4">
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
                   <Languages className="size-4 text-[#0F172A]" />
                   <Select value={language} onValueChange={setLanguage}>
                     <SelectTrigger className="w-full border-[#E2E8F0] bg-[#F7FAFC]/85 sm:w-44">
@@ -594,7 +662,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   >
                     {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
                   </Button>
-                  <Button type="submit" size="icon" className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95">
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={isTyping}
+                    className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
                     <Send className="size-5" />
                   </Button>
                 </form>
@@ -660,6 +733,17 @@ export function Chat({ onRequireLogin }: ChatProps) {
             )}
           </motion.div>
         </motion.div>
+
+        <div className="rounded-2xl border border-[#E2E8F0] bg-[#F7FAFC]/80 p-4 text-sm leading-6 text-[#0F172A]">
+          <p>
+            <strong>Disclaimer:</strong> This chatbot values your privacy and is designed to protect your personal
+            information. Any data shared during interactions is used solely to provide accurate and relevant
+            responses. The chatbot does not store, share, or sell personal data to third parties. Conversations may
+            be monitored anonymously to improve performance and user experience. Do not share sensitive information
+            such as passwords, financial details, or identification numbers. By continuing to use this chatbot, you
+            acknowledge and accept this notice.
+          </p>
+        </div>
     </div>
   );
 }

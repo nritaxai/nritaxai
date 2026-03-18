@@ -13,16 +13,14 @@ export function HeroPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state ?? {}) as HeroLocationState;
-  const hasStoredAuth = typeof window !== "undefined" && Boolean(localStorage.getItem("token"));
   const [hasViewedPolicy, setHasViewedPolicy] = useState(false);
   const [hasAcceptedPolicy, setHasAcceptedPolicy] = useState(false);
 
   useEffect(() => {
     const reviewedFromPrivacy = state.privacyReviewed === true;
-    const nextHasViewedPolicy = hasStoredAuth || reviewedFromPrivacy;
-    setHasViewedPolicy(nextHasViewedPolicy);
-    setHasAcceptedPolicy(nextHasViewedPolicy);
-  }, [hasStoredAuth, state.privacyReviewed]);
+    setHasViewedPolicy(reviewedFromPrivacy);
+    setHasAcceptedPolicy(reviewedFromPrivacy);
+  }, [state.privacyReviewed]);
 
   const canEnterWebsite = useMemo(
     () => hasViewedPolicy && hasAcceptedPolicy,
@@ -97,9 +95,7 @@ export function HeroPage() {
           </div>
 
           <p id="hero-privacy-help" className="mt-3 text-xs text-[#64748B]">
-            {hasStoredAuth
-              ? "You are already signed in. You can continue directly into the website."
-              : !hasViewedPolicy
+            {!hasViewedPolicy
               ? "Open the Privacy Policy and return here to enable the acknowledgment checkbox."
               : hasAcceptedPolicy
                 ? "Privacy acknowledgement completed. You can now use the hero page buttons."

@@ -1,8 +1,10 @@
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
 import { Briefcase, Calculator as CalcIcon, Globe, Home as HomeIcon, MessageSquare, TrendingUp } from "lucide-react";
 import { ExpertCouncil } from "../components/ExpertCouncil";
 import { Features } from "../components/Features";
 import { PrivacyTrustBanner } from "../components/PrivacyTrustBanner";
+import { getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
 const heroContent = {
@@ -55,32 +57,86 @@ const scenarioCards = [
   },
 ];
 
-export function Home() {
+interface HomeProps {
+  onRequireLogin: () => void;
+}
+
+export function Home({ onRequireLogin }: HomeProps) {
+  const navigate = useNavigate();
+  const [userName, setUserName] = useState("");
+
+  useEffect(() => {
+    const loadUserName = () => {
+      try {
+        const rawUser = localStorage.getItem("user");
+        if (!rawUser) {
+          setUserName("");
+          return;
+        }
+        const parsedUser = JSON.parse(rawUser);
+        setUserName(typeof parsedUser?.name === "string" ? parsedUser.name.trim() : "");
+      } catch {
+        setUserName("");
+      }
+    };
+
+    loadUserName();
+    window.addEventListener("storage", loadUserName);
+    window.addEventListener("auth-changed", loadUserName);
+    return () => {
+      window.removeEventListener("storage", loadUserName);
+      window.removeEventListener("auth-changed", loadUserName);
+    };
+  }, []);
+
+  const requireAuthFor = (path: string, state?: Record<string, unknown>) => {
+    if (!getStoredAuthToken()) {
+      onRequireLogin();
+      return;
+    }
+    navigate(path, state ? { state } : undefined);
+  };
+
   return (
     <main className="min-h-screen">
       <section className="bg-gradient-to-b from-gray-50 to-white py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
+            {userName ? (
+              <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-blue-700">
+                Welcome back, {renderTextWithShortForms(userName)}
+              </p>
+            ) : null}
             <span className="reveal-drop rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{renderTextWithShortForms(heroContent.badge)}</span>
             <h1 className="reveal-drop reveal-delay-1 mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
             <p className="reveal-drop reveal-delay-2 mb-6 text-2xl font-semibold text-blue-700">{renderTextWithShortForms(heroContent.subheadline)}</p>
             <p className="reveal-drop reveal-delay-3 mx-auto mb-8 max-w-2xl text-lg text-gray-600">{renderTextWithShortForms(heroContent.description)}</p>
             <div className="reveal-drop reveal-delay-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
-              <Link
-                to="/chat"
+              <button
+                type="button"
                 aria-label="Ask AI instantly"
+                onClick={() => requireAuthFor("/chat")}
                 className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-lg font-semibold text-white shadow-lg transition-all hover:bg-blue-700"
               >
                 <MessageSquare className="mr-2 size-5" />
                 Ask AI Instantly
-              </Link>
-              <Link
-                to="/consult"
+              </button>
+              <button
+                type="button"
                 aria-label="Consult a CPA"
+                onClick={() => requireAuthFor("/consult")}
                 className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-8 py-4 text-lg font-semibold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
               >
                 Consult a CPA
-              </Link>
+              </button>
+              <button
+                type="button"
+                aria-label="View pricing"
+                onClick={() => navigate("/pricing")}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-8 py-4 text-lg font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100"
+              >
+                View Pricing
+              </button>
             </div>
           </div>
 
@@ -122,10 +178,10 @@ export function Home() {
               {scenarioCards.map((scenario, index) => {
                 const Icon = scenario.icon;
                 return (
-                  <Link
+                  <button
+                    type="button"
                     key={scenario.title}
-                    to="/chat"
-                    state={{ starterMessage: scenario.message }}
+                    onClick={() => requireAuthFor("/chat", { starterMessage: scenario.message })}
                     className={`reveal-tile ${scenario.color} rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg`}
                     style={{ ["--reveal-delay" as any]: `${180 + index * 90}ms` }}
                     aria-label={scenario.title}
@@ -133,7 +189,7 @@ export function Home() {
                     <Icon className="mb-3 size-8" />
                     <h4 className="mb-1 text-lg font-semibold">{scenario.title}</h4>
                     <p className="text-sm opacity-80">{renderTextWithShortForms(scenario.subtitle)}</p>
-                  </Link>
+                  </button>
                 );
               })}
             </div>

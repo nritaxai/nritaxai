@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, isValid, parseISO, startOfToday } from "date-fns";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
 import { Button } from "./ui/button";
@@ -24,6 +24,7 @@ import {
   isValidEmail,
 } from "../utils/consultationWorkflow";
 import { buildApiUrl } from "../../utils/api";
+import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 
 interface CPAContactProps {
   onClose: () => void;
@@ -100,6 +101,27 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
   }, [browserTimeZone]);
 
   const whatsappDigits = CONTACT_WHATSAPP.replace(/\D/g, "");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const rawUser = localStorage.getItem("user");
+    if (!rawUser) {
+      setFormData((prev) => (prev.country ? prev : { ...prev, country: detectUserCountry() }));
+      return;
+    }
+
+    try {
+      const parsedUser = JSON.parse(rawUser);
+      setFormData((prev) => ({
+        ...prev,
+        name: prev.name || trimValue(parsedUser?.name),
+        email: prev.email || trimValue(parsedUser?.email),
+        country: prev.country || trimValue(parsedUser?.countryOfResidence) || detectUserCountry(),
+      }));
+    } catch {
+      setFormData((prev) => (prev.country ? prev : { ...prev, country: detectUserCountry() }));
+    }
+  }, []);
 
   const setFieldValue = (key: keyof typeof INITIAL_FORM_DATA, value: string) => {
     setFormData((prev) => ({ ...prev, [key]: value }));
@@ -264,15 +286,15 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
 
         <CardContent>
           <div className="mb-5 grid gap-3 sm:grid-cols-3">
-            <a href={`mailto:${CONTACT_EMAIL}`} className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
+            <a href={`mailto:${CONTACT_EMAIL}`} className="flex h-full min-h-[110px] flex-col justify-between rounded-lg border border-[#E2E8F0] p-4 text-sm hover:bg-[#F7FAFC]">
               <p className="font-medium text-[#0F172A] flex items-center gap-2"><Mail className="size-4" /> Email</p>
               <p className="text-[#0F172A] mt-1 truncate">{CONTACT_EMAIL}</p>
             </a>
-            <a href={`https://wa.me/${whatsappDigits}`} className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
+            <a href={`https://wa.me/${whatsappDigits}`} className="flex h-full min-h-[110px] flex-col justify-between rounded-lg border border-[#E2E8F0] p-4 text-sm hover:bg-[#F7FAFC]">
               <p className="font-medium text-[#0F172A] flex items-center gap-2"><MessageSquare className="size-4" /> WhatsApp</p>
               <p className="text-[#0F172A] mt-1 truncate">{CONTACT_WHATSAPP}</p>
             </a>
-            <a href={CONTACT_CALENDLY_URL} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-[#E2E8F0] p-3 text-sm hover:bg-[#F7FAFC]">
+            <a href={CONTACT_CALENDLY_URL} target="_blank" rel="noopener noreferrer" className="flex h-full min-h-[110px] flex-col justify-between rounded-lg border border-[#E2E8F0] p-4 text-sm hover:bg-[#F7FAFC]">
               <p className="font-medium text-[#0F172A] flex items-center gap-2"><CalendarIcon className="size-4" /> Schedule Call</p>
               <p className="text-[#0F172A] mt-1">Open calendar</p>
             </a>
@@ -406,7 +428,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                     setFormData((prev) => ({
                       ...prev,
                       country: value,
-                      customCountry: value === "other" ? prev.customCountry : "",
+                      customCountry: "",
                     }));
                     setFieldErrors((prev) => {
                       const next = { ...prev };
@@ -420,25 +442,20 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="usa">United States</SelectItem>
-                    <SelectItem value="uae">United Arab Emirates</SelectItem>
-                    <SelectItem value="uk">United Kingdom</SelectItem>
-                    <SelectItem value="singapore">Singapore</SelectItem>
-                    <SelectItem value="canada">Canada</SelectItem>
-                    <SelectItem value="australia">Australia</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <SelectItem key={country.code} value={country.name}>
+                        {country.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-
-                {formData.country === "other" && (
-                  <Input
-                    id="customCountry"
-                    required
-                    value={formData.customCountry}
-                    onChange={(e) => setFieldValue("customCountry", e.target.value)}
-                    placeholder="Type your country"
-                  />
-                )}
+                {!fieldErrors.country ? (
+                  <p className="text-sm text-slate-500">
+                    {formData.country
+                      ? `Using ${formData.country} as your country of residence.`
+                      : "We try to auto-detect your country first, and you can adjust it here."}
+                  </p>
+                ) : null}
                 {fieldErrors.country ? <p className="text-sm text-red-600">{fieldErrors.country}</p> : null}
               </div>
             </div>

@@ -31,8 +31,8 @@ export function Header({ onLogin }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
 
   const navItems = [
-    { to: "/home#features", label: "Features" },
-    { to: "/home#tax-updates", label: "Tax Updates" },
+    { to: "/#features", label: "Features" },
+    { to: "/#tax-updates", label: "Tax Updates" },
     { to: "/chat", label: "AI Chat" },
     { to: "/pricing", label: "Pricing" },
     { to: "/compliance", label: "Compliance" },
@@ -106,6 +106,27 @@ export function Header({ onLogin }: HeaderProps) {
 
   return (
     <header className="relative z-50">
+      <div className="border-b border-gray-200 bg-white/95 backdrop-blur-md md:hidden">
+        <div className="flex h-20 items-center justify-between px-4">
+          <Link to="/" className="inline-flex items-center" aria-label="NRITAX home">
+            <img
+              src="/logo-transparent.png"
+              alt="NRITAX logo"
+              className="h-16 w-auto object-contain"
+            />
+          </Link>
+
+          <button
+            className="rounded-md p-2 text-slate-800 transition-colors hover:text-blue-700"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
+          >
+            <Menu className="size-6" />
+          </button>
+        </div>
+      </div>
+
       <div className="border-b border-slate-800 bg-slate-900">
         <div className="h-10 overflow-x-auto">
           <div className="mx-auto flex h-full min-w-max max-w-6xl items-center justify-start gap-6 px-4 sm:justify-center">
@@ -218,15 +239,6 @@ export function Header({ onLogin }: HeaderProps) {
                 </>
               )}
             </div>
-
-            <button
-              className="rounded-md p-2 text-slate-800 transition-colors hover:text-blue-700 md:hidden"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              <Menu className="size-6" />
-            </button>
           </div>
         </div>
       </div>

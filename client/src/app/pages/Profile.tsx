@@ -6,6 +6,7 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,6 +19,7 @@ import {
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
 import { changePassword, deleteAccount, getSubscriptionStatus, getUserProfile, updateUserProfile } from "../../utils/api";
+import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 
 type ProfileData = {
   name: string;
@@ -66,12 +68,14 @@ export function Profile() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [retryingProfile, setRetryingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
+  const [profileLoadFailed, setProfileLoadFailed] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: "",
     newPassword: "",
@@ -101,37 +105,78 @@ export function Profile() {
     }
 
     let active = true;
-    const fetchProfile = async () => {
-      setLoading(true);
+
+    const applyProfileData = (data: ProfileData, nextSubscription: SubscriptionData | null) => {
+      setProfile(data);
+      setName(data.name || "");
+      setProfileImage(data.profileImage || "");
+      setPhone(data.phone || "");
+      setCountryOfResidence(data.countryOfResidence || detectUserCountry());
+      setPreferredLanguage(data.preferredLanguage || "english");
+      setBio(data.bio || "");
+      setSubscription(nextSubscription);
+      setProfileLoadFailed(false);
+    };
+
+    const fetchProfile = async (attempt = 0) => {
+      if (!active) return;
+      setLoading(attempt === 0);
+      setRetryingProfile(attempt > 0);
       setError("");
-      try {
-        const [profileResponse, subscriptionResponse] = await Promise.all([
-          getUserProfile(),
-          getSubscriptionStatus(),
-        ]);
-        if (!active) return;
-        const data = profileResponse?.data;
-        if (!data) {
-          setError("Unable to load profile data.");
+
+      const [profileResponse, subscriptionResponse] = await Promise.allSettled([
+        getUserProfile(),
+        getSubscriptionStatus(),
+      ]);
+
+      if (!active) return;
+
+      if (profileResponse.status === "rejected") {
+        const status = profileResponse.reason?.response?.status;
+        if (status === 401) {
+          localStorage.removeItem("token");
+          localStorage.removeItem("user");
+          window.dispatchEvent(new Event("storage"));
+          window.dispatchEvent(new Event("auth-changed"));
+          navigate("/login");
           return;
         }
-        setProfile(data);
-        setName(data.name || "");
-        setProfileImage(data.profileImage || "");
-        setPhone(data.phone || "");
-        setCountryOfResidence(data.countryOfResidence || "");
-        setPreferredLanguage(data.preferredLanguage || "english");
-        setBio(data.bio || "");
-        setSubscription(subscriptionResponse?.subscription || null);
-      } catch (err: any) {
-        if (!active) return;
-        setError(err?.response?.data?.message || "Failed to load profile.");
-      } finally {
-        if (active) setLoading(false);
+
+        if (attempt < 1) {
+          window.setTimeout(() => {
+            if (active) void fetchProfile(attempt + 1);
+          }, 900);
+          return;
+        }
+
+        setProfileLoadFailed(true);
+        setError(profileResponse.reason?.response?.data?.message || "Failed to load profile. Please retry.");
+      } else {
+        const data = profileResponse.value?.data;
+        if (!data) {
+          setProfileLoadFailed(true);
+          setError("Unable to load profile data.");
+        } else {
+          const nextSubscription =
+            subscriptionResponse.status === "fulfilled"
+              ? subscriptionResponse.value?.subscription || null
+              : null;
+
+          if (subscriptionResponse.status === "rejected") {
+            console.error("subscription status load failed", subscriptionResponse.reason);
+          }
+
+          applyProfileData(data, nextSubscription);
+        }
+      }
+
+      if (active) {
+        setLoading(false);
+        setRetryingProfile(false);
       }
     };
 
-    fetchProfile();
+    void fetchProfile();
     return () => {
       active = false;
     };
@@ -278,6 +323,21 @@ export function Profile() {
           <CardContent className="p-6 sm:p-8">
             {loading ? (
               <p className="text-[#0F172A]">Loading profile...</p>
+            ) : profileLoadFailed && !profile ? (
+              <div className="space-y-3">
+                <p className="text-[#0F172A]">We could not load your profile details.</p>
+                <p className="text-sm text-[#0F172A]">
+                  This usually means the profile API failed, auth state expired, or local session data is stale.
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={() => window.location.reload()} disabled={retryingProfile}>
+                    {retryingProfile ? "Retrying..." : "Try Again"}
+                  </Button>
+                  <Button type="button" variant="outline" onClick={handleLogout}>
+                    Logout
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
                 <div className="flex items-center gap-4">
@@ -305,7 +365,23 @@ export function Profile() {
           </CardContent>
         </Card>
 
-        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+            <p>{error}</p>
+            {profileLoadFailed ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => window.location.reload()}
+                disabled={retryingProfile}
+              >
+                {retryingProfile ? "Retrying..." : "Retry Profile Load"}
+              </Button>
+            ) : null}
+          </div>
+        )}
         {successMessage && (
           <p className="rounded-md border border-[#2563eb]/40 bg-[#2563eb]/12 px-3 py-2 text-sm text-[#2563eb]">
             {successMessage}
@@ -370,12 +446,26 @@ export function Profile() {
 
                     <div className="space-y-2">
                       <Label htmlFor="countryOfResidence">Country of Residence</Label>
-                      <Input
-                        id="countryOfResidence"
+                      <Select
                         value={countryOfResidence}
-                        onChange={(e) => setCountryOfResidence(e.target.value)}
-                        placeholder="United States"
-                      />
+                        onValueChange={setCountryOfResidence}
+                      >
+                        <SelectTrigger id="countryOfResidence">
+                          <SelectValue placeholder="Select country" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNTRY_OPTIONS.map((country) => (
+                            <SelectItem key={country.code} value={country.name}>
+                              {country.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-[#0F172A]">
+                        {countryOfResidence
+                          ? `Selected: ${countryOfResidence}`
+                          : "Auto-detect will be used when available, with manual selection as fallback."}
+                      </p>
                     </div>
                   </div>
 

@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { Calculator, DollarSign, FileText, Info, Users } from 'lucide-react'
 import { motion } from 'motion/react'
+import { AuthGateCard } from '../components/AuthGateCard'
 import { COUNTRY_LIST, getTaxData, calculateTax, getTaxSlabDescription, formatCurrency, type CountryCode } from '../data/taxRegulations'
+import { getStoredAuthToken } from '../../utils/api'
 import { renderTextWithShortForms } from '../utils/shortForms'
 
 type CalculatorType = 'residency' | 'income' | 'dtaa' | null
@@ -19,8 +21,19 @@ interface CalculatorsProps {
   onRequireLogin: () => void
 }
 
-export function Calculators(_props: CalculatorsProps) {
+export function Calculators({ onRequireLogin }: CalculatorsProps) {
+  const isAuthenticated = Boolean(typeof window !== 'undefined' && getStoredAuthToken())
   const [activeCalc, setActiveCalc] = useState<CalculatorType>('residency')
+
+  if (!isAuthenticated) {
+    return (
+      <AuthGateCard
+        title="Login to use tax calculators"
+        description="Please sign in to access the residency, income tax, and DTAA calculator tools."
+        onRequireLogin={onRequireLogin}
+      />
+    )
+  }
 
   return (
     <div className="min-h-screen max-w-5xl mx-auto px-4 py-8 md:px-6 md:py-10">
@@ -45,7 +58,7 @@ export function Calculators(_props: CalculatorsProps) {
           hidden: {},
           visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
         }}
-        className="grid md:grid-cols-3 gap-6 mb-8"
+        className="mb-8 grid gap-6 md:grid-cols-3 md:auto-rows-fr"
       >
         <motion.div
           variants={{
@@ -53,10 +66,11 @@ export function Calculators(_props: CalculatorsProps) {
             visible: { opacity: 1, y: 0, scale: 1 },
           }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="h-full"
         >
         <button
           onClick={() => setActiveCalc('residency')}
-          className={`p-6 rounded-lg border-2 transition-all text-left ${
+          className={`flex h-full w-full flex-col p-6 rounded-lg border-2 transition-all text-left ${
             activeCalc === 'residency'
               ? 'border-blue-600 bg-blue-50'
               : 'border-gray-200 bg-white hover:border-blue-300'
@@ -78,10 +92,11 @@ export function Calculators(_props: CalculatorsProps) {
             visible: { opacity: 1, y: 0, scale: 1 },
           }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="h-full"
         >
         <button
           onClick={() => setActiveCalc('income')}
-          className={`p-6 rounded-lg border-2 transition-all text-left ${
+          className={`flex h-full w-full flex-col p-6 rounded-lg border-2 transition-all text-left ${
             activeCalc === 'income'
               ? 'border-blue-600 bg-blue-50'
               : 'border-gray-200 bg-white hover:border-blue-300'
@@ -103,10 +118,11 @@ export function Calculators(_props: CalculatorsProps) {
             visible: { opacity: 1, y: 0, scale: 1 },
           }}
           transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+          className="h-full"
         >
         <button
           onClick={() => setActiveCalc('dtaa')}
-          className={`p-6 rounded-lg border-2 transition-all text-left ${
+          className={`flex h-full w-full flex-col p-6 rounded-lg border-2 transition-all text-left ${
             activeCalc === 'dtaa'
               ? 'border-blue-600 bg-blue-50'
               : 'border-gray-200 bg-white hover:border-blue-300'

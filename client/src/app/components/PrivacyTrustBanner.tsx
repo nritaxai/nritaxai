@@ -1,6 +1,9 @@
-import { Eye, ShieldCheck, UserCheck } from "lucide-react";
+import { Eye, ShieldCheck, UserCheck, ArrowRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 export function PrivacyTrustBanner() {
+  const navigate = useNavigate();
+
   return (
     <div className="my-8 rounded-xl border border-emerald-500/20 bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent p-6">
       <div className="flex items-start gap-4">
@@ -28,6 +31,19 @@ export function PrivacyTrustBanner() {
                 <p className="text-xs text-slate-600">Data is shared only with verified tax professionals on your explicit request</p>
               </div>
             </div>
+          </div>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+            <button
+              type="button"
+              onClick={() => navigate("/privacy-policy")}
+              className="inline-flex items-center justify-center rounded-lg bg-emerald-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+            >
+              Review Privacy Policy
+              <ArrowRight className="ml-2 size-4" />
+            </button>
+            <p className="text-sm text-slate-600">
+              Read how NRITAX handles privacy, access, and data-sharing with tax professionals.
+            </p>
           </div>
         </div>
       </div>
