@@ -209,9 +209,11 @@ export function Profile() {
       if (typeof window !== "undefined") {
         const storedUserRaw = localStorage.getItem("user");
         const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
-        localStorage.setItem("user", JSON.stringify({ ...storedUser, ...data }));
+        const nextStoredUser = { ...storedUser, ...data };
+        localStorage.setItem("user", JSON.stringify(nextStoredUser));
         window.dispatchEvent(new Event("storage"));
         window.dispatchEvent(new Event("auth-changed"));
+        window.dispatchEvent(new Event("user-updated"));
       }
     };
 
@@ -346,9 +348,11 @@ export function Profile() {
 
       const storedUserRaw = localStorage.getItem("user");
       const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
-      localStorage.setItem("user", JSON.stringify({ ...storedUser, ...updated }));
+      const nextStoredUser = { ...storedUser, ...updated };
+      localStorage.setItem("user", JSON.stringify(nextStoredUser));
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("auth-changed"));
+      window.dispatchEvent(new Event("user-updated"));
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to update profile.");
     } finally {

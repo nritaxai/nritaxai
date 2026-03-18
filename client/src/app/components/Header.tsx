@@ -25,6 +25,14 @@ interface User {
   profileImage?: string;
 }
 
+const sanitizeProfileImage = (value?: string) => {
+  const normalized = String(value || "").trim();
+  if (!normalized) return "";
+  if (normalized.startsWith("data:image/")) return normalized;
+  if (normalized.startsWith("http://") || normalized.startsWith("https://")) return normalized;
+  return "";
+};
+
 export function Header({ onLogin }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -76,7 +84,11 @@ export function Header({ onLogin }: HeaderProps) {
     const loadUser = () => {
       const storedUser = localStorage.getItem("user");
       if (storedUser) {
-        setUser(JSON.parse(storedUser));
+        const parsedUser = JSON.parse(storedUser);
+        setUser({
+          ...parsedUser,
+          profileImage: sanitizeProfileImage(parsedUser?.profileImage),
+        });
       } else {
         setUser(null);
       }
@@ -86,10 +98,16 @@ export function Header({ onLogin }: HeaderProps) {
 
     window.addEventListener("storage", loadUser);
     window.addEventListener("auth-changed", loadUser);
+    window.addEventListener("user-updated", loadUser);
+    window.addEventListener("focus", loadUser);
+    document.addEventListener("visibilitychange", loadUser);
 
     return () => {
       window.removeEventListener("storage", loadUser);
       window.removeEventListener("auth-changed", loadUser);
+      window.removeEventListener("user-updated", loadUser);
+      window.removeEventListener("focus", loadUser);
+      document.removeEventListener("visibilitychange", loadUser);
     };
   }, []);
 
@@ -115,6 +133,7 @@ export function Header({ onLogin }: HeaderProps) {
     <span className={`inline-flex items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm ${sizeClass}`}>
       {user?.profileImage && !avatarFailed ? (
         <img
+          key={user.profileImage}
           src={user.profileImage}
           alt={user.name}
           className="h-full w-full object-cover"
