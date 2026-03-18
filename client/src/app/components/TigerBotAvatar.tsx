@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Briefcase, Calculator, CreditCard, MessageSquareText, Send, ShieldCheck, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { buildApiUrl, getStoredAuthToken } from "../../utils/api";
+import { getStoredAuthToken } from "../../utils/api";
 
 type ServiceOption = {
   label: string;
@@ -26,31 +26,118 @@ const initialMessages: WidgetMessage[] = [
   {
     role: "bot",
     content:
-      "Hi, I am YUKTI. Ask me tax-related questions, especially about Indian tax, NRI tax, DTAA, ITR, TDS, and residential status.",
+      "Hi, I am YUKTI. Ask me about this website, our services, pricing, calculators, compliance, or how to contact an expert.",
   },
 ];
+
+const getWebsiteBotReply = (query: string) => {
+  const text = query.trim().toLowerCase();
+
+  if (!text) {
+    return {
+      message: "Please type your question. I can help with services, pricing, calculators, compliance, and booking a CPA.",
+      actions: serviceOptions,
+    };
+  }
+
+  if (/(price|pricing|plan|subscription|cost|fee)/.test(text)) {
+    return {
+      message: "You can check all subscription and pricing details on our Pricing page. If you want, I can open it for you now.",
+      actions: serviceOptions.filter((item) => item.to === "/pricing"),
+    };
+  }
+
+  if (/(login|log in|sign in|signup|sign up|register|account)/.test(text)) {
+    return {
+      message: "You can use Login / Sign Up from the top navigation to access your account and premium features.",
+      actions: [],
+    };
+  }
+
+  if (/(profile|my profile|account details|user profile)/.test(text)) {
+    return {
+      message: "Your profile page lets you view and manage your account details after signing in.",
+      actions: [],
+    };
+  }
+
+  if (/(calculator|calculate|tax calculator|residency|income tax|dtaa credit)/.test(text)) {
+    return {
+      message: "We provide Tax Calculators including residency status, income tax, and DTAA tax credit tools. I can take you to the calculator page.",
+      actions: serviceOptions.filter((item) => item.to === "/calculators"),
+    };
+  }
+
+  if (/(cpa|consult|expert|book|appointment|consultation)/.test(text)) {
+    return {
+      message: "You can book expert help through our Consult a CPA page for personalized assistance.",
+      actions: serviceOptions.filter((item) => item.to === "/consult"),
+    };
+  }
+
+  if (/(compliance|security|ssl|soc 2|dtaa compliant|encrypted)/.test(text)) {
+    return {
+      message: "Our website highlights compliance and trust information such as SSL encryption, ICAI-registered CPA support, DTAA compliance, and security standards.",
+      actions: serviceOptions.filter((item) => item.to === "/compliance"),
+    };
+  }
+
+  if (/(document|documents|trc|form 10f|checklist|upload|pdf)/.test(text)) {
+    return {
+      message: "For document-related tax guidance like TRC, Form 10F, and checklists, the AI Tax Chat can help. For broader website guidance, I can also direct you to calculators or consultation.",
+      actions: serviceOptions.filter((item) => item.to === "/chat" || item.to === "/consult"),
+    };
+  }
+
+  if (/(how to use|use calculator|calculator help|how does calculator work)/.test(text)) {
+    return {
+      message: "On the Tax Calculator page, you can choose a calculator type such as residency, income tax, or DTAA credit, then enter your details to view the result.",
+      actions: serviceOptions.filter((item) => item.to === "/calculators"),
+    };
+  }
+
+  if (/(chat|ai chat|assistant|nexa|bot)/.test(text)) {
+    return {
+      message: "For detailed tax questions, you can open the AI Tax Chat page and continue the conversation there.",
+      actions: serviceOptions.filter((item) => item.to === "/chat"),
+    };
+  }
+
+  if (/(feature|service|offer|provide|website|platform)/.test(text)) {
+    return {
+      message: "This platform provides AI tax chat, tax calculators, pricing plans, compliance information, and CPA consultation support for NRI users.",
+      actions: serviceOptions,
+    };
+  }
+
+  if (/(update|news|tax updates|latest)/.test(text)) {
+    return {
+      message: "The website also includes a Tax Updates section where users can review recent tax and compliance updates.",
+      actions: [],
+    };
+  }
+
+  return {
+    message:
+      "I can help with website-related questions like pricing, calculators, compliance, AI chat, and CPA consultation. For detailed tax advice, open AI Tax Chat.",
+    actions: serviceOptions.filter((item) => item.to === "/chat"),
+  };
+};
 
 export function TigerBotAvatar() {
   const navigate = useNavigate();
   const location = useLocation();
   const widgetRef = useRef<HTMLDivElement>(null);
   const messagesRef = useRef<HTMLDivElement>(null);
-  const activeRequestControllerRef = useRef<AbortController | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<WidgetMessage[]>(initialMessages);
   const [suggestedActions, setSuggestedActions] = useState<ServiceOption[]>(serviceOptions);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
   const resetWidgetState = () => {
-    activeRequestControllerRef.current?.abort();
-    activeRequestControllerRef.current = null;
     setQuery("");
     setMessages(initialMessages);
     setSuggestedActions(serviceOptions);
-    setIsLoading(false);
-    setErrorMessage("");
   };
 
   useEffect(() => {
@@ -71,12 +158,6 @@ export function TigerBotAvatar() {
     resetWidgetState();
     setIsOpen(false);
   }, [location.pathname]);
-
-  useEffect(() => {
-    return () => {
-      activeRequestControllerRef.current?.abort();
-    };
-  }, []);
 
   useEffect(() => {
     if (!messagesRef.current) return;
@@ -102,70 +183,19 @@ export function TigerBotAvatar() {
     navigate(to);
   };
 
-  const handleQuerySubmit = async (event: React.FormEvent) => {
+  const handleQuerySubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedQuery = query.trim();
-    if (!trimmedQuery || isLoading) return;
+    if (!trimmedQuery) return;
 
-    const controller = new AbortController();
-    activeRequestControllerRef.current?.abort();
-    activeRequestControllerRef.current = controller;
-    setMessages((prev) => [...prev, { role: "user", content: trimmedQuery }]);
+    const reply = getWebsiteBotReply(trimmedQuery);
+    setMessages((prev) => [
+      ...prev,
+      { role: "user", content: trimmedQuery },
+      { role: "bot", content: reply.message },
+    ]);
+    setSuggestedActions(reply.actions);
     setQuery("");
-    setErrorMessage("");
-    setIsLoading(true);
-
-    try {
-      const storedUserRaw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
-      const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : null;
-      const userId =
-        typeof storedUser?._id === "string" && storedUser._id.trim()
-          ? storedUser._id.trim()
-          : undefined;
-
-      const response = await fetch(buildApiUrl("/api/yukti/chat"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(getStoredAuthToken() ? { Authorization: `Bearer ${getStoredAuthToken()}` } : {}),
-        },
-        body: JSON.stringify({
-          question: trimmedQuery,
-          ...(userId ? { userId } : {}),
-        }),
-        signal: controller.signal,
-      });
-
-      const result = (await response.json().catch(() => null)) as
-        | { answer?: string; ok?: boolean }
-        | null;
-
-      if (!response.ok) {
-        throw new Error(result?.answer || "Unable to reach Yukti right now. Please try again.");
-      }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "bot",
-          content:
-            typeof result?.answer === "string" && result.answer.trim()
-              ? result.answer.trim()
-              : "Yukti did not return a usable answer.",
-        },
-      ]);
-      setSuggestedActions(serviceOptions);
-    } catch (error: any) {
-      if (error?.name === "AbortError") {
-        return;
-      }
-      const message = error?.message || "Unable to reach Yukti right now. Please try again.";
-      setErrorMessage(message);
-      setMessages((prev) => [...prev, { role: "bot", content: message }]);
-    } finally {
-      activeRequestControllerRef.current = null;
-      setIsLoading(false);
-    }
   };
 
   return (
@@ -180,7 +210,7 @@ export function TigerBotAvatar() {
               </span>
               <div>
                 <p className="text-lg font-semibold leading-none">YUKTI</p>
-                <p className="mt-1 text-sm text-[#1F2937]/80">Tax-only help for Indian tax and NRI tax</p>
+                <p className="mt-1 text-sm text-[#1F2937]/80">What services do you need?</p>
               </div>
             </div>
             <button
@@ -197,9 +227,6 @@ export function TigerBotAvatar() {
           </div>
 
           <div className="max-h-[390px] overflow-y-auto p-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-            <p className="mb-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
-              Yukti answers only tax-related questions.
-            </p>
             <div
               ref={messagesRef}
               className="max-h-[180px] space-y-3 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
@@ -216,14 +243,7 @@ export function TigerBotAvatar() {
                     {message.content}
                   </div>
                 </div>
-                ))}
-              {isLoading ? (
-                <div className="flex justify-start">
-                  <div className="max-w-[88%] rounded-2xl border border-[#D1FAE5] bg-[#F8FAFC] px-3 py-2 text-sm font-semibold text-[#0F172A]">
-                    Thinking.....
-                  </div>
-                </div>
-              ) : null}
+              ))}
             </div>
 
             <div className="mt-3 max-h-[132px] space-y-2 overflow-y-auto pr-1 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
@@ -249,18 +269,16 @@ export function TigerBotAvatar() {
               <textarea
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Ask a tax question..."
+                placeholder="Ask about this website..."
                 rows={2}
                 className="w-full resize-none rounded-2xl border border-[#D1FAE5] bg-white px-3 py-2.5 text-sm text-[#0F172A] outline-none transition focus:border-[#86D39B] focus:ring-2 focus:ring-[#DCFCE7]"
               />
-              {errorMessage ? <p className="text-xs text-red-600">{errorMessage}</p> : null}
               <button
                 type="submit"
-                disabled={isLoading}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#86D39B] px-4 py-2.5 text-sm font-semibold text-[#0F172A] transition hover:bg-[#72C68A] disabled:cursor-not-allowed disabled:opacity-70"
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#86D39B] px-4 py-2.5 text-sm font-semibold text-[#0F172A] transition hover:bg-[#72C68A]"
               >
                 <Send className="size-4" />
-                {isLoading ? "Thinking....." : "Ask YUKTI"}
+                Ask YUKTI
               </button>
             </form>
           </div>
