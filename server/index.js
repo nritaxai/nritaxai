@@ -68,6 +68,7 @@ app.use("/api", globalRateLimiter);
 
 app.use(
   express.json({
+    limit: process.env.JSON_BODY_LIMIT || "5mb",
     verify: (req, _res, buf) => {
       if (
         req.originalUrl.startsWith("/api/subscription/razorpay-webhook") ||
@@ -78,6 +79,7 @@ app.use(
     },
   })
 );
+app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT || "5mb" }));
 
 app.get("/health", (_req, res) => {
   return res.status(200).json({
