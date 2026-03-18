@@ -56,6 +56,80 @@ const formatDate = (value?: string | null) => {
 
 const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
+const PROFILE_IMAGE_OUTPUT_SIZE = 320;
+
+const loadImageFromDataUrl = (dataUrl: string) =>
+  new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Selected file could not be processed as an image."));
+    image.src = dataUrl;
+  });
+
+const canvasToDataUrl = (canvas: HTMLCanvasElement) =>
+  new Promise<string>((resolve, reject) => {
+    const preferredFormat = canvas.toDataURL("image/webp", 0.9);
+    if (preferredFormat && preferredFormat.startsWith("data:image/webp")) {
+      resolve(preferredFormat);
+      return;
+    }
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Selected file could not be processed as an image."));
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = typeof reader.result === "string" ? reader.result : "";
+          if (!result.startsWith("data:image/")) {
+            reject(new Error("Selected file could not be processed as an image."));
+            return;
+          }
+          resolve(result);
+        };
+        reader.onerror = () => reject(new Error("Failed to read the selected image."));
+        reader.readAsDataURL(blob);
+      },
+      "image/jpeg",
+      0.9
+    );
+  });
+
+const normalizeProfileImage = async (dataUrl: string) => {
+  const image = await loadImageFromDataUrl(dataUrl);
+  const canvas = document.createElement("canvas");
+  canvas.width = PROFILE_IMAGE_OUTPUT_SIZE;
+  canvas.height = PROFILE_IMAGE_OUTPUT_SIZE;
+
+  const context = canvas.getContext("2d");
+  if (!context) {
+    throw new Error("Image processing is not available in this browser.");
+  }
+
+  const sourceWidth = image.naturalWidth || image.width;
+  const sourceHeight = image.naturalHeight || image.height;
+  const sourceSize = Math.min(sourceWidth, sourceHeight);
+  const sourceX = Math.max(0, (sourceWidth - sourceSize) / 2);
+  const sourceY = Math.max(0, (sourceHeight - sourceSize) / 2);
+
+  context.clearRect(0, 0, PROFILE_IMAGE_OUTPUT_SIZE, PROFILE_IMAGE_OUTPUT_SIZE);
+  context.drawImage(
+    image,
+    sourceX,
+    sourceY,
+    sourceSize,
+    sourceSize,
+    0,
+    0,
+    PROFILE_IMAGE_OUTPUT_SIZE,
+    PROFILE_IMAGE_OUTPUT_SIZE
+  );
+
+  return canvasToDataUrl(canvas);
+};
 
 export function Profile() {
   const navigate = useNavigate();
@@ -299,14 +373,19 @@ export function Profile() {
     }
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       const result = typeof reader.result === "string" ? reader.result : "";
       if (!result.startsWith("data:image/")) {
         setError("Selected file could not be processed as an image.");
         return;
       }
-      setError("");
-      setProfileImage(result);
+      try {
+        const normalizedImage = await normalizeProfileImage(result);
+        setError("");
+        setProfileImage(normalizedImage);
+      } catch (imageError: any) {
+        setError(imageError?.message || "Selected file could not be processed as an image.");
+      }
     };
     reader.onerror = () => {
       setError("Failed to read the selected image.");
@@ -415,6 +494,10 @@ export function Profile() {
             src={profileImage}
             alt={profile?.name || "User"}
             className="max-h-[85vh] w-auto max-w-[min(90vw,36rem)] rounded-[2rem] border border-white/15 object-contain shadow-2xl"
+            onError={() => {
+              setIsProfileImagePreviewOpen(false);
+              setProfileImage("");
+            }}
           />
         </button>
       ) : null}
@@ -462,7 +545,12 @@ export function Profile() {
                       aria-label={profileImage ? "Preview profile photo" : "Profile photo"}
                     >
                       {profileImage ? (
-                        <img src={profileImage} alt={profile?.name || "User"} className="h-full w-full object-cover" />
+                        <img
+                          src={profileImage}
+                          alt={profile?.name || "User"}
+                          className="h-full w-full object-cover"
+                          onError={() => setProfileImage("")}
+                        />
                       ) : (
                         <User className="size-8 text-[#2563eb]" />
                       )}

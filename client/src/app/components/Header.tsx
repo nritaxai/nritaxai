@@ -216,12 +216,19 @@ export function Header({ onLogin }: HeaderProps) {
                     aria-label="Open profile"
                     title="Open profile"
                   >
-                    <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
-                      {user.profileImage ? (
-                        <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover" />
-                      ) : (
-                        <UserIcon className="size-5 text-slate-500" />
-                      )}
+                      <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
+                        {user.profileImage ? (
+                          <img
+                            src={user.profileImage}
+                            alt={user.name}
+                            className="h-full w-full object-cover"
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
+                          />
+                        ) : (
+                          <UserIcon className="size-5 text-slate-500" />
+                        )}
                     </span>
                     <span>Hello, {user.name}</span>
                   </Link>
@@ -295,7 +302,14 @@ export function Header({ onLogin }: HeaderProps) {
                     >
                       <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
                         {user.profileImage ? (
-                          <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover" />
+                          <img
+                            src={user.profileImage}
+                            alt={user.name}
+                            className="h-full w-full object-cover"
+                            onError={(event) => {
+                              event.currentTarget.style.display = "none";
+                            }}
+                          />
                         ) : (
                           <UserIcon className="size-5 text-slate-500" />
                         )}
