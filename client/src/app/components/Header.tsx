@@ -4,6 +4,7 @@ import {
   Globe,
   Lock,
   Menu,
+  User as UserIcon,
   Shield,
   Users,
   X,
@@ -21,6 +22,7 @@ interface HeaderProps {
 interface User {
   name: string;
   email: string;
+  profileImage?: string;
 }
 
 export function Header({ onLogin }: HeaderProps) {
@@ -208,8 +210,20 @@ export function Header({ onLogin }: HeaderProps) {
             <div className="hidden items-center gap-4 md:flex">
               {user ? (
                 <>
-                  <Link to="/profile" className="text-base font-medium text-slate-700 hover:text-blue-700 transition-colors">
-                    Hello, {user.name}
+                  <Link
+                    to="/profile"
+                    className="flex items-center gap-3 text-base font-medium text-slate-700 transition-colors hover:text-blue-700"
+                    aria-label="Open profile"
+                    title="Open profile"
+                  >
+                    <span className="inline-flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
+                      {user.profileImage ? (
+                        <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover" />
+                      ) : (
+                        <UserIcon className="size-5 text-slate-500" />
+                      )}
+                    </span>
+                    <span>Hello, {user.name}</span>
                   </Link>
                   <Button
                     variant="outline"
@@ -273,14 +287,30 @@ export function Header({ onLogin }: HeaderProps) {
 
               <div className="mt-4 space-y-2 border-t border-gray-200 pt-4">
                 {user ? (
-                  <Button
-                    variant="outline"
-                    onClick={handleLogout}
-                    className="w-full border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
-                  >
-                    <LogOut className="mr-2 size-4" />
-                    Logout
-                  </Button>
+                  <>
+                    <Link
+                      to="/profile"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 rounded-md px-3 py-2.5 text-base font-medium text-slate-800 transition-colors hover:bg-gray-100 hover:text-blue-700"
+                    >
+                      <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm">
+                        {user.profileImage ? (
+                          <img src={user.profileImage} alt={user.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <UserIcon className="size-5 text-slate-500" />
+                        )}
+                      </span>
+                      <span>{user.name}</span>
+                    </Link>
+                    <Button
+                      variant="outline"
+                      onClick={handleLogout}
+                      className="w-full border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+                    >
+                      <LogOut className="mr-2 size-4" />
+                      Logout
+                    </Button>
+                  </>
                 ) : (
                   <>
                     <Button

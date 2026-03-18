@@ -568,7 +568,7 @@ export const resetPassword = async (req, res) => {
 // -------------------------------- Get Profile --------------------------------------------------------------
 export const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = req.user;
     if (!user) {
       return res.status(404).json({
         success: false,

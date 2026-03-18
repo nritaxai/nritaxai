@@ -7,6 +7,7 @@ import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -80,6 +81,7 @@ export function Profile() {
   const [bio, setBio] = useState("");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [retryingProfile, setRetryingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -89,6 +91,7 @@ export function Profile() {
   const [passwordError, setPasswordError] = useState("");
   const [passwordSuccess, setPasswordSuccess] = useState("");
   const [profileLoadFailed, setProfileLoadFailed] = useState(false);
+  const [isProfileImagePreviewOpen, setIsProfileImagePreviewOpen] = useState(false);
   const [passwordForm, setPasswordForm] = useState({
     oldPassword: "",
     newPassword: "",
@@ -129,11 +132,35 @@ export function Profile() {
       setBio(data.bio || "");
       setSubscription(nextSubscription);
       setProfileLoadFailed(false);
+      if (typeof window !== "undefined") {
+        const storedUserRaw = localStorage.getItem("user");
+        const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+        localStorage.setItem("user", JSON.stringify({ ...storedUser, ...data }));
+        window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new Event("auth-changed"));
+      }
     };
 
     if (storedUser) {
       applyProfileData(storedUser, null);
     }
+
+    const fetchSubscription = async () => {
+      if (!active) return;
+      setSubscriptionLoading(true);
+      try {
+        const response = await getSubscriptionStatus();
+        if (!active) return;
+        setSubscription(response?.subscription || null);
+      } catch (subscriptionError) {
+        if (!active) return;
+        console.error("subscription status load failed", subscriptionError);
+      } finally {
+        if (active) {
+          setSubscriptionLoading(false);
+        }
+      }
+    };
 
     const fetchProfile = async (attempt = 0) => {
       if (!active) return;
@@ -141,10 +168,10 @@ export function Profile() {
       setRetryingProfile(attempt > 0);
       setError("");
 
-      const [profileResponse, subscriptionResponse] = await Promise.allSettled([
-        getUserProfile(),
-        getSubscriptionStatus(),
-      ]);
+      const profileResponse = await getUserProfile().then(
+        (value) => ({ status: "fulfilled" as const, value }),
+        (reason) => ({ status: "rejected" as const, reason })
+      );
 
       if (!active) return;
 
@@ -162,7 +189,7 @@ export function Profile() {
         if (attempt < 1) {
           window.setTimeout(() => {
             if (active) void fetchProfile(attempt + 1);
-          }, 900);
+          }, 350);
           return;
         }
 
@@ -178,16 +205,8 @@ export function Profile() {
           setProfileLoadFailed(true);
           setError("Unable to load profile data.");
         } else {
-          const nextSubscription =
-            subscriptionResponse.status === "fulfilled"
-              ? subscriptionResponse.value?.subscription || null
-              : null;
-
-          if (subscriptionResponse.status === "rejected") {
-            console.error("subscription status load failed", subscriptionResponse.reason);
-          }
-
-          applyProfileData(data, nextSubscription);
+          applyProfileData(data, subscription);
+          void fetchSubscription();
         }
       }
 
@@ -299,6 +318,7 @@ export function Profile() {
   const clearProfileImage = () => {
     setProfileImage("");
     setError("");
+    setIsEditingProfile(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -384,6 +404,27 @@ export function Profile() {
 
   return (
     <div className="py-16">
+      {isProfileImagePreviewOpen && profileImage ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/82 p-6 backdrop-blur-sm"
+          onClick={() => setIsProfileImagePreviewOpen(false)}
+          aria-label="Close profile photo preview"
+        >
+          <img
+            src={profileImage}
+            alt={profile?.name || "User"}
+            className="max-h-[85vh] w-auto max-w-[min(90vw,36rem)] rounded-[2rem] border border-white/15 object-contain shadow-2xl"
+          />
+        </button>
+      ) : null}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+        className="hidden"
+        onChange={handleProfileImageFileChange}
+      />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <Card className="rounded-2xl border border-[#E2E8F0] shadow-sm bg-[#F7FAFC]/90">
           <CardContent className="p-6 sm:p-8">
@@ -407,17 +448,61 @@ export function Profile() {
             ) : (
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="size-16 rounded-full bg-[#2563eb]/12 border border-[#2563eb]/40 overflow-hidden flex items-center justify-center">
-                    {profileImage ? (
-                      <img src={profileImage} alt={profile?.name || "User"} className="h-full w-full object-cover" />
-                    ) : (
-                      <User className="size-8 text-[#2563eb]" />
-                    )}
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (profileImage) {
+                          setIsProfileImagePreviewOpen(true);
+                        }
+                      }}
+                      className={`size-16 rounded-full bg-[#2563eb]/12 border border-[#2563eb]/40 overflow-hidden flex items-center justify-center transition ${
+                        profileImage ? "cursor-zoom-in hover:border-[#2563eb]" : "cursor-default"
+                      }`}
+                      aria-label={profileImage ? "Preview profile photo" : "Profile photo"}
+                    >
+                      {profileImage ? (
+                        <img src={profileImage} alt={profile?.name || "User"} className="h-full w-full object-cover" />
+                      ) : (
+                        <User className="size-8 text-[#2563eb]" />
+                      )}
+                    </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="absolute -right-1 -bottom-1 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm transition hover:border-[#2563eb] hover:text-[#2563eb]"
+                          aria-label="Edit profile photo"
+                          title="Edit profile photo"
+                        >
+                          <Pencil className="size-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" className="w-56">
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setIsEditingProfile(true);
+                            window.setTimeout(() => fileInputRef.current?.click(), 0);
+                          }}
+                        >
+                          Upload From Desktop
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={clearProfileImage}>
+                          Use Default Picture
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={clearProfileImage} disabled={!profileImage}>
+                          Remove Current Profile Photo
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                   <div>
                     <p className="text-sm text-[#0F172A]">Welcome back</p>
                     <h1 className="text-2xl sm:text-3xl text-[#0F172A]">{profile?.name}</h1>
                     <p className="text-[#0F172A]">{profile?.email}</p>
+                    <p className="mt-1 text-xs text-[#475569]">
+                      Click the photo to preview it. Use the pencil button to change it.
+                    </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -498,13 +583,6 @@ export function Profile() {
                       />
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
-                        className="hidden"
-                        onChange={handleProfileImageFileChange}
-                      />
                       <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()}>
                         Choose From Desktop
                       </Button>
@@ -667,7 +745,7 @@ export function Profile() {
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-[#E2E8F0] p-3">
                 <p className="text-xs text-[#0F172A] mb-1">Current Plan</p>
-                <p className="text-lg text-[#0F172A]">{subscription?.plan || "FREE"}</p>
+                <p className="text-lg text-[#0F172A]">{subscriptionLoading ? "Loading..." : subscription?.plan || "FREE"}</p>
               </div>
 
               <div className="rounded-lg border border-[#E2E8F0] p-3 space-y-3">
