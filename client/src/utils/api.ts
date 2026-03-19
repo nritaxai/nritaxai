@@ -126,6 +126,7 @@ export const updateUserProfile = async (payload: {
   countryOfResidence?: string;
   preferredLanguage?: "english" | "hindi" | "tamil" | "indonesian";
   bio?: string;
+  linkedinProfile?: string;
 }) => {
   return putRequest("/api/auth/profile", payload);
 };

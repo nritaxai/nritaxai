@@ -30,6 +30,7 @@ type ProfileData = {
   countryOfResidence?: string;
   preferredLanguage?: "english" | "hindi" | "tamil" | "indonesian";
   bio?: string;
+  linkedinProfile?: string;
   provider?: "local" | "google";
   usage?: {
     queriesUsed?: number;
@@ -57,6 +58,7 @@ const formatDate = (value?: string | null) => {
 const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
 const PROFILE_IMAGE_OUTPUT_SIZE = 320;
+const LINKEDIN_URL_PATTERN = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
 
 const loadImageFromDataUrl = (dataUrl: string) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
@@ -153,6 +155,7 @@ export function Profile() {
   const [countryOfResidence, setCountryOfResidence] = useState("");
   const [preferredLanguage, setPreferredLanguage] = useState<"english" | "hindi" | "tamil" | "indonesian">("english");
   const [bio, setBio] = useState("");
+  const [linkedinProfile, setLinkedinProfile] = useState("");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [loading, setLoading] = useState(true);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
@@ -184,9 +187,10 @@ export function Profile() {
       phone.trim() !== (profile.phone || "").trim() ||
       countryOfResidence.trim() !== (profile.countryOfResidence || "").trim() ||
       preferredLanguage !== (profile.preferredLanguage || "english") ||
-      bio.trim() !== (profile.bio || "").trim()
+      bio.trim() !== (profile.bio || "").trim() ||
+      linkedinProfile.trim() !== (profile.linkedinProfile || "").trim()
     );
-  }, [name, profileImage, phone, countryOfResidence, preferredLanguage, bio, profile]);
+  }, [name, profileImage, phone, countryOfResidence, preferredLanguage, bio, linkedinProfile, profile]);
 
   useEffect(() => {
     if (!token) {
@@ -204,6 +208,7 @@ export function Profile() {
       setCountryOfResidence(data.countryOfResidence || detectUserCountry());
       setPreferredLanguage(data.preferredLanguage || "english");
       setBio(data.bio || "");
+      setLinkedinProfile(data.linkedinProfile || "");
       setSubscription(nextSubscription);
       setProfileLoadFailed(false);
       if (typeof window !== "undefined") {
@@ -313,6 +318,14 @@ export function Profile() {
       setError("Phone number format is invalid.");
       return;
     }
+    if (!linkedinProfile.trim()) {
+      setError("LinkedIn profile is required.");
+      return;
+    }
+    if (!LINKEDIN_URL_PATTERN.test(linkedinProfile.trim())) {
+      setError("LinkedIn profile must be a valid linkedin.com URL.");
+      return;
+    }
     if (profileImage && !profileImage.startsWith("http://") && !profileImage.startsWith("https://") && !profileImage.startsWith("data:image/")) {
       setError("Profile image must be a valid image URL or uploaded image file.");
       return;
@@ -330,6 +343,7 @@ export function Profile() {
         countryOfResidence: countryOfResidence.trim(),
         preferredLanguage,
         bio: bio.trim(),
+        linkedinProfile: linkedinProfile.trim(),
       });
       const updated = response?.data;
       if (!updated) {
@@ -343,6 +357,7 @@ export function Profile() {
       setCountryOfResidence(updated.countryOfResidence || "");
       setPreferredLanguage(updated.preferredLanguage || "english");
       setBio(updated.bio || "");
+      setLinkedinProfile(updated.linkedinProfile || "");
       setSuccessMessage("Profile updated successfully.");
       setIsEditingProfile(false);
 
@@ -663,6 +678,20 @@ export function Profile() {
                   </div>
 
                   <div className="space-y-2">
+                    <Label htmlFor="linkedinProfile">LinkedIn Profile</Label>
+                    <Input
+                      id="linkedinProfile"
+                      value={linkedinProfile}
+                      onChange={(e) => setLinkedinProfile(e.target.value)}
+                      placeholder="https://www.linkedin.com/in/your-profile"
+                      required
+                    />
+                    <p className="text-xs text-[#475569]">
+                      This is required and must be a valid LinkedIn profile URL.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
                     <Label htmlFor="profileImage">Profile Image</Label>
                     <div className="relative">
                       <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
@@ -764,6 +793,7 @@ export function Profile() {
                         setCountryOfResidence(profile?.countryOfResidence || "");
                         setPreferredLanguage(profile?.preferredLanguage || "english");
                         setBio(profile?.bio || "");
+                        setLinkedinProfile(profile?.linkedinProfile || "");
                       }}
                     >
                       Cancel
@@ -789,6 +819,15 @@ export function Profile() {
                       <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
                       <Input id="email" value={profile?.email || ""} className="pl-9 bg-[#F7FAFC]" disabled />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="linkedin-readonly">LinkedIn Profile</Label>
+                    <Input
+                      id="linkedin-readonly"
+                      value={profile?.linkedinProfile || "Not set"}
+                      className="bg-[#F7FAFC]"
+                      disabled
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="provider">Sign-in Provider</Label>

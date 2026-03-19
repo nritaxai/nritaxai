@@ -59,6 +59,11 @@ const userSchema = new mongoose.Schema(
       maxlength: [240, "Bio must be at most 240 characters"],
       default: "",
     },
+    linkedinProfile: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     provider: {
       type: String,
       enum: ["local", "google", "apple"],

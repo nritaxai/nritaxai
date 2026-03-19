@@ -15,6 +15,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
+import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils/api";
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -31,6 +32,20 @@ const sanitizeProfileImage = (value?: string) => {
   if (normalized.startsWith("data:image/")) return normalized;
   if (normalized.startsWith("http://") || normalized.startsWith("https://")) return normalized;
   return "";
+};
+
+const parseStoredUser = () => {
+  try {
+    const raw = localStorage.getItem("user");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return {
+      ...parsed,
+      profileImage: sanitizeProfileImage(parsed?.profileImage),
+    } as User;
+  } catch {
+    return null;
+  }
 };
 
 export function Header({ onLogin }: HeaderProps) {
@@ -81,33 +96,59 @@ export function Header({ onLogin }: HeaderProps) {
   }, []);
 
   useEffect(() => {
-    const loadUser = () => {
-      const storedUser = localStorage.getItem("user");
-      if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser({
-          ...parsedUser,
-          profileImage: sanitizeProfileImage(parsedUser?.profileImage),
-        });
-      } else {
+    const loadUser = async () => {
+      const storedUser = parseStoredUser();
+      if (storedUser?.name && storedUser?.email) {
+        setUser(storedUser);
+        return;
+      }
+
+      const token = getStoredAuthToken();
+      if (!token) {
+        setUser(null);
+        return;
+      }
+
+      try {
+        const response = await getUserProfile();
+        const profile = response?.data;
+        if (!profile?.email) {
+          setUser(null);
+          return;
+        }
+
+        const nextUser = {
+          ...profile,
+          profileImage: sanitizeProfileImage(profile?.profileImage),
+        };
+        localStorage.setItem("user", JSON.stringify(nextUser));
+        setUser(nextUser);
+      } catch (error: any) {
+        if (error?.response?.status === 401) {
+          clearStoredAuth();
+        }
         setUser(null);
       }
     };
 
-    loadUser();
+    void loadUser();
 
-    window.addEventListener("storage", loadUser);
-    window.addEventListener("auth-changed", loadUser);
-    window.addEventListener("user-updated", loadUser);
-    window.addEventListener("focus", loadUser);
-    document.addEventListener("visibilitychange", loadUser);
+    const reloadUser = () => {
+      void loadUser();
+    };
+
+    window.addEventListener("storage", reloadUser);
+    window.addEventListener("auth-changed", reloadUser);
+    window.addEventListener("user-updated", reloadUser);
+    window.addEventListener("focus", reloadUser);
+    document.addEventListener("visibilitychange", reloadUser);
 
     return () => {
-      window.removeEventListener("storage", loadUser);
-      window.removeEventListener("auth-changed", loadUser);
-      window.removeEventListener("user-updated", loadUser);
-      window.removeEventListener("focus", loadUser);
-      document.removeEventListener("visibilitychange", loadUser);
+      window.removeEventListener("storage", reloadUser);
+      window.removeEventListener("auth-changed", reloadUser);
+      window.removeEventListener("user-updated", reloadUser);
+      window.removeEventListener("focus", reloadUser);
+      document.removeEventListener("visibilitychange", reloadUser);
     };
   }, []);
 

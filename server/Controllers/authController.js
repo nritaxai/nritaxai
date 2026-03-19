@@ -182,6 +182,17 @@ const isValidPhone = (value) => {
   return /^[\d+()\-\s]{7,20}$/.test(value);
 };
 
+const isValidLinkedInProfile = (value) => {
+  if (!value) return false;
+  try {
+    const parsed = new URL(value);
+    const hostname = parsed.hostname.toLowerCase();
+    return (hostname === "linkedin.com" || hostname === "www.linkedin.com") && parsed.pathname.length > 1;
+  } catch {
+    return false;
+  }
+};
+
 const buildPasswordResetUrl = (req, token) => {
   const configuredBase =
     sanitizeString(process.env.FRONTEND_URL) ||
@@ -206,6 +217,7 @@ const toSafeUser = (userDoc) => {
     countryOfResidence: user.countryOfResidence || "",
     preferredLanguage: user.preferredLanguage || "english",
     bio: user.bio || "",
+    linkedinProfile: user.linkedinProfile || "",
     provider: user.provider || "local",
     subscription: user.subscription,
     usage: user.usage,
@@ -348,14 +360,25 @@ export const appleLogin = async (req, res) => {
 // -------------------------------- Register --------------------------------------------------------------
 export const registerUser = async (req, res) => {
   try {
-    const { name, email, password, confirmPassword } = req.body;
+    const name = sanitizeString(req.body?.name);
+    const email = sanitizeString(req.body?.email).toLowerCase();
+    const password = String(req.body?.password || "");
+    const confirmPassword = String(req.body?.confirmPassword || "");
+    const linkedinProfile = sanitizeString(req.body?.linkedinProfile);
 
-    if (!name || !email || !password || !confirmPassword) {
+    if (!name || !email || !password || !confirmPassword || !linkedinProfile) {
       return res.status(404).json({
         success: false,
-        message: "Please enter all required fields: Name, Email and Password"
+        message: "Please enter all required fields: Name, Email, LinkedIn Profile and Password"
       });
     };
+
+    if (!isValidLinkedInProfile(linkedinProfile)) {
+      return res.status(400).json({
+        success: false,
+        message: "LinkedIn profile must be a valid linkedin.com URL.",
+      });
+    }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
@@ -372,7 +395,7 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    const newUser = new User({ name, email, password });
+    const newUser = new User({ name, email, password, linkedinProfile });
     await newUser.save();
 
     const token = generateToken(newUser._id);
@@ -608,6 +631,7 @@ export const updateUserProfile = async (req, res) => {
     const preferredLanguage = sanitizeString(req.body?.preferredLanguage).toLowerCase();
     const bio = sanitizeString(req.body?.bio);
     const phone = normalizePhone(req.body?.phone);
+    const linkedinProfile = sanitizeString(req.body?.linkedinProfile);
 
     if (name && name.length < 2) {
       return res.status(400).json({
@@ -651,6 +675,20 @@ export const updateUserProfile = async (req, res) => {
       });
     }
 
+    if (!linkedinProfile) {
+      return res.status(400).json({
+        success: false,
+        message: "LinkedIn profile is required.",
+      });
+    }
+
+    if (!isValidLinkedInProfile(linkedinProfile)) {
+      return res.status(400).json({
+        success: false,
+        message: "LinkedIn profile must be a valid linkedin.com URL.",
+      });
+    }
+
     if (preferredLanguage && !PROFILE_LANGUAGES.has(preferredLanguage)) {
       return res.status(400).json({
         success: false,
@@ -663,6 +701,7 @@ export const updateUserProfile = async (req, res) => {
     user.phone = phone;
     user.countryOfResidence = countryOfResidence;
     user.bio = bio;
+    user.linkedinProfile = linkedinProfile;
     if (preferredLanguage) user.preferredLanguage = preferredLanguage;
 
     await user.save();

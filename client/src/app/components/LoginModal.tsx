@@ -21,10 +21,12 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ onClose }: LoginModalProps) {
+  const linkedInUrlPattern = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
     name: "",
     email: "",
+    linkedinProfile: "",
     password: "",
     confirmPassword: "",
   });
@@ -247,13 +249,18 @@ export function LoginModal({ onClose }: LoginModalProps) {
     e.preventDefault();
     setSignupError(null);
 
-    if (!signupData.name.trim() || !signupData.email.trim() || !signupData.password || !signupData.confirmPassword) {
+    if (!signupData.name.trim() || !signupData.email.trim() || !signupData.linkedinProfile.trim() || !signupData.password || !signupData.confirmPassword) {
       setSignupError("Please fill all fields to create your account.");
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signupData.email.trim())) {
       setSignupError("Please enter a valid email address.");
+      return;
+    }
+
+    if (!linkedInUrlPattern.test(signupData.linkedinProfile.trim())) {
+      setSignupError("Please enter a valid LinkedIn profile URL.");
       return;
     }
 
@@ -270,7 +277,12 @@ export function LoginModal({ onClose }: LoginModalProps) {
     setLoading(true);
 
     try {
-      const response = await signupUser(signupData);
+      const response = await signupUser({
+        ...signupData,
+        name: signupData.name.trim(),
+        email: signupData.email.trim(),
+        linkedinProfile: signupData.linkedinProfile.trim(),
+      });
       const user = resolveAuthUser(response);
       handleAuthSuccess(
         response,
@@ -488,6 +500,19 @@ export function LoginModal({ onClose }: LoginModalProps) {
                     value={signupData.email}
                     onChange={(e) =>
                       setSignupData({ ...signupData, email: e.target.value })
+                    }
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>LinkedIn Profile</Label>
+                  <Input
+                    type="url"
+                    required
+                    placeholder="https://www.linkedin.com/in/your-profile"
+                    value={signupData.linkedinProfile}
+                    onChange={(e) =>
+                      setSignupData({ ...signupData, linkedinProfile: e.target.value })
                     }
                   />
                 </div>
