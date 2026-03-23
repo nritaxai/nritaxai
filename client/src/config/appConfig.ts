@@ -21,8 +21,16 @@ export const API_BASE_URL = normalizeUrl(
   envApiUrl || (import.meta.env.DEV && !IS_NATIVE_APP ? resolvedDevApiUrl : resolvedProdApiUrl)
 );
 
+const getBannerOrigin = () => {
+  if (envBannerApiUrl) return normalizeUrl(envBannerApiUrl);
+  if (typeof window !== "undefined" && window.location.origin) {
+    return normalizeUrl(window.location.origin);
+  }
+  return "https://www.nritax.ai";
+};
+
 export const BANNER_API_BASE_URL = normalizeUrl(
-  envBannerApiUrl || PROD_API_URL_DEFAULT
+  getBannerOrigin()
 );
 
 export const APPLE_AUTH_CONFIG = {
