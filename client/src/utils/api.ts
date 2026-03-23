@@ -1,5 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
+import { BANNER_API_BASE_URL } from "../config/appConfig";
 
 export const API_URL = API_BASE_URL;
 export const buildApiUrl = (path: string) => `${API_URL}${path}`;
@@ -134,7 +135,16 @@ export interface BannerUpdate {
 
 export const getBannerUpdates = async (country?: string) => {
   const query = country ? `?country=${encodeURIComponent(country)}` : "";
-  return getRequest(`/api/banner-updates${query}`) as Promise<BannerUpdate[]>;
+  try {
+    const response = await axios.get(`${BANNER_API_BASE_URL}/api/banner-updates${query}`, {
+      timeout: 20000,
+      withCredentials: false,
+    });
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error: any) {
+    logClientApiError("GET", `/api/banner-updates${query}`, error);
+    throw error;
+  }
 };
 
 export const getUserProfile = async () => {

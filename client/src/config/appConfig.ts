@@ -2,12 +2,14 @@ import { Capacitor } from "@capacitor/core";
 
 const PROD_API_URL_DEFAULT = "https://nritax.ai";
 const DEV_API_URL_DEFAULT = "http://localhost:5000";
+const DEV_BANNER_API_URL_DEFAULT = "http://localhost:3000";
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
 
 const envApiUrl = String(import.meta.env.VITE_API_URL || "").trim();
 const envProdApiUrl = String(import.meta.env.VITE_API_URL_PROD || "").trim();
 const envDevApiUrl = String(import.meta.env.VITE_API_URL_DEV || "").trim();
+const envBannerApiUrl = String(import.meta.env.VITE_BANNER_API_URL || "").trim();
 
 export const IS_NATIVE_APP = Capacitor.isNativePlatform();
 export const PLATFORM = Capacitor.getPlatform();
@@ -18,6 +20,10 @@ const resolvedDevApiUrl = normalizeUrl(envDevApiUrl || DEV_API_URL_DEFAULT);
 
 export const API_BASE_URL = normalizeUrl(
   envApiUrl || (import.meta.env.DEV && !IS_NATIVE_APP ? resolvedDevApiUrl : resolvedProdApiUrl)
+);
+
+export const BANNER_API_BASE_URL = normalizeUrl(
+  envBannerApiUrl || (import.meta.env.DEV && !IS_NATIVE_APP ? DEV_BANNER_API_URL_DEFAULT : API_BASE_URL)
 );
 
 export const APPLE_AUTH_CONFIG = {
