@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const bannerUpdateSchema = new mongoose.Schema(
   {
     label: { type: String, trim: true, default: "" },
-    title: { type: String, trim: true, required: true },
+    title: { type: String, trim: true, default: "" },
     country: { type: String, trim: true, default: "" },
     date: { type: String, trim: true, default: "" },
     url: { type: String, trim: true, default: "" },

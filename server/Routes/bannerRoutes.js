@@ -12,13 +12,13 @@ router.post("/banner-updates", async (req, res) => {
     if (!Array.isArray(updates)) {
       return res.status(400).json({
         success: false,
-        message: "Invalid payload. 'updates' must be an array.",
+        message: "Invalid payload: 'updates' must be an array.",
       });
     }
 
     await Banner.findOneAndUpdate(
       { key: BANNER_KEY },
-      { key: BANNER_KEY, updates },
+      { updates },
       {
         new: true,
         upsert: true,
