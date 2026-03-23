@@ -14,6 +14,8 @@ const sanitizeString = (value) => (typeof value === "string" ? value.trim() : ""
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEYS_ENDPOINT = "https://appleid.apple.com/auth/keys";
 const APPLE_TOKEN_ENDPOINT = "https://appleid.apple.com/auth/token";
+const LINKEDIN_TOKEN_ENDPOINT = "https://www.linkedin.com/oauth/v2/accessToken";
+const LINKEDIN_USERINFO_ENDPOINT = "https://api.linkedin.com/v2/userinfo";
 let appleSigningKeysCache = { keys: [], fetchedAt: 0 };
 
 const logAuthError = (action, error, context = {}) => {
@@ -154,6 +156,51 @@ const exchangeAppleAuthorizationCode = async (authorizationCode) => {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Apple code exchange failed (${response.status}): ${text}`);
+  }
+
+  return response.json();
+};
+
+const exchangeLinkedInAuthorizationCode = async ({ code, redirectUri }) => {
+  const clientId = sanitizeString(process.env.LINKEDIN_CLIENT_ID);
+  const clientSecret = sanitizeString(process.env.LINKEDIN_CLIENT_SECRET);
+
+  if (!clientId || !clientSecret) {
+    throw new Error("LinkedIn OAuth is not configured");
+  }
+
+  const body = new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    client_id: clientId,
+    client_secret: clientSecret,
+    redirect_uri: redirectUri,
+  });
+
+  const response = await fetch(LINKEDIN_TOKEN_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`LinkedIn token exchange failed (${response.status}): ${text}`);
+  }
+
+  return response.json();
+};
+
+const getLinkedInUserInfo = async (accessToken) => {
+  const response = await fetch(LINKEDIN_USERINFO_ENDPOINT, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`LinkedIn user info failed (${response.status}): ${text}`);
   }
 
   return response.json();
@@ -440,7 +487,7 @@ export const loginUser = async (req, res) => {
     if (!user.password) {
       return res.status(400).json({
         success: false,
-        message: "This account has no password yet. Please use Google sign-in or set a password from Profile."
+        message: "This account has no password yet. Please use the original social sign-in method or set a password from Profile."
       });
     }
 
@@ -525,6 +572,97 @@ export const forgotPassword = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: `Unable to send password reset email right now. ${error?.message || "Unknown mail error."}`,
+    });
+  }
+};
+
+// -------------------------------- LinkedIn Login --------------------------------------------------------------
+export const linkedinLogin = async (req, res) => {
+  try {
+    const code = sanitizeString(req.body?.code);
+    const redirectUri = sanitizeString(req.body?.redirectUri);
+
+    if (!code || !redirectUri) {
+      return res.status(400).json({
+        success: false,
+        message: "LinkedIn authorization code and redirect URI are required",
+      });
+    }
+
+    const tokenResponse = await exchangeLinkedInAuthorizationCode({ code, redirectUri });
+    const accessToken = sanitizeString(tokenResponse?.access_token);
+
+    if (!accessToken) {
+      throw new Error("LinkedIn access token missing");
+    }
+
+    const profile = await getLinkedInUserInfo(accessToken);
+    const linkedinId = sanitizeString(profile?.sub);
+    const email = sanitizeString(profile?.email).toLowerCase();
+    const name =
+      sanitizeString(profile?.name) ||
+      [sanitizeString(profile?.given_name), sanitizeString(profile?.family_name)].filter(Boolean).join(" ");
+    const picture = sanitizeString(profile?.picture);
+
+    if (!linkedinId) {
+      throw new Error("LinkedIn user ID missing");
+    }
+
+    let user = null;
+
+    if (email) {
+      user = await User.findOne({ email });
+    }
+
+    if (!user) {
+      user = await User.findOne({ linkedinId });
+    }
+
+    if (!user) {
+      user = await User.create({
+        name: name || "LinkedIn User",
+        email: email || `linkedin_${linkedinId}@users.nritax.ai`,
+        linkedinId,
+        profileImage: picture,
+        provider: "linkedin",
+      });
+    } else {
+      let changed = false;
+
+      if (!user.linkedinId) {
+        user.linkedinId = linkedinId;
+        changed = true;
+      }
+
+      if ((!user.provider || user.provider === "local") && !user.googleId && !user.appleId) {
+        user.provider = "linkedin";
+        changed = true;
+      }
+
+      if (!user.profileImage && picture) {
+        user.profileImage = picture;
+        changed = true;
+      }
+
+      if (changed) {
+        await user.save();
+      }
+    }
+
+    const token = generateToken(user._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "LinkedIn login successful",
+      user: toSafeUser(user),
+      token,
+    });
+  } catch (error) {
+    logAuthError("linkedin-login", error);
+    return res.status(401).json({
+      success: false,
+      message: "LinkedIn authentication failed",
+      error: error?.message || "Unknown LinkedIn authentication error",
     });
   }
 };

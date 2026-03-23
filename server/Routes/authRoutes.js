@@ -6,6 +6,7 @@ import {
   forgotPassword,
   getUserProfile,
   googleLogin,
+  linkedinLogin,
   loginUser, registerUser,
   resetPassword,
   updateUserProfile
@@ -27,6 +28,7 @@ router.post("/reset-password", authRateLimiter, resetPassword);
 
 router.post("/google-login", authRateLimiter, googleLogin);
 router.post("/apple", authRateLimiter, appleLogin);
+router.post("/linkedin", authRateLimiter, linkedinLogin);
 
 router.get("/profile", protect, getUserProfile);
 

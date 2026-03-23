@@ -35,6 +35,9 @@ const userSchema = new mongoose.Schema(
     appleId: {
       type: String,
     },
+    linkedinId: {
+      type: String,
+    },
     profileImage: {
       type: String,
     },
@@ -66,7 +69,7 @@ const userSchema = new mongoose.Schema(
     },
     provider: {
       type: String,
-      enum: ["local", "google", "apple"],
+      enum: ["local", "google", "apple", "linkedin"],
       default: "local",
     },
     resetPasswordToken: {

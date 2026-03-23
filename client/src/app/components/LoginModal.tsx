@@ -12,8 +12,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { X, Eye, EyeOff, Loader2 } from "lucide-react";
-import { appleLoginUser, forgotPassword, loginUser, signupUser, googleLoginUser } from "../../utils/api";
-import { APPLE_AUTH_CONFIG, GOOGLE_AUTH_CONFIG } from "../../config/appConfig";
+import { appleLoginUser, forgotPassword, linkedinLoginUser, loginUser, signupUser, googleLoginUser } from "../../utils/api";
+import { APPLE_AUTH_CONFIG, GOOGLE_AUTH_CONFIG, LINKEDIN_AUTH_CONFIG } from "../../config/appConfig";
 import { AuthPopup } from "./AuthPopup";
 
 interface LoginModalProps {
@@ -47,6 +47,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
     type: "success" | "error";
   } | null>(null);
   const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
+  const canUseLinkedInAuth = Boolean(LINKEDIN_AUTH_CONFIG.clientId && LINKEDIN_AUTH_CONFIG.redirectUri);
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -59,6 +60,48 @@ export function LoginModal({ onClose }: LoginModalProps) {
       type: "error",
     });
     setTimeout(() => setPopup(null), 4500);
+  };
+
+  const openCenteredPopup = (url: string, name: string) => {
+    const width = 560;
+    const height = 720;
+    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
+    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
+    return window.open(
+      url,
+      name,
+      `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)}`
+    );
+  };
+
+  const handleLinkedInAuth = (mode: "login" | "signup") => {
+    try {
+      if (!LINKEDIN_AUTH_CONFIG.clientId || !LINKEDIN_AUTH_CONFIG.redirectUri) {
+        throw new Error("LinkedIn Sign-In configuration is missing");
+      }
+
+      const state = `${mode}:${crypto.randomUUID()}`;
+      sessionStorage.setItem("nritax.linkedin.oauth.state", state);
+      sessionStorage.setItem("nritax.linkedin.oauth.mode", mode);
+
+      const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
+      authUrl.searchParams.set("response_type", "code");
+      authUrl.searchParams.set("client_id", LINKEDIN_AUTH_CONFIG.clientId);
+      authUrl.searchParams.set("redirect_uri", LINKEDIN_AUTH_CONFIG.redirectUri);
+      authUrl.searchParams.set("scope", LINKEDIN_AUTH_CONFIG.scope);
+      authUrl.searchParams.set("state", state);
+
+      const popupWindow = openCenteredPopup(authUrl.toString(), "linkedin-oauth");
+      if (!popupWindow) {
+        throw new Error("Popup blocked. Please allow popups and try again.");
+      }
+    } catch (error: any) {
+      setPopup({
+        message: error?.message || "LinkedIn Sign-In could not start",
+        type: "error",
+      });
+      setTimeout(() => setPopup(null), 2200);
+    }
   };
 
   const completeAppleLogin = async (
@@ -157,6 +200,65 @@ export function LoginModal({ onClose }: LoginModalProps) {
       const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ""}`;
       window.history.replaceState({}, document.title, cleanUrl);
     });
+  }, []);
+
+  useEffect(() => {
+    const handleLinkedInMessage = async (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      const payload = event.data;
+      if (!payload || payload.source !== "nritax-linkedin-oauth") return;
+
+      const expectedState = sessionStorage.getItem("nritax.linkedin.oauth.state");
+      const mode = sessionStorage.getItem("nritax.linkedin.oauth.mode") === "signup" ? "signup" : "login";
+
+      if (payload.error) {
+        setPopup({
+          message: payload.error,
+          type: "error",
+        });
+        setTimeout(() => setPopup(null), 2500);
+        return;
+      }
+
+      if (!payload.code || !payload.state || payload.state !== expectedState) {
+        setPopup({
+          message: "LinkedIn authentication failed. Please try again.",
+          type: "error",
+        });
+        setTimeout(() => setPopup(null), 2500);
+        return;
+      }
+
+      sessionStorage.removeItem("nritax.linkedin.oauth.state");
+      sessionStorage.removeItem("nritax.linkedin.oauth.mode");
+      setLoading(true);
+
+      try {
+        const response = await linkedinLoginUser({
+          code: payload.code,
+          redirectUri: LINKEDIN_AUTH_CONFIG.redirectUri,
+        });
+        const user = resolveAuthUser(response);
+        handleAuthSuccess(
+          response,
+          mode === "signup"
+            ? `Account created successfully! Welcome ${user?.name || "User"}`
+            : `Welcome ${user?.name || "User"}!`
+        );
+      } catch (error: any) {
+        setPopup({
+          message: error?.response?.data?.message || "LinkedIn login failed",
+          type: "error",
+        });
+        setTimeout(() => setPopup(null), 2500);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    window.addEventListener("message", handleLinkedInMessage);
+    return () => window.removeEventListener("message", handleLinkedInMessage);
   }, []);
 
   const handleAuthSuccess = (response: any, message: string) => {
@@ -441,6 +543,16 @@ export function LoginModal({ onClose }: LoginModalProps) {
                   >
                     Continue with Apple
                   </Button>
+                  {canUseLinkedInAuth ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
+                      onClick={() => handleLinkedInAuth("login")}
+                    >
+                      Continue with LinkedIn
+                    </Button>
+                  ) : null}
                   {canUseGoogleAuth ? (
                     <GoogleLogin
                      text="signin_with"
@@ -611,6 +723,16 @@ export function LoginModal({ onClose }: LoginModalProps) {
                   >
                     Continue with Apple
                   </Button>
+                  {canUseLinkedInAuth ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
+                      onClick={() => handleLinkedInAuth("signup")}
+                    >
+                      Continue with LinkedIn
+                    </Button>
+                  ) : null}
                   {canUseGoogleAuth ? (
                     <GoogleLogin
                       text="signup_with"

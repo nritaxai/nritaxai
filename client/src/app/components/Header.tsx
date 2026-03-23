@@ -1,6 +1,5 @@
 import { Button } from "./ui/button";
 import {
-  BadgeCheck,
   Globe,
   Lock,
   Menu,
@@ -67,7 +66,6 @@ export function Header({ onLogin }: HeaderProps) {
 
   const trustItems = [
     { icon: Shield, label: "256-bit SSL Encrypted", title: "Bank-grade encryption for all data" },
-    { icon: BadgeCheck, label: "ICAI Registered CPA", title: "Services by Certified Public Accountants" },
     { icon: Globe, label: "DTAA Compliant", title: "Double Taxation Avoidance compliance" },
     { icon: Lock, label: "SOC 2 Standards", title: "Enterprise security compliance" },
     { icon: Users, label: "500+ NRIs Served", title: "Trusted by global NRI professionals" },

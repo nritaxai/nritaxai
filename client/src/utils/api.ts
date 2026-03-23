@@ -115,6 +115,13 @@ export const appleLoginUser = async (payload: {
   return postRequest("/api/auth/apple", payload);
 };
 
+export const linkedinLoginUser = async (payload: {
+  code: string;
+  redirectUri: string;
+}) => {
+  return postRequest("/api/auth/linkedin", payload);
+};
+
 export const getUserProfile = async () => {
   return getRequest("/api/auth/profile");
 };

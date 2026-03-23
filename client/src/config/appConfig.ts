@@ -51,6 +51,19 @@ export const GOOGLE_AUTH_CONFIG = {
   origin: getWebOrigin(),
 };
 
+const getLinkedInRedirectUri = () => {
+  const configured = String(import.meta.env.VITE_LINKEDIN_REDIRECT_URI || "").trim();
+  if (configured) return configured;
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}/linkedin-auth-callback.html`;
+};
+
+export const LINKEDIN_AUTH_CONFIG = {
+  clientId: String(import.meta.env.VITE_LINKEDIN_CLIENT_ID || "").trim(),
+  redirectUri: getLinkedInRedirectUri(),
+  scope: "openid profile email",
+};
+
 export const GSTIN = String(import.meta.env.VITE_GSTIN || "GSTIN_PLACEHOLDER").trim();
 export const CONTACT_EMAIL = String(import.meta.env.VITE_CONTACT_EMAIL || "ask@nritax.ai").trim();
 export const CONTACT_WHATSAPP = String(import.meta.env.VITE_CONTACT_WHATSAPP || "+62-xxx-xxxx-xxxx").trim();
