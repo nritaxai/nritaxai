@@ -44,7 +44,7 @@ const corsOptions = {
     return callback(new Error(`CORS blocked: ${origin}`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-guest-session-id"],
+  allowedHeaders: ["Content-Type", "Authorization", "x-guest-session-id", "x-api-key"],
   credentials: true,
 };
 
@@ -90,6 +90,16 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/version", (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    app: "nritax-server",
+    version: String(process.env.APP_VERSION || "dev").trim(),
+    commit: String(process.env.APP_COMMIT || "unknown").trim(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 app.get("/ready", (_req, res) => {
   return res.status(200).json({
     success: true,
@@ -104,7 +114,7 @@ app.use("/api/subscription", subscriptionRoute);
 app.use("/api/calculator", calculatorRoute);
 app.use("/api/pdf", pdfRoute);
 app.use("/api/consultations", consultationRoute);
-app.use("/api/banner-updates", bannerRoute);
+app.use("/api", bannerRoute);
 
 app.use((req, res) => {
   return res.status(404).json({
