@@ -91,15 +91,16 @@ export function Features() {
                 visible: { opacity: 1, y: 0, scale: 1 },
               }}
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="h-full"
             >
-              <Card className="group border-border hover:-translate-y-1.5 hover:shadow-2xl transition-all duration-300">
+              <Card className="group flex h-full flex-col border-border transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl">
                 <CardHeader>
                   <div className={`inline-flex w-12 h-12 items-center justify-center rounded-lg shadow-md ${feature.color} mb-4 group-hover:scale-110 transition-transform`}>
                     <Icon className="size-6" />
                   </div>
                   <CardTitle className="text-xl font-extrabold text-[#0F172A]">{renderTextWithShortForms(feature.title)}</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="flex-1">
                   <CardDescription className="text-base font-semibold text-[#0F172A] leading-relaxed">
                     {renderTextWithShortForms(feature.description)}
                   </CardDescription>
