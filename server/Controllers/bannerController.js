@@ -127,10 +127,7 @@ export const updateBannerUpdates = async (req, res) => {
       updatedAt: new Date().toISOString(),
     });
 
-    return res.status(200).json({
-      success: true,
-      count: bannerUpdates.length,
-    });
+    return res.status(200).json({ success: true });
   } catch (error) {
     console.error("[banner-updates:update]", error);
     return res.status(500).json({
@@ -147,7 +144,9 @@ export const getBannerHealth = async (_req, res) => {
 export const getBannerUpdates = async (req, res) => {
   try {
     const countryFilter = String(req.query?.country || "").trim().toLowerCase();
-    const data = sortAndFilterBannerUpdates(bannerUpdates, countryFilter);
+    const data = countryFilter
+      ? sortAndFilterBannerUpdates(bannerUpdates, countryFilter)
+      : bannerUpdates;
 
     return res.status(200).json(data);
   } catch (error) {
