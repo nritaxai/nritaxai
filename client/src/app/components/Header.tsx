@@ -74,7 +74,6 @@ export function Header({ onLogin }: HeaderProps) {
     { to: "/home#tax-updates", label: "Tax Updates" },
     { to: "/chat", label: "AI Chat" },
     { to: "/pricing", label: "Pricing" },
-    { to: "/compliance", label: "Compliance" },
     { to: "/calculators", label: "Tax Calculator" },
   ] as const;
 
