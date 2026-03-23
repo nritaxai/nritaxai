@@ -6,7 +6,6 @@ import {
   User as UserIcon,
   Shield,
   Users,
-  X,
   LogIn,
   LogOut,
 } from "lucide-react";
@@ -14,8 +13,8 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
-import { clearStoredAuth, getBannerUpdates, getStoredAuthToken, getUserProfile } from "../../utils/api";
-import type { BannerUpdate } from "../../utils/api";
+import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils/api";
+import { BannerTicker } from "./BannerTicker";
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -25,18 +24,6 @@ interface User {
   email: string;
   profileImage?: string;
 }
-
-const FALLBACK_BANNER_UPDATES: BannerUpdate[] = [
-  {
-    label: "INFO",
-    date: "",
-    country: "",
-    title: "No updates available",
-    url: "#",
-    active: true,
-    priority: 999,
-  },
-];
 
 const sanitizeProfileImage = (value?: string) => {
   const normalized = String(value || "").trim();
@@ -64,10 +51,8 @@ export function Header({ onLogin }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [tickerVisible, setTickerVisible] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
-  const [bannerUpdates, setBannerUpdates] = useState<BannerUpdate[]>(FALLBACK_BANNER_UPDATES);
 
   const navItems = [
     { to: "/home#features", label: "Features" },
@@ -91,13 +76,6 @@ export function Header({ onLogin }: HeaderProps) {
     }
     return location.pathname === path;
   };
-
-  useEffect(() => {
-    const dismissed = localStorage.getItem("regulatory-ticker-dismissed");
-    if (dismissed === "true") {
-      setTickerVisible(false);
-    }
-  }, []);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -160,54 +138,6 @@ export function Header({ onLogin }: HeaderProps) {
     setAvatarFailed(false);
   }, [user?.profileImage]);
 
-  useEffect(() => {
-    let intervalId: number | null = null;
-    let cancelled = false;
-
-    const loadBannerUpdates = async () => {
-      try {
-        const response = await getBannerUpdates();
-        if (cancelled) return;
-
-        const filtered = Array.isArray(response)
-          ? response
-              .filter((item) => item?.active === true)
-              .sort((a, b) => {
-                const priorityDelta = Number(a?.priority || 0) - Number(b?.priority || 0);
-                if (priorityDelta !== 0) return priorityDelta;
-                return Date.parse(String(b?.date || "")) - Date.parse(String(a?.date || ""));
-              })
-          : [];
-
-        setBannerUpdates(filtered.length ? filtered : FALLBACK_BANNER_UPDATES);
-      } catch {
-        if (cancelled) return;
-        setBannerUpdates(FALLBACK_BANNER_UPDATES);
-      }
-    };
-
-    void loadBannerUpdates();
-    intervalId = window.setInterval(() => {
-      void loadBannerUpdates();
-    }, 5 * 60 * 1000);
-
-    return () => {
-      cancelled = true;
-      if (intervalId !== null) {
-        window.clearInterval(intervalId);
-      }
-    };
-  }, []);
-
-  const tickerItems = bannerUpdates.length ? bannerUpdates : FALLBACK_BANNER_UPDATES;
-  const loopingTickerItems = tickerItems.length > 1 ? [...tickerItems, ...tickerItems] : tickerItems;
-
-  const formatBannerHref = (url: string) => {
-    if (!url || url === "#") return "#";
-    if (url.startsWith("http://") || url.startsWith("https://")) return url;
-    return url.startsWith("/") ? url : `/${url}`;
-  };
-
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -215,11 +145,6 @@ export function Header({ onLogin }: HeaderProps) {
     window.dispatchEvent(new Event("auth-changed"));
     setMobileMenuOpen(false);
     navigate("/", { replace: true });
-  };
-
-  const handleDismissTicker = () => {
-    setTickerVisible(false);
-    localStorage.setItem("regulatory-ticker-dismissed", "true");
   };
 
   const renderUserAvatar = (sizeClass: string, iconSizeClass: string) => (
@@ -246,7 +171,7 @@ export function Header({ onLogin }: HeaderProps) {
             <img
               src="/logo-transparent.png"
               alt="NRITAX logo"
-              className="h-16 w-auto object-contain"
+              className="h-18 w-auto scale-110 object-contain sm:h-20"
             />
           </Link>
 
@@ -281,41 +206,7 @@ export function Header({ onLogin }: HeaderProps) {
         </div>
       </div>
 
-      {tickerVisible && (
-        <div className="relative border-b border-slate-700 bg-[#0b1f3a] py-2">
-          <div className="overflow-hidden">
-            <div className="nri-ticker-track flex w-max gap-8 whitespace-nowrap">
-              {loopingTickerItems.map((item, index) => (
-                <a
-                  key={`${item.date}-${item.country}-${index}`}
-                  href={formatBannerHref(item.url)}
-                  className="inline-flex items-center gap-2 rounded-sm px-1 text-sm text-white transition-opacity hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  title={item.title}
-                >
-                  {item.label ? (
-                    <span className="rounded bg-amber-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-black">
-                      {item.label}
-                    </span>
-                  ) : null}
-                  {item.date ? <span className="text-xs text-slate-300">{item.date}</span> : null}
-                  {item.date ? <span aria-hidden="true" className="text-slate-500">|</span> : null}
-                  {item.country ? <span className="text-xs font-medium text-sky-300">{item.country}</span> : null}
-                  {item.country ? <span aria-hidden="true" className="text-slate-500">|</span> : null}
-                  <span className="text-white">{renderTextWithShortForms(item.title)}</span>
-                </a>
-              ))}
-            </div>
-          </div>
-          <button
-            type="button"
-            className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-slate-400 transition-colors hover:text-white"
-            aria-label="Dismiss ticker"
-            onClick={handleDismissTicker}
-          >
-            <X className="size-4" />
-          </button>
-        </div>
-      )}
+      <BannerTicker />
 
       <div className="sticky top-0 border-b border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
@@ -324,7 +215,7 @@ export function Header({ onLogin }: HeaderProps) {
               <img
                 src="/logo-transparent.png"
                 alt="NRITAX logo"
-                className="h-20 w-auto scale-110 object-contain sm:h-24"
+                className="h-22 w-auto scale-[1.18] object-contain sm:h-28"
               />
             </Link>
 
