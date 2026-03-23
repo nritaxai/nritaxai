@@ -14,7 +14,8 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
-import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils/api";
+import { clearStoredAuth, getBannerUpdates, getStoredAuthToken, getUserProfile } from "../../utils/api";
+import type { BannerUpdate } from "../../utils/api";
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -24,6 +25,18 @@ interface User {
   email: string;
   profileImage?: string;
 }
+
+const FALLBACK_BANNER_UPDATES: BannerUpdate[] = [
+  {
+    label: "INFO",
+    date: "",
+    country: "",
+    title: "No updates available",
+    url: "#",
+    active: true,
+    priority: 999,
+  },
+];
 
 const sanitizeProfileImage = (value?: string) => {
   const normalized = String(value || "").trim();
@@ -54,6 +67,7 @@ export function Header({ onLogin }: HeaderProps) {
   const [tickerVisible, setTickerVisible] = useState(true);
   const [user, setUser] = useState<User | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [bannerUpdates, setBannerUpdates] = useState<BannerUpdate[]>(FALLBACK_BANNER_UPDATES);
 
   const navItems = [
     { to: "/home#features", label: "Features" },
@@ -69,13 +83,6 @@ export function Header({ onLogin }: HeaderProps) {
     { icon: Globe, label: "DTAA Compliant", title: "Double Taxation Avoidance compliance" },
     { icon: Lock, label: "SOC 2 Standards", title: "Enterprise security compliance" },
     { icon: Users, label: "500+ NRIs Served", title: "Trusted by global NRI professionals" },
-  ] as const;
-
-  const tickerItems = [
-    { date: "2025-01-05", region: "India-Singapore", text: "DTAA amendment: Article 12 royalty rates reduced from 15% to 10% effective April 1, 2025", important: true },
-    { date: "2025-01-04", region: "India-UAE", text: "Clarification on tax residency certificate requirements for FY 2024-25", important: true },
-    { date: "2025-01-02", region: "India-USA", text: "New MLI provisions on Permanent Establishment effective January 1, 2025", important: true },
-    { date: "2024-12-28", region: "", text: "Form 15CA/15CB revised procedures for remittances exceeding INR 5 lakh from February 2025", important: false },
   ] as const;
 
   const isNavItemActive = (to: string) => {
@@ -154,6 +161,54 @@ export function Header({ onLogin }: HeaderProps) {
     setAvatarFailed(false);
   }, [user?.profileImage]);
 
+  useEffect(() => {
+    let intervalId: number | null = null;
+    let cancelled = false;
+
+    const loadBannerUpdates = async () => {
+      try {
+        const response = await getBannerUpdates();
+        if (cancelled) return;
+
+        const filtered = Array.isArray(response)
+          ? response
+              .filter((item) => item?.active === true)
+              .sort((a, b) => {
+                const priorityDelta = Number(a?.priority || 0) - Number(b?.priority || 0);
+                if (priorityDelta !== 0) return priorityDelta;
+                return Date.parse(String(b?.date || "")) - Date.parse(String(a?.date || ""));
+              })
+          : [];
+
+        setBannerUpdates(filtered.length ? filtered : FALLBACK_BANNER_UPDATES);
+      } catch {
+        if (cancelled) return;
+        setBannerUpdates(FALLBACK_BANNER_UPDATES);
+      }
+    };
+
+    void loadBannerUpdates();
+    intervalId = window.setInterval(() => {
+      void loadBannerUpdates();
+    }, 5 * 60 * 1000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId !== null) {
+        window.clearInterval(intervalId);
+      }
+    };
+  }, []);
+
+  const tickerItems = bannerUpdates.length ? bannerUpdates : FALLBACK_BANNER_UPDATES;
+  const loopingTickerItems = tickerItems.length > 1 ? [...tickerItems, ...tickerItems] : tickerItems;
+
+  const formatBannerHref = (url: string) => {
+    if (!url || url === "#") return "#";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return url.startsWith("/") ? url : `/${url}`;
+  };
+
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -228,21 +283,27 @@ export function Header({ onLogin }: HeaderProps) {
       </div>
 
       {tickerVisible && (
-        <div className="relative border-b border-slate-700 bg-slate-800 py-2">
+        <div className="relative border-b border-slate-700 bg-[#0b1f3a] py-2">
           <div className="overflow-hidden">
-            <div className="nri-ticker-track flex gap-8 whitespace-nowrap">
-              {[...tickerItems, ...tickerItems].map((item, index) => (
-                <div key={`${item.date}-${index}`} className="inline-flex items-center gap-2 text-sm text-slate-300">
-                  {item.important && (
-                    <span className="rounded bg-amber-500 px-2 py-0.5 text-xs font-bold text-black">IMPORTANT</span>
-                  )}
-                  <Globe className="size-4 shrink-0" />
-                  <span className="text-xs text-slate-400">{item.date}</span>
-                  <span aria-hidden="true" className="text-slate-500">|</span>
-                  {item.region && <span className="text-xs font-medium text-blue-400">{item.region}</span>}
-                  <span aria-hidden="true" className="text-slate-500">|</span>
-                  <span className="text-slate-100">{renderTextWithShortForms(item.text)}</span>
-                </div>
+            <div className="nri-ticker-track flex w-max gap-8 whitespace-nowrap">
+              {loopingTickerItems.map((item, index) => (
+                <a
+                  key={`${item.date}-${item.country}-${index}`}
+                  href={formatBannerHref(item.url)}
+                  className="inline-flex items-center gap-2 rounded-sm px-1 text-sm text-white transition-opacity hover:opacity-85 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                  title={item.title}
+                >
+                  {item.label ? (
+                    <span className="rounded bg-amber-500 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-black">
+                      {item.label}
+                    </span>
+                  ) : null}
+                  {item.date ? <span className="text-xs text-slate-300">{item.date}</span> : null}
+                  {item.date ? <span aria-hidden="true" className="text-slate-500">|</span> : null}
+                  {item.country ? <span className="text-xs font-medium text-sky-300">{item.country}</span> : null}
+                  {item.country ? <span aria-hidden="true" className="text-slate-500">|</span> : null}
+                  <span className="text-white">{renderTextWithShortForms(item.title)}</span>
+                </a>
               ))}
             </div>
           </div>

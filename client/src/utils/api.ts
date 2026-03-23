@@ -122,6 +122,21 @@ export const linkedinLoginUser = async (payload: {
   return postRequest("/api/auth/linkedin", payload);
 };
 
+export interface BannerUpdate {
+  label: string;
+  date: string;
+  country: string;
+  title: string;
+  url: string;
+  active: boolean;
+  priority: number;
+}
+
+export const getBannerUpdates = async (country?: string) => {
+  const query = country ? `?country=${encodeURIComponent(country)}` : "";
+  return getRequest(`/api/banner-updates${query}`) as Promise<BannerUpdate[]>;
+};
+
 export const getUserProfile = async () => {
   return getRequest("/api/auth/profile");
 };
