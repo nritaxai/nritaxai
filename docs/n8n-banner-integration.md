@@ -1,15 +1,11 @@
 # n8n Banner Integration
 
-## HTTP Request Node
+## Push To Website Node
 
-Use an `HTTP Request` node after your scheduler/data-formatting nodes.
+Only the `Push To Website` node needs to change.
 
 - Method: `POST`
-- URL: `http://localhost:5000/api/banner-updates`
-  Replace with your production API base URL when deploying.
-- Headers:
-  - `Content-Type: application/json`
-  - `x-api-key: YOUR_SECRET_KEY`
+- URL: `https://nritax.ai/api/banner-updates`
 - Send Body: `true`
 - Content Type: `JSON`
 - JSON Body:
@@ -18,33 +14,23 @@ Use an `HTTP Request` node after your scheduler/data-formatting nodes.
 {{ $json }}
 ```
 
-## Supported Payload Shapes
+- Headers:
+  - `Content-Type: application/json`
+  - `x-api-key: {{ $env.BANNER_API_KEY }}`
 
-The NRITAX backend accepts either of these payload shapes from n8n:
+## Payload Format
 
-```json
-[
-  {
-    "label": "IMPORTANT",
-    "date": "2025-01-04",
-    "country": "India-UAE",
-    "title": "Clarification on tax residency certificate requirements for FY 2024-25",
-    "url": "/tax-updates/india-uae-trc",
-    "active": true,
-    "priority": 1
-  }
-]
-```
+The payload structure remains unchanged:
 
 ```json
 {
   "updates": [
     {
       "label": "IMPORTANT",
-      "date": "2025-01-04",
-      "country": "India-UAE",
       "title": "Clarification on tax residency certificate requirements for FY 2024-25",
-      "url": "/tax-updates/india-uae-trc",
+      "country": "India-UAE",
+      "date": "2025-01-04",
+      "url": "https://nritax.ai/tax-updates/india-uae-trc",
       "active": true,
       "priority": 1
     }
@@ -52,22 +38,12 @@ The NRITAX backend accepts either of these payload shapes from n8n:
 }
 ```
 
-## Backend Endpoints
+## Workflow Compatibility
 
-- `POST /api/banner-updates`
-  Replaces the in-memory banner data with the incoming n8n payload.
-- `GET /api/banner-updates`
-  Returns active items sorted by `priority` ascending and `date` descending.
-
-## Security
-
-Set `BANNER_API_KEY` in the server environment to require the `x-api-key` header.
-If `BANNER_API_KEY` is empty, the POST endpoint stays open for local development.
-
-## End-to-End Flow
-
-1. n8n schedules and formats update data.
-2. n8n posts the payload to `POST /api/banner-updates`.
-3. The NRITAX backend stores the data in memory.
-4. The website header fetches `GET /api/banner-updates` every 5 minutes.
-5. The frontend ticker renders the updates as a continuous scrolling banner.
+- Keep the existing workflow shape:
+  1. Manual Trigger
+  2. Set Banner Data
+  3. Format Banner
+  4. Push To Website
+- Do not change the `Format Banner` output.
+- Do not change any node except `Push To Website`.

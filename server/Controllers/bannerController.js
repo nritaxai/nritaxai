@@ -101,9 +101,24 @@ export const updateBannerUpdates = async (req, res) => {
       });
     }
 
-    const incomingUpdates = extractBannerPayload(req.body)
+    const extractedPayload = extractBannerPayload(req.body);
+    if (!extractedPayload.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid payload. Expected { updates: [...] }",
+      });
+    }
+
+    const incomingUpdates = extractedPayload
       .map((item, index) => normalizeBannerItem(item, index))
       .filter(Boolean);
+
+    if (!incomingUpdates.length) {
+      return res.status(400).json({
+        success: false,
+        message: "Payload contained no valid banner updates",
+      });
+    }
 
     bannerUpdates = incomingUpdates;
 
@@ -123,6 +138,10 @@ export const updateBannerUpdates = async (req, res) => {
       message: "Unable to update banner updates",
     });
   }
+};
+
+export const getBannerHealth = async (_req, res) => {
+  return res.status(200).json({ ok: true });
 };
 
 export const getBannerUpdates = async (req, res) => {

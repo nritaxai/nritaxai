@@ -4,28 +4,22 @@
 
 - `server/banner-service/server.js`
 - `server/banner-service/package.json`
-- `docs/banner-frontend-snippet.js`
+- `server/banner-service/.env.example`
+- `docs/banner-frontend-example.html`
+- `docs/n8n-push-to-website-node.json`
 
-## Run Locally
+## Deploy
 
-From the repo root:
+Deploy the backend on the NRITAX domain or an API subdomain that is publicly reachable over HTTPS.
 
-```bash
-cd server/banner-service
-npm install
-npm start
-```
-
-The banner backend will listen on:
-
-```text
-http://localhost:3000
-```
+Recommended production endpoint:
+`https://nritax.ai/api/banner-updates`
 
 ## API Endpoints
 
 - `POST /api/banner-updates`
 - `GET /api/banner-updates`
+- `GET /health`
 
 ## Expected POST Payload
 
@@ -47,14 +41,16 @@ http://localhost:3000
 
 ## n8n Flow
 
-1. Start the banner service with `npm start`.
-2. Run the n8n workflow that POSTs to `http://localhost:3000/api/banner-updates`.
-3. Confirm the server logs `Banner updated:` with the stored items.
-4. Open the website and confirm the frontend fetches `http://localhost:3000/api/banner-updates`.
-5. The scrolling ticker should refresh automatically every 5 minutes.
+1. Deploy the backend and expose `https://nritax.ai/api/banner-updates`.
+2. Set `BANNER_API_KEY` in the backend environment.
+3. Update only the n8n `Push To Website` node to POST to `https://nritax.ai/api/banner-updates`.
+4. Send the workflow payload unchanged as `{{ $json }}`.
+5. Confirm `GET https://nritax.ai/health` responds with `{ "ok": true }`.
+6. Confirm the website banner fetches `https://nritax.ai/api/banner-updates`.
+7. The scrolling ticker should refresh automatically every 5 minutes.
 
 ## Notes
 
 - The service stores data in memory only, so restarting the process clears the banner.
-- The existing NRITAX frontend now reads banner data from `VITE_BANNER_API_URL` when provided.
-- In local development, the frontend defaults to `http://localhost:3000`.
+- Add the `x-api-key` header in n8n if API-key protection is enabled.
+- The NRITAX frontend banner now targets `https://nritax.ai/api/banner-updates` by default.

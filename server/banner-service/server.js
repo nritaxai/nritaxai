@@ -2,7 +2,8 @@ import cors from "cors";
 import express from "express";
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT || 3000);
+const API_KEY = String(process.env.BANNER_API_KEY || "").trim();
 
 app.use(cors());
 app.use(express.json());
@@ -29,6 +30,14 @@ const normalizeUpdate = (item, index) => {
 };
 
 app.post("/api/banner-updates", (req, res) => {
+  const providedApiKey = String(req.get("x-api-key") || "").trim();
+  if (API_KEY && providedApiKey !== API_KEY) {
+    return res.status(401).json({
+      success: false,
+      message: "Unauthorized",
+    });
+  }
+
   const updates = req.body?.updates;
 
   if (!Array.isArray(updates)) {
@@ -56,6 +65,10 @@ app.get("/api/banner-updates", (_req, res) => {
   return res.status(200).json(bannerData);
 });
 
+app.get("/health", (_req, res) => {
+  return res.status(200).json({ ok: true });
+});
+
 app.listen(PORT, () => {
-  console.log(`Banner service running on http://localhost:${PORT}`);
+  console.log(`Banner service running on port ${PORT}`);
 });

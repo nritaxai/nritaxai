@@ -2,7 +2,6 @@ import { Capacitor } from "@capacitor/core";
 
 const PROD_API_URL_DEFAULT = "https://nritax.ai";
 const DEV_API_URL_DEFAULT = "http://localhost:5000";
-const DEV_BANNER_API_URL_DEFAULT = "http://localhost:3000";
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
 
@@ -23,7 +22,7 @@ export const API_BASE_URL = normalizeUrl(
 );
 
 export const BANNER_API_BASE_URL = normalizeUrl(
-  envBannerApiUrl || (import.meta.env.DEV && !IS_NATIVE_APP ? DEV_BANNER_API_URL_DEFAULT : API_BASE_URL)
+  envBannerApiUrl || PROD_API_URL_DEFAULT
 );
 
 export const APPLE_AUTH_CONFIG = {

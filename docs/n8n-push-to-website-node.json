@@ -1,0 +1,30 @@
+{
+  "parameters": {
+    "method": "POST",
+    "url": "https://nritax.ai/api/banner-updates",
+    "sendHeaders": true,
+    "headerParameters": {
+      "parameters": [
+        {
+          "name": "Content-Type",
+          "value": "application/json"
+        },
+        {
+          "name": "x-api-key",
+          "value": "={{ $env.BANNER_API_KEY }}"
+        }
+      ]
+    },
+    "sendBody": true,
+    "contentType": "json",
+    "jsonBody": "={{ $json }}",
+    "options": {}
+  },
+  "name": "Push To Website",
+  "type": "n8n-nodes-base.httpRequest",
+  "typeVersion": 2.1,
+  "position": [
+    960,
+    300
+  ]
+}
