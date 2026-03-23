@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 let cachedTransporter = null;
 
 const RESEND_API_URL = "https://api.resend.com/emails";
+const DEFAULT_FROM_EMAIL = "NRITAX <noreply@mail.nritax.ai>";
 
 const sanitizeEnv = (value) => String(value || "").trim();
 const sanitizePassword = (value) => sanitizeEnv(value).replace(/\s+/g, "");
@@ -29,10 +30,20 @@ const getEmailConfig = () => {
 
 const getResendConfig = () => {
   const apiKey = sanitizeEnv(process.env.RESEND_API_KEY);
-  const from = sanitizeEnv(process.env.RESEND_FROM_EMAIL) || "NRITAX <onboarding@resend.dev>";
+  const from = sanitizeEnv(process.env.RESEND_FROM_EMAIL);
 
   if (!apiKey) {
     throw new Error("Missing required email env var: RESEND_API_KEY");
+  }
+
+  if (!from) {
+    throw new Error("Missing required email env var: RESEND_FROM_EMAIL");
+  }
+
+  if (/@resend\.dev>?$/i.test(from)) {
+    throw new Error(
+      "RESEND_FROM_EMAIL is using Resend's test domain. Verify your domain in Resend and use a sender like NRITAX <noreply@your-domain.com>."
+    );
   }
 
   return { apiKey, from };
@@ -83,7 +94,7 @@ const sendViaResend = async ({ to, subject, html, fromOverride }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: fromOverride || config.from,
+      from: fromOverride || config.from || DEFAULT_FROM_EMAIL,
       to: Array.isArray(to) ? to : [to],
       subject,
       html,
@@ -109,7 +120,7 @@ const sendViaSmtp = async ({ to, subject, html, fromOverride }) => {
   try {
     const transporter = getTransporter();
     return await transporter.sendMail({
-      from: fromOverride || `"NRITAX" <${config.user}>`,
+      from: fromOverride || DEFAULT_FROM_EMAIL,
       to,
       subject,
       html,
@@ -123,7 +134,7 @@ const sendViaSmtp = async ({ to, subject, html, fromOverride }) => {
       try {
         const fallbackTransporter = buildTransporter(config, compactPass);
         const info = await fallbackTransporter.sendMail({
-          from: fromOverride || `"NRITAX" <${config.user}>`,
+          from: fromOverride || DEFAULT_FROM_EMAIL,
           to,
           subject,
           html,
