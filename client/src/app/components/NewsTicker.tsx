@@ -41,22 +41,6 @@ const formatBannerDate = (value?: string) => {
   return parsedDate.toLocaleDateString();
 };
 
-const extractBannerItems = (payload: unknown): Banner[] => {
-  if (Array.isArray(payload)) {
-    return payload as Banner[];
-  }
-
-  if (
-    payload &&
-    typeof payload === "object" &&
-    Array.isArray((payload as { updates?: unknown }).updates)
-  ) {
-    return (payload as { updates: Banner[] }).updates;
-  }
-
-  return [];
-};
-
 export default function NewsTicker() {
   const [items, setItems] = useState<Banner[]>([]);
 
@@ -74,16 +58,18 @@ export default function NewsTicker() {
           throw new Error(`Banner API request failed with status ${response.status}`);
         }
 
-        const payload = await response.json();
-        const extractedItems = extractBannerItems(payload);
+        const data = await response.json();
+        const updates = Array.isArray(data)
+          ? data
+          : Array.isArray((data as { updates?: unknown })?.updates)
+            ? ((data as { updates: Banner[] }).updates)
+            : [];
 
-        if (!Array.isArray(extractedItems)) {
-          console.error("Banner API payload did not contain a valid updates array:", payload);
-          setItems([]);
-          return;
+        if (!updates.length && !Array.isArray(data) && !Array.isArray((data as { updates?: unknown })?.updates)) {
+          console.error("Banner API payload did not contain a valid updates array:", data);
         }
 
-        const nextItems = extractedItems
+        const nextItems = updates
           .filter((item) => item && item.active === true)
           .map(normalizeBanner)
           .sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));

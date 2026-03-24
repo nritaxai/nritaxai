@@ -276,6 +276,7 @@ export default function App() {
   const requiresAuthentication = protectedPaths.has(location.pathname);
   const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
   const hasSiteHeader = !isStandaloneRoute && isAuthenticated;
+  const shouldShowNewsTicker = location.pathname === "/home";
 
   return (
     <div className="app-shell">
@@ -291,7 +292,7 @@ export default function App() {
       {hasSiteHeader && (
         <Header onLogin={() => setShowLoginModal(true)} />
       )}
-      {hasSiteHeader && location.pathname === "/home" ? <NewsTicker /> : null}
+      {shouldShowNewsTicker ? <NewsTicker /> : null}
 
       <div ref={routeContentRef}>
         <Suspense fallback={<div className="p-6 text-sm text-[#0F172A]">Loading...</div>}>
