@@ -3,7 +3,7 @@ import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { WifiOff } from "lucide-react";
 
 import { Header } from "./components/Header";
-import NewsBanner from "./components/NewsBanner";
+import NewsTicker from "./components/NewsTicker";
 import { ComplianceStandards } from "./components/ComplianceStandards";
 import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
@@ -291,7 +291,7 @@ export default function App() {
       {hasSiteHeader && (
         <Header onLogin={() => setShowLoginModal(true)} />
       )}
-      {hasSiteHeader && location.pathname === "/home" ? <NewsBanner /> : null}
+      {hasSiteHeader && location.pathname === "/home" ? <NewsTicker /> : null}
 
       <div ref={routeContentRef}>
         <Suspense fallback={<div className="p-6 text-sm text-[#0F172A]">Loading...</div>}>
