@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
 type Banner = {
@@ -59,35 +59,42 @@ export default function NewsBanner() {
     fetchBanner();
   }, []);
 
-  const tickerItems = useMemo(
-    () => (banners.length > 0 ? [...banners, ...banners] : []),
-    [banners]
-  );
-
   if (banners.length === 0) return null;
 
   return (
     <div className="w-full border-b border-yellow-200 bg-yellow-50">
       <div className="mx-auto max-w-7xl overflow-hidden px-4 py-2">
-        <div className="nri-ticker-track flex w-max items-center gap-8 whitespace-nowrap pr-8">
-          {tickerItems.map((banner, index) => (
-            <a
-              key={`${banner.title}-${banner.date}-${index}`}
-              href={banner.url || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-w-max items-center gap-3 text-sm text-gray-800 transition-opacity hover:opacity-80"
+        <div className="nri-ticker-track flex min-w-max items-center whitespace-nowrap">
+          {[0, 1].map((groupIndex) => (
+            <div
+              key={groupIndex}
+              aria-hidden={groupIndex === 1}
+              className="flex shrink-0 items-center gap-8 pr-8"
             >
-              <span className="rounded bg-black px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
-                {banner.label || "LATEST NEWS"}
-              </span>
-              <span className="font-medium">
-                {renderTextWithShortForms(banner.title || "View update")}
-              </span>
-              {banner.date ? (
-                <span className="text-xs text-gray-500">{formatBannerDate(banner.date)}</span>
-              ) : null}
-            </a>
+              {banners.map((banner, index) => (
+                <Fragment key={`${groupIndex}-${banner.title}-${banner.date}-${index}`}>
+                  <a
+                    href={banner.url || "#"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-w-max items-center gap-3 text-sm text-gray-800 transition-opacity hover:opacity-80"
+                  >
+                    <span className="rounded bg-black px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+                      {banner.label || "LATEST NEWS"}
+                    </span>
+                    <span className="font-medium">
+                      {renderTextWithShortForms(banner.title || "View update")}
+                    </span>
+                    {banner.date ? (
+                      <span className="text-xs text-gray-500">{formatBannerDate(banner.date)}</span>
+                    ) : null}
+                  </a>
+                  <span className="text-xs font-semibold uppercase tracking-[0.25em] text-yellow-700/70">
+                    ///
+                  </span>
+                </Fragment>
+              ))}
+            </div>
           ))}
         </div>
       </div>
