@@ -51,6 +51,12 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
   } | null>(null);
   const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
   const canUseLinkedInAuth = Boolean(LINKEDIN_AUTH_CONFIG.clientId && LINKEDIN_AUTH_CONFIG.redirectUri);
+  const allowedLinkedInMessageOrigins = new Set([
+    "https://nritax.ai",
+    "https://www.nritax.ai",
+    "http://localhost:5173",
+    window.location.origin,
+  ]);
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -295,7 +301,7 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
 
   useEffect(() => {
     const handleLinkedInMessage = async (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) return;
+      if (!allowedLinkedInMessageOrigins.has(event.origin)) return;
 
       const payload = event.data;
       if (!payload || payload.source !== "nritax-linkedin-oauth") return;

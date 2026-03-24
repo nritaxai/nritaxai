@@ -8,6 +8,25 @@
   <body>
     <script>
       (function () {
+        function getAllowedOrigins() {
+          var origins = [
+            "https://nritax.ai",
+            "https://www.nritax.ai",
+            "http://localhost:5173",
+            window.location.origin
+          ];
+
+          try {
+            if (document.referrer) {
+              origins.unshift(new URL(document.referrer).origin);
+            }
+          } catch (error) {
+            console.error("[linkedin-oauth-callback] unable to read referrer origin", error);
+          }
+
+          return Array.from(new Set(origins.filter(Boolean)));
+        }
+
         var params = new URLSearchParams(window.location.search);
         var payload = {
           source: "nritax-linkedin-oauth",
@@ -17,7 +36,13 @@
         };
 
         if (window.opener && !window.opener.closed) {
-          window.opener.postMessage(payload, window.location.origin);
+          getAllowedOrigins().forEach(function (origin) {
+            try {
+              window.opener.postMessage(payload, origin);
+            } catch (error) {
+              console.error("[linkedin-oauth-callback] postMessage failed", { origin: origin, error: error });
+            }
+          });
         }
 
         window.close();
