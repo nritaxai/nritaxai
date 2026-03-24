@@ -609,16 +609,14 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                   >
                     Continue with Apple
                   </Button>
-                  {canUseLinkedInAuth ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
-                      onClick={() => handleLinkedInAuth("login")}
-                    >
-                      Sign in with LinkedIn
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
+                    onClick={() => handleLinkedInAuth("login")}
+                  >
+                    Sign in with LinkedIn
+                  </Button>
                   {canUseGoogleAuth ? (
                     <GoogleLogin
                      text="signin_with"
