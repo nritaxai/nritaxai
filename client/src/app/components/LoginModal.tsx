@@ -134,8 +134,17 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
           : `WELCOME ${user?.name || "User"}!`
       );
     } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.response?.data?.message ||
+        error?.message ||
+        "LinkedIn login failed";
+      console.error("[linkedin-oauth] login failed", {
+        message,
+        response: error?.response?.data,
+      });
       setPopup({
-        message: error?.response?.data?.message || "LinkedIn login failed",
+        message,
         type: "error",
       });
       setTimeout(() => setPopup(null), 2500);
@@ -160,6 +169,12 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
       authUrl.searchParams.set("redirect_uri", LINKEDIN_AUTH_CONFIG.redirectUri);
       authUrl.searchParams.set("scope", LINKEDIN_AUTH_CONFIG.scope);
       authUrl.searchParams.set("state", state);
+
+      console.log("[linkedin-oauth] opening authorization url", {
+        origin: window.location.origin,
+        redirectUri: LINKEDIN_AUTH_CONFIG.redirectUri,
+        authorizationUrl: authUrl.toString(),
+      });
 
       const popupWindow = openCenteredPopup(authUrl.toString(), "linkedin-oauth");
       if (!popupWindow) {

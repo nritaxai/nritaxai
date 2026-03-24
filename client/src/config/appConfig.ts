@@ -63,9 +63,11 @@ export const GOOGLE_AUTH_CONFIG = {
 
 const getLinkedInRedirectUri = () => {
   const configured = String(import.meta.env.VITE_LINKEDIN_REDIRECT_URI || "").trim();
+  if (typeof window !== "undefined" && !IS_NATIVE_APP) {
+    return `${normalizeUrl(window.location.origin)}/linkedin-auth-callback.html`;
+  }
   if (configured) return configured;
-  if (typeof window === "undefined") return "";
-  return `${window.location.origin}/linkedin-auth-callback.html`;
+  return "";
 };
 
 export const LINKEDIN_AUTH_CONFIG = {
