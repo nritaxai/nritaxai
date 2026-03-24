@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
 type Banner = {
@@ -104,51 +104,52 @@ export default function NewsTicker() {
 
   return (
     <div className="w-full overflow-hidden border-y border-slate-200 bg-slate-50">
-      <div className="nri-ticker-track flex w-max items-center gap-8 py-3 pr-8 hover:[animation-play-state:paused] md:gap-10 md:py-3.5 md:pr-10">
+      <div className="nri-ticker-track flex w-max min-w-max items-center gap-8 py-3 pr-8 hover:[animation-play-state:paused] md:gap-10 md:py-3.5 md:pr-10">
         {loopItems.map((item, index) => {
           const key = `${item.title}-${item.country}-${item.date}-${index}`;
+          const isLoopDivider = index === items.length;
 
           return (
-            <div
-              key={key}
-              className="inline-flex shrink-0 items-center gap-3 rounded-full border border-slate-200 bg-white px-5 py-2 shadow-sm whitespace-nowrap"
-            >
-              <span className="shrink-0 rounded-md bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
-                {renderTextWithShortForms(item.label || "INTERNATIONAL TAX ALERT")}
-              </span>
+            <Fragment key={key}>
+              {isLoopDivider ? <div className="h-px w-24 shrink-0 md:w-32" aria-hidden="true" /> : null}
+              <div className="inline-flex shrink-0 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm whitespace-nowrap">
+                <span className="shrink-0 rounded-md bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                  {renderTextWithShortForms(item.label || "INTERNATIONAL TAX ALERT")}
+                </span>
 
-              <span className="text-sm font-semibold text-slate-700">
-                {renderTextWithShortForms(item.country || "Cross-Border")}
-              </span>
+                <span className="shrink-0 text-sm font-semibold text-slate-700">
+                  {renderTextWithShortForms(item.country || "Cross-Border")}
+                </span>
 
-              <span className="mx-1 text-slate-300">|</span>
+                <span className="mx-1 shrink-0 text-slate-300">|</span>
 
-              <span className="text-sm text-slate-600">
-                {renderTextWithShortForms(item.type || "Tax Update")}
-              </span>
+                <span className="shrink-0 text-sm text-slate-600">
+                  {renderTextWithShortForms(item.type || "Tax Update")}
+                </span>
 
-              <span className="mx-1 text-slate-300">|</span>
+                <span className="mx-1 shrink-0 text-slate-300">|</span>
 
-              <a
-                href={item.url || "#"}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="max-w-[30rem] text-sm font-medium text-slate-900 hover:underline"
-              >
-                {renderTextWithShortForms(
-                  item.title || item.summary || "View regulatory update",
-                )}
-              </a>
+                <a
+                  href={item.url || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="max-w-[220px] overflow-hidden text-ellipsis whitespace-nowrap text-sm font-medium text-slate-900 hover:underline md:max-w-[420px]"
+                >
+                  {renderTextWithShortForms(
+                    item.title || item.summary || "View regulatory update",
+                  )}
+                </a>
 
-              {item.date ? (
-                <>
-                  <span className="mx-1 text-slate-300">|</span>
-                  <span className="ml-1 text-xs text-slate-500">
-                    {formatBannerDate(item.date)}
-                  </span>
-                </>
-              ) : null}
-            </div>
+                {item.date ? (
+                  <>
+                    <span className="mx-1 shrink-0 text-slate-300">|</span>
+                    <span className="shrink-0 text-xs text-slate-500">
+                      {formatBannerDate(item.date)}
+                    </span>
+                  </>
+                ) : null}
+              </div>
+            </Fragment>
           );
         })}
       </div>
