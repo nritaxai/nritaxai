@@ -23,9 +23,6 @@ export const API_BASE_URL = normalizeUrl(
 
 const getBannerOrigin = () => {
   if (envBannerApiUrl) return normalizeUrl(envBannerApiUrl);
-  if (typeof window !== "undefined" && window.location.origin) {
-    return normalizeUrl(window.location.origin);
-  }
   return "https://www.nritax.ai";
 };
 
