@@ -16,6 +16,7 @@ const APPLE_KEYS_ENDPOINT = "https://appleid.apple.com/auth/keys";
 const APPLE_TOKEN_ENDPOINT = "https://appleid.apple.com/auth/token";
 const LINKEDIN_TOKEN_ENDPOINT = "https://www.linkedin.com/oauth/v2/accessToken";
 const LINKEDIN_USERINFO_ENDPOINT = "https://api.linkedin.com/v2/userinfo";
+const LINKEDIN_SCOPE = "openid profile email";
 let appleSigningKeysCache = { keys: [], fetchedAt: 0 };
 
 const logAuthError = (action, error, context = {}) => {
@@ -204,6 +205,131 @@ const getLinkedInUserInfo = async (accessToken) => {
   }
 
   return response.json();
+};
+
+const getLinkedInCallbackUri = (req) => {
+  const configured = sanitizeString(process.env.LINKEDIN_REDIRECT_URI);
+  if (configured) return configured;
+  return `${req.protocol}://${req.get("host")}/auth/linkedin/callback`;
+};
+
+const getAllowedFrontendOrigins = () =>
+  Array.from(
+    new Set(
+      [
+        sanitizeString(process.env.FRONTEND_URL),
+        sanitizeString(process.env.CLIENT_URL),
+        sanitizeString(process.env.APP_URL),
+        "https://www.nritax.ai",
+        "https://nritax.ai",
+        "http://localhost:5173",
+      ].filter(Boolean)
+    )
+  );
+
+const resolveFrontendOrigin = (requestedOrigin) => {
+  const normalizedRequestedOrigin = sanitizeString(requestedOrigin).replace(/\/+$/, "");
+  const allowedOrigins = getAllowedFrontendOrigins();
+  if (normalizedRequestedOrigin && allowedOrigins.includes(normalizedRequestedOrigin)) {
+    return normalizedRequestedOrigin;
+  }
+  return allowedOrigins[0] || "https://www.nritax.ai";
+};
+
+const encodeLinkedInState = (payload) =>
+  Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+
+const decodeLinkedInState = (value) => {
+  if (!value) return {};
+  try {
+    const decoded = Buffer.from(String(value), "base64url").toString("utf8");
+    const parsed = JSON.parse(decoded);
+    return typeof parsed === "object" && parsed !== null ? parsed : {};
+  } catch (error) {
+    logAuthError("linkedin-state-parse", error);
+    return {};
+  }
+};
+
+const buildFrontendAuthRedirect = (frontendOrigin, params = {}) => {
+  const redirectUrl = new URL(frontendOrigin);
+  redirectUrl.search = "";
+  redirectUrl.hash = "";
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== "") {
+      redirectUrl.searchParams.set(key, String(value));
+    }
+  });
+  return redirectUrl.toString();
+};
+
+const completeLinkedInLogin = async ({ code, redirectUri }) => {
+  const tokenResponse = await exchangeLinkedInAuthorizationCode({ code, redirectUri });
+  const accessToken = sanitizeString(tokenResponse?.access_token);
+
+  if (!accessToken) {
+    throw new Error("LinkedIn access token missing");
+  }
+
+  const profile = await getLinkedInUserInfo(accessToken);
+  const linkedinId = sanitizeString(profile?.sub);
+  const email = sanitizeString(profile?.email).toLowerCase();
+  const name =
+    sanitizeString(profile?.name) ||
+    [sanitizeString(profile?.given_name), sanitizeString(profile?.family_name)].filter(Boolean).join(" ");
+  const picture = sanitizeString(profile?.picture);
+
+  if (!linkedinId) {
+    throw new Error("LinkedIn user ID missing");
+  }
+
+  let user = null;
+
+  if (email) {
+    user = await User.findOne({ email });
+  }
+
+  if (!user) {
+    user = await User.findOne({ linkedinId });
+  }
+
+  if (!user) {
+    user = await User.create({
+      name: name || "LinkedIn User",
+      email: email || `linkedin_${linkedinId}@users.nritax.ai`,
+      linkedinId,
+      profileImage: picture,
+      provider: "linkedin",
+    });
+  } else {
+    let changed = false;
+
+    if (!user.linkedinId) {
+      user.linkedinId = linkedinId;
+      changed = true;
+    }
+
+    if ((!user.provider || user.provider === "local") && !user.googleId && !user.appleId) {
+      user.provider = "linkedin";
+      changed = true;
+    }
+
+    if (!user.profileImage && picture) {
+      user.profileImage = picture;
+      changed = true;
+    }
+
+    if (changed) {
+      await user.save();
+    }
+  }
+
+  const token = generateToken(user._id);
+
+  return {
+    token,
+    user,
+  };
 };
 
 const isValidProfileImage = (value) => {
@@ -577,6 +703,82 @@ export const forgotPassword = async (req, res) => {
 };
 
 // -------------------------------- LinkedIn Login --------------------------------------------------------------
+export const startLinkedInAuth = async (req, res) => {
+  try {
+    const clientId = sanitizeString(process.env.LINKEDIN_CLIENT_ID);
+    if (!clientId) {
+      return res.status(500).json({
+        success: false,
+        message: "LinkedIn OAuth is not configured",
+      });
+    }
+
+    const mode = sanitizeString(req.query?.mode) === "signup" ? "signup" : "login";
+    const frontendOrigin = resolveFrontendOrigin(req.query?.origin);
+    const redirectUri = getLinkedInCallbackUri(req);
+    const state = encodeLinkedInState({ mode, frontendOrigin });
+    const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
+    authUrl.searchParams.set("response_type", "code");
+    authUrl.searchParams.set("client_id", clientId);
+    authUrl.searchParams.set("redirect_uri", redirectUri);
+    authUrl.searchParams.set("scope", LINKEDIN_SCOPE);
+    authUrl.searchParams.set("state", state);
+
+    return res.redirect(authUrl.toString());
+  } catch (error) {
+    logAuthError("linkedin-start", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to start LinkedIn authentication",
+    });
+  }
+};
+
+export const linkedinCallback = async (req, res) => {
+  const statePayload = decodeLinkedInState(req.query?.state);
+  const frontendOrigin = resolveFrontendOrigin(statePayload?.frontendOrigin);
+  const mode = statePayload?.mode === "signup" ? "signup" : "login";
+
+  try {
+    const errorMessage = sanitizeString(req.query?.error_description || req.query?.error);
+    if (errorMessage) {
+      return res.redirect(
+        buildFrontendAuthRedirect(frontendOrigin, {
+          auth_provider: "linkedin",
+          auth_mode: mode,
+          auth_error: errorMessage,
+        })
+      );
+    }
+
+    const code = sanitizeString(req.query?.code);
+    if (!code) {
+      throw new Error("LinkedIn authorization code missing");
+    }
+
+    const redirectUri = getLinkedInCallbackUri(req);
+    const { token, user } = await completeLinkedInLogin({ code, redirectUri });
+
+    return res.redirect(
+      buildFrontendAuthRedirect(frontendOrigin, {
+        auth_provider: "linkedin",
+        auth_mode: mode,
+        token,
+        user: JSON.stringify(toSafeUser(user)),
+      })
+    );
+  } catch (error) {
+    logAuthError("linkedin-callback", error);
+    return res.redirect(
+      buildFrontendAuthRedirect(frontendOrigin, {
+        auth_provider: "linkedin",
+        auth_mode: mode,
+        auth_error: error?.message || "LinkedIn authentication failed",
+      })
+    );
+  }
+};
+
 export const linkedinLogin = async (req, res) => {
   try {
     const code = sanitizeString(req.body?.code);
@@ -589,67 +791,7 @@ export const linkedinLogin = async (req, res) => {
       });
     }
 
-    const tokenResponse = await exchangeLinkedInAuthorizationCode({ code, redirectUri });
-    const accessToken = sanitizeString(tokenResponse?.access_token);
-
-    if (!accessToken) {
-      throw new Error("LinkedIn access token missing");
-    }
-
-    const profile = await getLinkedInUserInfo(accessToken);
-    const linkedinId = sanitizeString(profile?.sub);
-    const email = sanitizeString(profile?.email).toLowerCase();
-    const name =
-      sanitizeString(profile?.name) ||
-      [sanitizeString(profile?.given_name), sanitizeString(profile?.family_name)].filter(Boolean).join(" ");
-    const picture = sanitizeString(profile?.picture);
-
-    if (!linkedinId) {
-      throw new Error("LinkedIn user ID missing");
-    }
-
-    let user = null;
-
-    if (email) {
-      user = await User.findOne({ email });
-    }
-
-    if (!user) {
-      user = await User.findOne({ linkedinId });
-    }
-
-    if (!user) {
-      user = await User.create({
-        name: name || "LinkedIn User",
-        email: email || `linkedin_${linkedinId}@users.nritax.ai`,
-        linkedinId,
-        profileImage: picture,
-        provider: "linkedin",
-      });
-    } else {
-      let changed = false;
-
-      if (!user.linkedinId) {
-        user.linkedinId = linkedinId;
-        changed = true;
-      }
-
-      if ((!user.provider || user.provider === "local") && !user.googleId && !user.appleId) {
-        user.provider = "linkedin";
-        changed = true;
-      }
-
-      if (!user.profileImage && picture) {
-        user.profileImage = picture;
-        changed = true;
-      }
-
-      if (changed) {
-        await user.save();
-      }
-    }
-
-    const token = generateToken(user._id);
+    const { token, user } = await completeLinkedInLogin({ code, redirectUri });
 
     return res.status(200).json({
       success: true,

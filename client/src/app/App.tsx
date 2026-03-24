@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
-import { Routes, Route, useLocation, Navigate } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { WifiOff } from "lucide-react";
 
 import { Header } from "./components/Header";
@@ -57,6 +57,7 @@ export default function App() {
   });
 
   const location = useLocation();
+  const navigate = useNavigate();
   const routeContentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -164,6 +165,49 @@ export default function App() {
       }
     }
   }, [location]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("auth_provider") !== "linkedin") return;
+
+    const authError = params.get("auth_error");
+    const token = params.get("token");
+    const encodedUser = params.get("user");
+    const authMode = params.get("auth_mode") === "signup" ? "signup" : "login";
+
+    if (authError) {
+      setSuccessPopup(decodeURIComponent(authError));
+      const timeout = window.setTimeout(() => setSuccessPopup(null), 2600);
+      navigate("/home", { replace: true });
+      return () => window.clearTimeout(timeout);
+    }
+
+    if (!token || !encodedUser) {
+      navigate("/home", { replace: true });
+      return;
+    }
+
+    try {
+      const user = JSON.parse(encodedUser);
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("auth-changed"));
+      setIsAuthenticated(true);
+      setSuccessPopup(
+        authMode === "signup"
+          ? `Account created successfully! WELCOME ${user?.name || "User"}`
+          : `WELCOME ${user?.name || "User"}!`
+      );
+    } catch (error) {
+      console.error("[linkedin-auth] failed to hydrate auth result", error);
+      setSuccessPopup("LinkedIn authentication failed");
+    }
+
+    const timeout = window.setTimeout(() => setSuccessPopup(null), 2600);
+    navigate("/home", { replace: true });
+    return () => window.clearTimeout(timeout);
+  }, [location.search, navigate]);
 
   useLayoutEffect(() => {
     const root = routeContentRef.current;

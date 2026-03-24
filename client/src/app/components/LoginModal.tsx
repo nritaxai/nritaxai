@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import {
   Card,
@@ -12,7 +12,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { X, Eye, EyeOff, Loader2 } from "lucide-react";
-import { appleLoginUser, forgotPassword, linkedinLoginUser, loginUser, signupUser, googleLoginUser } from "../../utils/api";
+import { appleLoginUser, forgotPassword, loginUser, signupUser, googleLoginUser } from "../../utils/api";
 import { APPLE_AUTH_CONFIG, GOOGLE_AUTH_CONFIG, LINKEDIN_AUTH_CONFIG } from "../../config/appConfig";
 import { AuthPopup } from "./AuthPopup";
 
@@ -22,8 +22,6 @@ interface LoginModalProps {
 }
 
 export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
-  const linkedInPopupRef = useRef<Window | null>(null);
-  const linkedInPopupPollRef = useRef<number | null>(null);
   const linkedInUrlPattern = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
@@ -50,13 +48,7 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     type: "success" | "error";
   } | null>(null);
   const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
-  const canUseLinkedInAuth = Boolean(LINKEDIN_AUTH_CONFIG.clientId && LINKEDIN_AUTH_CONFIG.redirectUri);
-  const allowedLinkedInMessageOrigins = new Set([
-    "https://nritax.ai",
-    "https://www.nritax.ai",
-    "http://localhost:5173",
-    window.location.origin,
-  ]);
+  const canUseLinkedInAuth = Boolean(LINKEDIN_AUTH_CONFIG.clientId && LINKEDIN_AUTH_CONFIG.authBaseUrl);
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -71,128 +63,24 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     setTimeout(() => setPopup(null), 4500);
   };
 
-  const openCenteredPopup = (url: string, name: string) => {
-    const width = 560;
-    const height = 720;
-    const left = window.screenX + Math.max(0, (window.outerWidth - width) / 2);
-    const top = window.screenY + Math.max(0, (window.outerHeight - height) / 2);
-    return window.open(
-      url,
-      name,
-      `popup=yes,width=${width},height=${height},left=${Math.round(left)},top=${Math.round(top)}`
-    );
-  };
-
-  const clearLinkedInPopupWatcher = () => {
-    if (linkedInPopupPollRef.current !== null) {
-      window.clearInterval(linkedInPopupPollRef.current);
-      linkedInPopupPollRef.current = null;
-    }
-    linkedInPopupRef.current = null;
-  };
-
-  const clearLinkedInSessionState = () => {
-    sessionStorage.removeItem("nritax.linkedin.oauth.state");
-    sessionStorage.removeItem("nritax.linkedin.oauth.mode");
-  };
-
-  const buildLinkedInState = (mode: "login" | "signup") => {
-    const randomState =
-      typeof window !== "undefined" && window.crypto?.randomUUID
-        ? window.crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    return `${mode}:${randomState}`;
-  };
-
-  const startLinkedInPopupWatcher = () => {
-    clearLinkedInPopupWatcher();
-    linkedInPopupPollRef.current = window.setInterval(() => {
-      const popupWindow = linkedInPopupRef.current;
-      if (!popupWindow || popupWindow.closed) {
-        clearLinkedInPopupWatcher();
-        if (sessionStorage.getItem("nritax.linkedin.oauth.state")) {
-          clearLinkedInSessionState();
-          setPopup({
-            message: "LinkedIn Sign-In was closed before completion.",
-            type: "error",
-          });
-          setTimeout(() => setPopup(null), 2200);
-        }
-      }
-    }, 500);
-  };
-
-  const completeLinkedInAuth = async (
-    mode: "login" | "signup",
-    payload: { code: string; state: string }
-  ) => {
-    setLoading(true);
-    try {
-      const response = await linkedinLoginUser({
-        code: payload.code,
-        redirectUri: LINKEDIN_AUTH_CONFIG.redirectUri,
-      });
-      const user = resolveAuthUser(response);
-      handleAuthSuccess(
-        response,
-        mode === "signup"
-          ? `Account created successfully! WELCOME ${user?.name || "User"}`
-          : `WELCOME ${user?.name || "User"}!`
-      );
-    } catch (error: any) {
-      const message =
-        error?.response?.data?.error ||
-        error?.response?.data?.message ||
-        error?.message ||
-        "LinkedIn login failed";
-      console.error("[linkedin-oauth] login failed", {
-        message,
-        response: error?.response?.data,
-      });
-      setPopup({
-        message,
-        type: "error",
-      });
-      setTimeout(() => setPopup(null), 2500);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleLinkedInAuth = (mode: "login" | "signup") => {
     try {
-      if (!LINKEDIN_AUTH_CONFIG.clientId || !LINKEDIN_AUTH_CONFIG.redirectUri) {
+      if (!LINKEDIN_AUTH_CONFIG.clientId || !LINKEDIN_AUTH_CONFIG.authBaseUrl) {
         throw new Error("LinkedIn Sign-In configuration is missing");
       }
 
-      const state = buildLinkedInState(mode);
-      sessionStorage.setItem("nritax.linkedin.oauth.state", state);
-      sessionStorage.setItem("nritax.linkedin.oauth.mode", mode);
-
-      const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
-      authUrl.searchParams.set("response_type", "code");
-      authUrl.searchParams.set("client_id", LINKEDIN_AUTH_CONFIG.clientId);
-      authUrl.searchParams.set("redirect_uri", LINKEDIN_AUTH_CONFIG.redirectUri);
-      authUrl.searchParams.set("scope", LINKEDIN_AUTH_CONFIG.scope);
-      authUrl.searchParams.set("state", state);
+      const authUrl = new URL("/auth/linkedin", `${LINKEDIN_AUTH_CONFIG.authBaseUrl}/`);
+      authUrl.searchParams.set("mode", mode);
+      authUrl.searchParams.set("origin", window.location.origin);
 
       console.log("[linkedin-oauth] opening authorization url", {
         origin: window.location.origin,
-        redirectUri: LINKEDIN_AUTH_CONFIG.redirectUri,
+        redirectUri: `${LINKEDIN_AUTH_CONFIG.authBaseUrl}/auth/linkedin/callback`,
         authorizationUrl: authUrl.toString(),
       });
 
-      const popupWindow = openCenteredPopup(authUrl.toString(), "linkedin-oauth");
-      if (!popupWindow) {
-        clearLinkedInSessionState();
-        throw new Error("Popup blocked. Please allow popups and try again.");
-      }
-
-      linkedInPopupRef.current = popupWindow;
-      startLinkedInPopupWatcher();
+      window.location.href = authUrl.toString();
     } catch (error: any) {
-      clearLinkedInPopupWatcher();
-      clearLinkedInSessionState();
       setPopup({
         message: error?.message || "LinkedIn Sign-In could not start",
         type: "error",
@@ -297,53 +185,6 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
       const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ""}`;
       window.history.replaceState({}, document.title, cleanUrl);
     });
-  }, []);
-
-  useEffect(() => {
-    const handleLinkedInMessage = async (event: MessageEvent) => {
-      if (!allowedLinkedInMessageOrigins.has(event.origin)) return;
-
-      const payload = event.data;
-      if (!payload || payload.source !== "nritax-linkedin-oauth") return;
-
-      const expectedState = sessionStorage.getItem("nritax.linkedin.oauth.state");
-      const mode = sessionStorage.getItem("nritax.linkedin.oauth.mode") === "signup" ? "signup" : "login";
-
-      if (payload.error) {
-        clearLinkedInPopupWatcher();
-        clearLinkedInSessionState();
-        setPopup({
-          message: payload.error,
-          type: "error",
-        });
-        setTimeout(() => setPopup(null), 2500);
-        return;
-      }
-
-      if (!payload.code || !payload.state || payload.state !== expectedState) {
-        clearLinkedInPopupWatcher();
-        clearLinkedInSessionState();
-        setPopup({
-          message: "LinkedIn authentication failed. Please try again.",
-          type: "error",
-        });
-        setTimeout(() => setPopup(null), 2500);
-        return;
-      }
-
-      clearLinkedInPopupWatcher();
-      clearLinkedInSessionState();
-      await completeLinkedInAuth(mode, {
-        code: payload.code,
-        state: payload.state,
-      });
-    };
-
-    window.addEventListener("message", handleLinkedInMessage);
-    return () => {
-      clearLinkedInPopupWatcher();
-      window.removeEventListener("message", handleLinkedInMessage);
-    };
   }, []);
 
   const handleAuthSuccess = (response: any, message: string) => {

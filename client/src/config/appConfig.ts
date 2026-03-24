@@ -9,6 +9,7 @@ const envApiUrl = String(import.meta.env.VITE_API_URL || "").trim();
 const envProdApiUrl = String(import.meta.env.VITE_API_URL_PROD || "").trim();
 const envDevApiUrl = String(import.meta.env.VITE_API_URL_DEV || "").trim();
 const envBannerApiUrl = String(import.meta.env.VITE_BANNER_API_URL || "").trim();
+const envLinkedInAuthBaseUrl = String(import.meta.env.VITE_LINKEDIN_AUTH_BASE_URL || "").trim();
 
 export const IS_NATIVE_APP = Capacitor.isNativePlatform();
 export const PLATFORM = Capacitor.getPlatform();
@@ -74,6 +75,7 @@ export const LINKEDIN_AUTH_CONFIG = {
   clientId: String(import.meta.env.VITE_LINKEDIN_CLIENT_ID || "").trim(),
   redirectUri: getLinkedInRedirectUri(),
   scope: "openid profile email",
+  authBaseUrl: normalizeUrl(envLinkedInAuthBaseUrl || "https://api.nritax.ai"),
 };
 
 export const GSTIN = String(import.meta.env.VITE_GSTIN || "GSTIN_PLACEHOLDER").trim();

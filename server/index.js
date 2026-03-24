@@ -108,6 +108,7 @@ app.get("/ready", (_req, res) => {
 });
 
 app.use("/api/auth", authRoute);
+app.use("/auth", authRoute);
 app.use("/api/chat", chatRoute);
 app.use("/api/yukti", yuktiRoute);
 app.use("/api/subscription", subscriptionRoute);

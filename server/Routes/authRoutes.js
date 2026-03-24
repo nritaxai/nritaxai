@@ -7,8 +7,10 @@ import {
   getUserProfile,
   googleLogin,
   linkedinLogin,
+  linkedinCallback,
   loginUser, registerUser,
   resetPassword,
+  startLinkedInAuth,
   updateUserProfile
 } from '../Controllers/authController.js';
 import { createRateLimiter } from "../Middlewares/rateLimit.js";
@@ -29,6 +31,8 @@ router.post("/reset-password", authRateLimiter, resetPassword);
 router.post("/google-login", authRateLimiter, googleLogin);
 router.post("/apple", authRateLimiter, appleLogin);
 router.post("/linkedin", authRateLimiter, linkedinLogin);
+router.get("/linkedin", authRateLimiter, startLinkedInAuth);
+router.get("/linkedin/callback", linkedinCallback);
 
 router.get("/profile", protect, getUserProfile);
 
