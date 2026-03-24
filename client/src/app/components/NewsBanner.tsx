@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { renderTextWithShortForms } from "../utils/shortForms";
 
 type Banner = {
   label: string;
@@ -11,7 +12,16 @@ type Banner = {
 };
 
 export default function NewsBanner() {
-  const [banner, setBanner] = useState<Banner | null>(null);
+  const [banners, setBanners] = useState<Banner[]>([]);
+
+  const formatBannerDate = (value?: string) => {
+    if (!value) return "";
+
+    const parsedDate = new Date(value);
+    if (Number.isNaN(parsedDate.getTime())) return value;
+
+    return parsedDate.toLocaleDateString();
+  };
 
   useEffect(() => {
     async function fetchBanner() {
@@ -31,7 +41,7 @@ export default function NewsBanner() {
 
         if (!Array.isArray(data)) {
           console.error("Banner API did not return an array:", data);
-          setBanner(null);
+          setBanners([]);
           return;
         }
 
@@ -39,39 +49,47 @@ export default function NewsBanner() {
           .filter((item: Banner) => item && item.active === true)
           .sort((a: Banner, b: Banner) => (a.priority ?? 9999) - (b.priority ?? 9999));
 
-        setBanner(activeBanners[0] || null);
+        setBanners(activeBanners);
       } catch (error) {
         console.error("Failed to load banner:", error);
-        setBanner(null);
+        setBanners([]);
       }
     }
 
     fetchBanner();
   }, []);
 
-  if (!banner) return null;
+  const tickerItems = useMemo(
+    () => (banners.length > 0 ? [...banners, ...banners] : []),
+    [banners]
+  );
+
+  if (banners.length === 0) return null;
 
   return (
-    <div className="w-full border-b border-yellow-200 bg-yellow-50 px-4 py-2">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-3 text-sm">
-        <span className="rounded bg-black px-2 py-1 text-xs font-semibold text-white">
-          {banner.label || "LATEST NEWS"}
-        </span>
-
-        <a
-          href={banner.url || "#"}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex-1 font-medium text-gray-800 hover:underline"
-        >
-          {banner.title || "View update"}
-        </a>
-
-        {banner.date ? (
-          <span className="text-xs text-gray-500">
-            {new Date(banner.date).toLocaleDateString()}
-          </span>
-        ) : null}
+    <div className="w-full border-b border-yellow-200 bg-yellow-50">
+      <div className="mx-auto max-w-7xl overflow-hidden px-4 py-2">
+        <div className="nri-ticker-track flex w-max items-center gap-8 whitespace-nowrap pr-8">
+          {tickerItems.map((banner, index) => (
+            <a
+              key={`${banner.title}-${banner.date}-${index}`}
+              href={banner.url || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-w-max items-center gap-3 text-sm text-gray-800 transition-opacity hover:opacity-80"
+            >
+              <span className="rounded bg-black px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white">
+                {banner.label || "LATEST NEWS"}
+              </span>
+              <span className="font-medium">
+                {renderTextWithShortForms(banner.title || "View update")}
+              </span>
+              {banner.date ? (
+                <span className="text-xs text-gray-500">{formatBannerDate(banner.date)}</span>
+              ) : null}
+            </a>
+          ))}
+        </div>
       </div>
     </div>
   );
