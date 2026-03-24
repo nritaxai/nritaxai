@@ -14,7 +14,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils/api";
-import { BannerTicker } from "./BannerTicker";
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -205,9 +204,6 @@ export function Header({ onLogin }: HeaderProps) {
           </div>
         </div>
       </div>
-
-      <BannerTicker />
-
       <div className="sticky top-0 border-b border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between">

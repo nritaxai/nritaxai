@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Briefcase, Calculator as CalcIcon, Globe, Home as HomeIcon, MessageSquare, TrendingUp } from "lucide-react";
 import { ExpertCouncil } from "../components/ExpertCouncil";
 import { Features } from "../components/Features";
+import NewsBanner from "../components/NewsBanner";
 import { PrivacyTrustBanner } from "../components/PrivacyTrustBanner";
 import { getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
@@ -99,6 +100,7 @@ export function Home({ onRequireLogin }: HomeProps) {
 
   return (
     <main className="min-h-screen">
+      <NewsBanner />
       <section className="bg-gradient-to-b from-gray-50 to-white py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
