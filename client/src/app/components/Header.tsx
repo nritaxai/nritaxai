@@ -1,5 +1,6 @@
 import { Button } from "./ui/button";
 import {
+  ChevronLeft,
   Globe,
   Lock,
   Menu,
@@ -162,6 +163,15 @@ export function Header({ onLogin }: HeaderProps) {
     </span>
   );
 
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/home");
+  };
+
   return (
     <header className="relative z-50">
       <div className="border-b border-gray-200 bg-white/95 backdrop-blur-md md:hidden">
@@ -174,14 +184,24 @@ export function Header({ onLogin }: HeaderProps) {
             />
           </Link>
 
-          <button
-            className="rounded-md p-2 text-slate-800 transition-colors hover:text-blue-700"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
-            aria-expanded={mobileMenuOpen}
-          >
-            <Menu className="size-6" />
-          </button>
+          <div className="-ml-1 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleGoBack}
+              aria-label="Go back"
+              className="inline-flex items-center rounded-full border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
+            >
+              <ChevronLeft className="size-5" />
+            </button>
+            <button
+              className="rounded-md p-2 text-slate-800 transition-colors hover:text-blue-700"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              <Menu className="size-6" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -207,13 +227,23 @@ export function Header({ onLogin }: HeaderProps) {
       <div className="sticky top-0 border-b border-gray-200 bg-white/90 backdrop-blur-md">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between">
-            <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
-              <img
-                src="/logo-transparent.png"
-                alt="NRITAX logo"
-                className="h-22 w-auto scale-[1.18] object-contain sm:h-28"
-              />
-            </Link>
+            <div className="ml-1 flex items-center gap-5">
+              <button
+                type="button"
+                onClick={handleGoBack}
+                aria-label="Go back"
+                className="inline-flex items-center rounded-full border border-slate-200 bg-white p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-900"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+              <Link to="/home" className="ml-2 inline-flex items-center" aria-label="NRITAX home">
+                <img
+                  src="/logo-transparent.png"
+                  alt="NRITAX logo"
+                  className="h-22 w-auto scale-[1.18] object-contain sm:h-28"
+                />
+              </Link>
+            </div>
 
             <nav className="hidden items-center gap-3 md:flex">
               {navItems.map((item) => {
