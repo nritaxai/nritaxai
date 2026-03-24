@@ -18,9 +18,10 @@ import { AuthPopup } from "./AuthPopup";
 
 interface LoginModalProps {
   onClose: () => void;
+  disableClose?: boolean;
 }
 
-export function LoginModal({ onClose }: LoginModalProps) {
+export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
   const linkedInUrlPattern = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
@@ -123,8 +124,8 @@ export function LoginModal({ onClose }: LoginModalProps) {
     const user = resolveAuthUser(response);
     const successMessage =
       mode === "signup"
-        ? `Account created successfully! Welcome ${user?.name || "User"}`
-        : `Welcome ${user?.name || "User"}!`;
+        ? `Account created successfully! WELCOME ${user?.name || "User"}`
+        : `WELCOME ${user?.name || "User"}!`;
     handleAuthSuccess(response, successMessage);
   };
 
@@ -243,8 +244,8 @@ export function LoginModal({ onClose }: LoginModalProps) {
         handleAuthSuccess(
           response,
           mode === "signup"
-            ? `Account created successfully! Welcome ${user?.name || "User"}`
-            : `Welcome ${user?.name || "User"}!`
+            ? `Account created successfully! WELCOME ${user?.name || "User"}`
+            : `WELCOME ${user?.name || "User"}!`
         );
       } catch (error: any) {
         setPopup({
@@ -331,7 +332,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
     try {
       const response = await loginUser(loginData);
       const user = resolveAuthUser(response);
-      handleAuthSuccess(response, `Welcome back, ${user?.name || "User"}!`);
+      handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
 
     } catch (err: any) {
       setLoginError(err.response?.data?.message || "Login failed");
@@ -388,7 +389,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
       const user = resolveAuthUser(response);
       handleAuthSuccess(
         response,
-        `Account created successfully! Welcome ${user?.name || "User"}`
+        `Account created successfully! WELCOME ${user?.name || "User"}`
       );
     } catch (err: any) {
       setSignupError(err.response?.data?.message || "Signup failed");
@@ -414,9 +415,11 @@ export function LoginModal({ onClose }: LoginModalProps) {
                 Login or create an account to continue
               </CardDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="size-5" />
-            </Button>
+            {!disableClose ? (
+              <Button variant="ghost" size="icon" onClick={onClose}>
+                <X className="size-5" />
+              </Button>
+            ) : null}
           </div>
         </CardHeader>
 
@@ -568,7 +571,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
                           const user = resolveAuthUser(response);
                           handleAuthSuccess(
                             response,
-                            `Welcome ${user?.name || "User"}!`
+                            `WELCOME ${user?.name || "User"}!`
                           );
                         } catch (err: any) {
                           setPopup({
@@ -748,7 +751,7 @@ export function LoginModal({ onClose }: LoginModalProps) {
                           const user = resolveAuthUser(response);
                           handleAuthSuccess(
                             response,
-                            `Account created successfully! Welcome ${user?.name || "User"}`
+                            `Account created successfully! WELCOME ${user?.name || "User"}`
                           );
                         } catch (err: any) {
                           setPopup({

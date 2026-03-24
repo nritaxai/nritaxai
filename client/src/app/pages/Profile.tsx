@@ -604,7 +604,7 @@ export function Profile() {
                     </DropdownMenu>
                   </div>
                   <div>
-                    <p className="text-sm text-[#0F172A]">Welcome back</p>
+                    <p className="text-sm text-[#0F172A]">WELCOME</p>
                     <h1 className="text-2xl sm:text-3xl text-[#0F172A]">{profile?.name}</h1>
                     <p className="text-[#0F172A]">{profile?.email}</p>
                     <p className="mt-1 text-xs text-[#475569]">
