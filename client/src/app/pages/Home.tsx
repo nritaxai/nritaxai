@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { Briefcase, Calculator as CalcIcon, Globe, Home as HomeIcon, MessageSquare, TrendingUp } from "lucide-react";
 import { ExpertCouncil } from "../components/ExpertCouncil";
 import { Features } from "../components/Features";
-import NewsBanner from "../components/NewsBanner";
 import { PrivacyTrustBanner } from "../components/PrivacyTrustBanner";
 import { getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
@@ -22,9 +21,33 @@ const heroContent = {
 };
 
 const taxUpdates = [
-  { date: "2026-02-20", title: "DTAA filing checklist refresh for FY 2025-26" },
-  { date: "2026-02-12", title: "Updated non-resident tax residency documentation guidance" },
-  { date: "2026-01-30", title: "Revised remittance compliance notes for Form 15CA/15CB" },
+  {
+    label: "DTAA UPDATE",
+    country: "India-UAE",
+    type: "Treaty Compliance",
+    date: "2026-02-20",
+    source: "CBDT",
+    confidence: "Authoritative",
+    title: "DTAA filing checklist refresh for FY 2025-26",
+  },
+  {
+    label: "INTERNATIONAL TAX ALERT",
+    country: "India-Singapore",
+    type: "Residency Guidance",
+    date: "2026-02-12",
+    source: "Gazette",
+    confidence: "Validated",
+    title: "Updated non-resident tax residency documentation guidance",
+  },
+  {
+    label: "TAX TREATY UPDATE",
+    country: "India-US",
+    type: "Remittance Rules",
+    date: "2026-01-30",
+    source: "NRITAX Research",
+    confidence: "Advisory",
+    title: "Revised remittance compliance notes for Form 15CA/15CB",
+  },
 ];
 
 const scenarioCards = [
@@ -155,37 +178,58 @@ export function Home({ onRequireLogin }: HomeProps) {
           </div>
         </div>
       </section>
-
-      <div className="border-y border-slate-200/70 bg-white/90">
-        <NewsBanner />
-      </div>
-
       <section id="features">
         <Features />
       </section>
 
-      <section className="bg-gradient-to-b from-white to-gray-50 py-16 md:py-20">
+      <section className="bg-gradient-to-b from-gray-50 to-white pt-10 pb-5 md:pt-14 md:pb-8">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <section id="tax-updates" className="mt-14">
-            <h3 className="mb-5 text-center text-2xl font-bold text-gray-900">Tax Updates</h3>
+          <section id="tax-updates">
+            <div className="mb-4 text-center">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                Regulatory Intelligence
+              </p>
+              <h3 className="mt-3 text-2xl font-bold text-gray-900">Tax Updates</h3>
+            </div>
             <div className="grid gap-4 md:grid-cols-3">
               {taxUpdates.map((item, index) => (
                 <article
                   key={item.date + item.title}
-                  className="reveal-tile rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
+                  className="reveal-tile rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,250,0.98))] p-5 text-left shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
                   style={{ ["--reveal-delay" as any]: `${140 + index * 100}ms` }}
                 >
-                  <div className="mb-2 inline-flex items-center gap-2 text-xs font-medium text-blue-700">
-                    <Globe className="size-3.5" />
-                    {item.date}
+                  <div className="mb-4 flex flex-wrap items-center gap-2">
+                    <span className="rounded-sm border border-slate-800 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
+                      {item.label}
+                    </span>
+                    <span className="rounded-sm bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                      {item.country}
+                    </span>
+                    <span className="rounded-sm border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                      {item.type}
+                    </span>
                   </div>
-                  <p className="text-sm text-gray-700">{renderTextWithShortForms(item.title)}</p>
+                  <p className="text-base font-semibold leading-6 text-slate-900">
+                    {renderTextWithShortForms(item.title)}
+                  </p>
+                  <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+                    <span className="inline-flex items-center gap-1 font-medium text-slate-500">
+                      <Globe className="size-3.5" />
+                      {item.date}
+                    </span>
+                    <span className="rounded-sm bg-slate-100 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-slate-700">
+                      Source: {item.source}
+                    </span>
+                    <span className="rounded-sm border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                      {item.confidence}
+                    </span>
+                  </div>
                 </article>
               ))}
             </div>
           </section>
 
-          <div className="mt-16">
+          <div className="mt-10">
             <h3 className="mb-8 text-center text-2xl font-bold text-gray-900">Quick Access by Scenario</h3>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {scenarioCards.map((scenario, index) => {
@@ -208,7 +252,7 @@ export function Home({ onRequireLogin }: HomeProps) {
             </div>
           </div>
 
-          <div className="mt-16">
+          <div className="mt-8">
             <PrivacyTrustBanner />
           </div>
         </div>

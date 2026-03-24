@@ -1,8 +1,9 @@
 import { lazy, Suspense, useState, useEffect, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
+import { Routes, Route, useLocation, Navigate } from "react-router-dom";
 import { WifiOff } from "lucide-react";
 
 import { Header } from "./components/Header";
+import NewsBanner from "./components/NewsBanner";
 import { ComplianceStandards } from "./components/ComplianceStandards";
 import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
@@ -13,7 +14,7 @@ import { Home } from "./pages/Home";
 import { HeroPage } from "./pages/HeroPage";
 import { Pricing } from "./pages/Pricing";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
-import { buildApiUrl } from "../utils/api";
+import { buildApiUrl, getStoredAuthToken } from "../utils/api";
 const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
@@ -41,6 +42,9 @@ export default function App() {
   const stagingModeEnabled = import.meta.env.VITE_STAGING_MODE === "true";
   const stagingPassword = String(import.meta.env.VITE_STAGING_ACCESS_PASSWORD || "");
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() =>
+    Boolean(typeof window !== "undefined" && getStoredAuthToken())
+  );
   const [successPopup, setSuccessPopup] = useState<string | null>(null);
   const [isOnline, setIsOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine
@@ -72,11 +76,34 @@ export default function App() {
 
   useEffect(() => {
     const handleRequireLogin = () => setShowLoginModal(true);
+    const syncAuthState = () => setIsAuthenticated(Boolean(getStoredAuthToken()));
+
     window.addEventListener("nritax:require-login", handleRequireLogin as EventListener);
+    window.addEventListener("storage", syncAuthState);
+    window.addEventListener("auth-changed", syncAuthState);
+
     return () => {
       window.removeEventListener("nritax:require-login", handleRequireLogin as EventListener);
+      window.removeEventListener("storage", syncAuthState);
+      window.removeEventListener("auth-changed", syncAuthState);
     };
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowLoginModal(false);
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (isAuthenticated || location.pathname !== "/home") return;
+
+    const timeoutId = window.setTimeout(() => {
+      setShowLoginModal(true);
+    }, 350);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isAuthenticated, location.pathname]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -224,8 +251,31 @@ export default function App() {
     );
   }
 
-  const isStandaloneRoute = location.pathname === "/" || location.pathname === "/reset-password";
-  const hasSiteHeader = !isStandaloneRoute;
+  const isHeroRoute = location.pathname === "/" || location.pathname === "/hero" || location.pathname === "/Hero";
+  const isStandaloneRoute = isHeroRoute || location.pathname === "/reset-password";
+  const protectedPaths = new Set([
+    "/calculators",
+    "/Pricing",
+    "/pricing",
+    "/checkout",
+    "/login",
+    "/profile",
+    "/chat",
+    "/dashboard",
+    "/compliance",
+    "/builder",
+    "/consult",
+    "/reschedule",
+    "/cancel",
+    "/privacy-policy",
+    "/about-us",
+    "/terms-and-conditions",
+    "/refund-policy",
+    "/disclaimer",
+  ]);
+  const requiresAuthentication = protectedPaths.has(location.pathname);
+  const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
+  const hasSiteHeader = !isStandaloneRoute && isAuthenticated;
 
   return (
     <div className="app-shell">
@@ -237,9 +287,11 @@ export default function App() {
           </div>
         </div>
       )}
+      {requiresAuthentication && !isAuthenticated ? <Navigate to="/home" replace /> : null}
       {hasSiteHeader && (
         <Header onLogin={() => setShowLoginModal(true)} />
       )}
+      {hasSiteHeader && location.pathname === "/home" ? <NewsBanner /> : null}
 
       <div ref={routeContentRef}>
         <Suspense fallback={<div className="p-6 text-sm text-[#0F172A]">Loading...</div>}>
@@ -278,13 +330,16 @@ export default function App() {
         </Suspense>
       </div>
 
-      {!isStandaloneRoute && <TigerBotAvatar />}
+      {!isStandaloneRoute && isAuthenticated && <TigerBotAvatar />}
 
       {hasSiteHeader && <Footer />}
 
       {showLoginModal && (
         <Suspense fallback={null}>
-          <LoginModal onClose={() => setShowLoginModal(false)} />
+          <LoginModal
+            onClose={() => setShowLoginModal(false)}
+            disableClose={requiresHomeLoginGate}
+          />
         </Suspense>
       )}
 
