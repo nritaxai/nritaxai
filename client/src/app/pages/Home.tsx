@@ -100,7 +100,6 @@ export function Home({ onRequireLogin }: HomeProps) {
 
   return (
     <main className="min-h-screen">
-      <NewsBanner />
       <section className="bg-gradient-to-b from-gray-50 to-white py-16 md:py-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
@@ -154,7 +153,19 @@ export function Home({ onRequireLogin }: HomeProps) {
               </div>
             ))}
           </div>
+        </div>
+      </section>
 
+      <div className="border-y border-slate-200/70 bg-white/90">
+        <NewsBanner />
+      </div>
+
+      <section id="features">
+        <Features />
+      </section>
+
+      <section className="bg-gradient-to-b from-white to-gray-50 py-16 md:py-20">
+        <div className="mx-auto max-w-6xl px-4 md:px-6">
           <section id="tax-updates" className="mt-14">
             <h3 className="mb-5 text-center text-2xl font-bold text-gray-900">Tax Updates</h3>
             <div className="grid gap-4 md:grid-cols-3">
@@ -203,9 +214,6 @@ export function Home({ onRequireLogin }: HomeProps) {
         </div>
       </section>
 
-      <section id="features">
-        <Features />
-      </section>
       <ExpertCouncil />
     </main>
   );
