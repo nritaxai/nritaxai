@@ -420,7 +420,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                 <Bot className="size-6 text-[#2563eb]" />
               </div>
               <div>
-                <CardTitle>YUKTI</CardTitle>
+                <CardTitle>AI Chat Assistant</CardTitle>
                 <CardDescription className="text-[#0F172A]">Secure guidance for NRI taxes</CardDescription>
               </div>
             </div>
@@ -552,9 +552,6 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                     : "bg-[#F7FAFC]/95 text-[#0F172A] border border-[#E2E8F0]/80 prose prose-sm max-w-none"
                 }`}
               >
-                <p className={`mb-1 text-[11px] uppercase tracking-wide ${message.role === "user" ? "text-[#2563eb]" : "text-[#0F172A]"}`}>
-                  {message.role === "user" ? "You" : "YUKTI"}
-                </p>
                 {message.role === "ai" ? (
                   <ReactMarkdown
                     components={{
@@ -590,7 +587,6 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                 AI
               </div>
               <div className="rounded-2xl border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-4 py-3 shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md">
-                <p className="mb-2 text-[11px] uppercase tracking-wide text-[#0F172A]">YUKTI</p>
                 <p className="text-sm font-black tracking-[0.18em] text-[#0F172A] [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
                   <span className="blur-[0.2px]">Thinking.....</span>
                 </p>

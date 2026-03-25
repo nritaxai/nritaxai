@@ -156,10 +156,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const knowledgeSource = "dtaa";
   const [subscription, setSubscription] = useState<{ plan?: string; status?: string } | null>(null);
   const welcomeByLanguage: Record<string, string> = {
-    english: `Hi${userName ? ` ${userName}` : ""}! I am YUKTI, your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
-    tamil: `Vanakkam${userName ? ` ${userName}` : ""}! Naan YUKTI, ungal AI chat assistant. DTAA vidhigal, NRI vari kelvigal, matrum vari thittamidhalil naan uthava tayaaraga irukkiren. Indru naan ungalukku eppadi uthavalam?`,
-    hindi: `Namaste${userName ? ` ${userName}` : ""}! Main YUKTI, aapka AI chat assistant hoon. DTAA niyamon, NRI tax prashnon, aur tax planning mein main aapki madad kar sakta hoon. Main aaj aapki kaise sahayata kar sakta hoon?`,
-    indonesian: `Halo${userName ? ` ${userName}` : ""}! Saya YUKTI, asisten chat AI Anda. Saya siap membantu Anda terkait regulasi DTAA, pertanyaan pajak NRI, dan perencanaan pajak. Bagaimana saya bisa membantu Anda hari ini?`,
+    english: `Hi${userName ? ` ${userName}` : ""}! I am your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
+    tamil: `Vanakkam${userName ? ` ${userName}` : ""}! Naan ungal AI chat assistant. DTAA vidhigal, NRI vari kelvigal, matrum vari thittamidhalil naan uthava tayaaraga irukkiren. Indru naan ungalukku eppadi uthavalam?`,
+    hindi: `Namaste${userName ? ` ${userName}` : ""}! Main aapka AI chat assistant hoon. DTAA niyamon, NRI tax prashnon, aur tax planning mein main aapki madad kar sakta hoon. Main aaj aapki kaise sahayata kar sakta hoon?`,
+    indonesian: `Halo${userName ? ` ${userName}` : ""}! Saya asisten chat AI Anda. Saya siap membantu Anda terkait regulasi DTAA, pertanyaan pajak NRI, dan perencanaan pajak. Bagaimana saya bisa membantu Anda hari ini?`,
   };
   const [messages, setMessages] = useState<Array<{ role: "user" | "ai"; content: string }>>([
     {
@@ -721,7 +721,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
         <CardHeader className="pb-3">
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#CBD5E1] bg-[#E2E8F0] px-4 py-2 text-[#0F172A]">
             <Sparkles className="size-4" />
-            <span className="text-sm">YUKTI</span>
+            <span className="text-sm">AI Chat Assistant</span>
           </div>
           <h1 className="mb-2 text-3xl text-[#0F172A] sm:text-4xl">AI Tax Chat</h1>
           <p className="max-w-2xl text-base text-[#0F172A]">
@@ -757,7 +757,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                       <Bot className="size-6 text-[#0F172A]" />
                     </div>
                     <div>
-                      <CardTitle className="text-[#0F172A]">YUKTI</CardTitle>
+                      <CardTitle className="text-[#0F172A]">AI Chat Assistant</CardTitle>
                       <CardDescription className="text-[#0F172A]">
                         {userName ? `Hi ${userName}` : "Hi"} - Ask anything about NRI taxes and DTAA
                       </CardDescription>
@@ -903,7 +903,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             <Card>
               <CardHeader>
                 <CardTitle className="text-lg">Starter Questions</CardTitle>
-                <CardDescription>Click to ask YUKTI</CardDescription>
+                <CardDescription>Click to ask the AI Chat Assistant</CardDescription>
               </CardHeader>
               <CardContent className="space-y-2">
                 {[
