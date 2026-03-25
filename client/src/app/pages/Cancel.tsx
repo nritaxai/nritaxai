@@ -21,6 +21,10 @@ export function Cancel() {
 
   const handleCancel = async () => {
     if (!identifier || loading) return;
+    if (identifier.key !== "token") {
+      setErrorMessage("This cancellation link is missing a valid token.");
+      return;
+    }
     setLoading(true);
     setErrorMessage("");
     setSuccessMessage("");
@@ -81,12 +85,12 @@ export function Cancel() {
             ) : (
               <div className="space-y-5">
                 <div className="rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 text-sm text-[#475569]">
-                  {identifier ? (
+                  {identifier && identifier.key === "token" ? (
                     <span>
-                      Cancellation request detected using <strong>{identifier.key}</strong>: {identifier.value}
+                      Cancellation request detected using <strong>token</strong>: {identifier.value}
                     </span>
                   ) : (
-                    <span>Please use a valid cancellation link containing a token, booking reference, or email.</span>
+                    <span>Please use a valid cancellation link containing a token.</span>
                   )}
                 </div>
 
@@ -112,7 +116,7 @@ export function Cancel() {
                   </Button>
                   <Button
                     type="button"
-                    disabled={loading || !identifier}
+                    disabled={loading || !identifier || identifier.key !== "token"}
                     onClick={handleCancel}
                     className="bg-red-600 text-white hover:bg-red-700 sm:flex-1"
                   >
@@ -127,4 +131,3 @@ export function Cancel() {
     </div>
   );
 }
-

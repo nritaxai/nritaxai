@@ -31,6 +31,7 @@ export function TopBar({ onOpenSidebar }: TopBarProps) {
             <Menu className="size-5" />
           </Button>
           <NavLink to="/home" className="inline-flex items-center gap-2">
+            <img src="/logo-transparent.png" alt="NRITAX logo" className="h-8 w-auto" />
             <span className="text-base font-semibold tracking-wider text-[#0F172A]">NRITAX.AI</span>
           </NavLink>
         </div>

@@ -2,9 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "motion/react";
+import { AIChat } from "../components/AIChat";
 import { AuthGateCard } from "../components/AuthGateCard";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
@@ -114,6 +116,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const [sessionMessage, setSessionMessage] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isPopupOpen, setIsPopupOpen] = useState(false);
   const chatContentRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -444,6 +447,14 @@ export function Chat({ onRequireLogin }: ChatProps) {
     void submitQuestion(selectedQuestion);
   };
 
+  const handleOpenPopup = () => {
+    if (!isAuthenticated) {
+      onRequireLogin();
+      return;
+    }
+    setIsPopupOpen(true);
+  };
+
   useEffect(() => {
     if (!isAuthenticated) return;
     if (starterMessageHandledRef.current) return;
@@ -468,30 +479,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
       />
     );
   }
-
-  // const handleSubmit = (e: React.FormEvent) => {
-  //   e.preventDefault();
-  //   if (!question.trim()) return;
-
-  //   setMessages(prev => [...prev, { role: "user", content: question }]);
-  //   setQuestion("");
-  //   setIsTyping(true);
-
-  //   setTimeout(() => {
-  //     const aiResponses = [
-  //       "Based on current DTAA regulations between India and your country of residence, you may be eligible for tax relief. To provide specific guidance, I'll need to know: 1) Your country of residence, 2) Type of income (salary/capital gains/rental), and 3) Whether you have a Tax Residency Certificate.",
-  //       "For the India-Singapore DTAA, the recent amendment effective April 1, 2025, reduces royalty withholding tax from 15% to 10%. This applies to payments made from April 1, 2025 onwards. You'll need to submit Form 10F along with your Tax Residency Certificate to claim treaty benefits.",
-  //       "NRIs must file ITR if their total income in India exceeds ₹2.5 lakh (basic exemption limit). Common scenarios include: rental income, capital gains from property/shares sold in India, interest on NRO accounts, or business income. DTAA provisions can help reduce your tax liability.",
-  //       "To claim DTAA benefits, you need: 1) Valid Tax Residency Certificate (TRC) from your country, 2) Form 10F submission, 3) PAN card, and 4) Documentation of income source. The TRC must be from the financial year for which you're claiming benefits.",
-  //       "For NRO (Non-Resident Ordinary) accounts, interest earned is taxable at 30% (plus applicable surcharge and cess). However, you can claim DTAA benefits to reduce this rate. NRE (Non-Resident External) account interest is tax-free in India.",
-  //       "Long-term capital gains (LTCG) on equity shares and equity mutual funds exceeding ₹1.25 lakh are taxed at 12.5%. Short-term capital gains (STCG) are taxed at 20%. Remember to check DTAA provisions for your country of residence."
-  //     ];
-      
-  //     const randomResponse = aiResponses[Math.floor(Math.random() * aiResponses.length)];
-  //     setMessages(prev => [...prev, { role: "ai", content: randomResponse }]);
-  //     setIsTyping(false);
-  //   }, 1500);
-  // };
 
   return (
     <div className="mx-auto w-full max-w-[1320px] space-y-5">
@@ -525,7 +512,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
           }}
           className="grid gap-4 xl:grid-cols-3"
         >
-          {/* Main Chat */}
           <motion.div
             className="xl:col-span-2"
             variants={{
@@ -628,10 +614,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
                   <Textarea
                     ref={questionInputRef}
-                    placeholder="Ask about DTAA, NRI taxes, tax planning, ITR filing..."
+                    placeholder="Click here to open AI chat"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     onKeyDown={handleQuestionKeyDown}
+                    onClick={handleOpenPopup}
+                    onFocus={handleOpenPopup}
+                    readOnly
                     className="min-h-[44px] max-h-32 resize-none border-[#E2E8F0] bg-[#F7FAFC]/90"
                     rows={1}
                   />
@@ -674,7 +663,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
             </Card>
           </motion.div>
 
-          {/* Sidebar with starter questions */}
           <motion.div
             className="space-y-4"
             variants={{
@@ -740,22 +728,15 @@ export function Chat({ onRequireLogin }: ChatProps) {
             acknowledge and accept this notice.
           </p>
         </div>
+
+        <Dialog open={isPopupOpen} onOpenChange={setIsPopupOpen}>
+          <DialogContent className="max-h-[94vh] max-w-[min(1200px,96vw)] overflow-hidden border border-[#E2E8F0] bg-white p-0 shadow-2xl">
+            <DialogTitle className="sr-only">AI Chat Popup</DialogTitle>
+            <div className="max-h-[94vh] overflow-auto rounded-2xl bg-white p-2">
+              <AIChat onRequireLogin={onRequireLogin} />
+            </div>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

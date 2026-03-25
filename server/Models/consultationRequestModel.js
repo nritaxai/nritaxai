@@ -5,8 +5,12 @@ const consultationRequestSchema = new mongoose.Schema(
     name: { type: String, required: true, trim: true, maxlength: 120 },
     email: { type: String, required: true, trim: true, lowercase: true, maxlength: 160 },
     phone: { type: String, required: true, trim: true, maxlength: 30 },
+    whatsapp: { type: String, trim: true, maxlength: 30, default: "" },
+    contactMethod: { type: String, trim: true, maxlength: 30, default: "" },
     country: { type: String, required: true, trim: true, maxlength: 80 },
     service: { type: String, required: true, trim: true, maxlength: 80 },
+    preferredDate: { type: String, trim: true, maxlength: 20, default: "" },
+    preferredTime: { type: String, trim: true, maxlength: 20, default: "" },
     taxQuery: { type: String, required: true, trim: true, maxlength: 3000 },
     status: { type: String, enum: ["new", "contacted", "closed"], default: "new" },
     notificationStatus: {

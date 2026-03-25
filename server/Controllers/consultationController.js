@@ -4,6 +4,7 @@ import { sendEmail } from "../src/utils/emailService.js";
 
 const sanitize = (value) => (typeof value === "string" ? value.trim() : "");
 const DEFAULT_ADMIN_EMAIL = "admin@nritax.ai";
+const CONSULTATION_WEBHOOK_TIMEOUT_MS = Number(process.env.CONSULTATION_WEBHOOK_TIMEOUT_MS || 12000);
 
 const isValidEmail = (email) =>
   /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$/.test(String(email || ""));
@@ -44,6 +45,126 @@ const parseWebhookResponse = async (response) => {
   }
 };
 
+const forwardConsultationToWebhook = async (payload) => {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), CONSULTATION_WEBHOOK_TIMEOUT_MS);
+
+  try {
+    console.info(
+      `[consultation] Forwarding submission to webhook: ${CONSULTATION_WEBHOOK_URL}`
+    );
+
+    const webhookResponse = await fetch(CONSULTATION_WEBHOOK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const webhookResult = await parseWebhookResponse(webhookResponse);
+
+    if (!webhookResponse.ok) {
+      throw new Error(
+        webhookResult?.message ||
+          `Consultation webhook failed with status ${webhookResponse.status}`
+      );
+    }
+
+    return webhookResult;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("Consultation booking timed out. Please try again.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
+const queueConsultationEmails = ({
+  requestDoc,
+  bookingId,
+  adminEmail,
+  customerEmail,
+  name,
+  phone,
+  whatsapp,
+  contactMethod,
+  date,
+  time,
+  timezone,
+  country,
+  service,
+  notes,
+}) => {
+  setImmediate(async () => {
+    const emailErrors = [];
+
+    const emailTasks = [
+      sendEmail({
+        to: customerEmail,
+        subject: "CPA Consultation Booking Confirmed",
+        html: `
+          <h2>Hello ${name},</h2>
+          <p>Your CPA consultation has been successfully booked.</p>
+          <p><strong>Booking ID:</strong> ${bookingId}</p>
+          <p><strong>Date:</strong> ${date}</p>
+          <p><strong>Time:</strong> ${time}</p>
+          <p><strong>Timezone:</strong> ${timezone}</p>
+          <p>We will contact you shortly.</p>
+          <br/>
+          <p>Regards,<br/>NRITAX Team</p>
+        `,
+      }),
+      sendEmail({
+        to: adminEmail,
+        subject: "New CPA Consultation Booking",
+        html: `
+          <h3>New Booking Details</h3>
+          <p><strong>Booking ID:</strong> ${bookingId}</p>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${customerEmail}</p>
+          <p><strong>Phone:</strong> ${phone}</p>
+          <p><strong>WhatsApp:</strong> ${whatsapp || "Not provided"}</p>
+          <p><strong>Preferred Contact Method:</strong> ${contactMethod || "Not provided"}</p>
+          <p><strong>Date:</strong> ${date}</p>
+          <p><strong>Time:</strong> ${time}</p>
+          <p><strong>Timezone:</strong> ${timezone}</p>
+          <p><strong>Country:</strong> ${country}</p>
+          <p><strong>Service:</strong> ${service}</p>
+          <p><strong>Notes:</strong> ${notes}</p>
+        `,
+      }),
+    ];
+
+    const [confirmationResult, adminResult] = await Promise.allSettled(emailTasks);
+
+    if (confirmationResult.status === "rejected") {
+      const message = String(confirmationResult.reason?.message || confirmationResult.reason || "unknown");
+      console.error("Consultation confirmation email error:", message);
+      emailErrors.push(`confirmation:${message}`);
+    }
+
+    if (adminResult.status === "rejected") {
+      const message = String(adminResult.reason?.message || adminResult.reason || "unknown");
+      console.error("Consultation admin email error:", message);
+      emailErrors.push(`admin:${message}`);
+    }
+
+    try {
+      requestDoc.notificationStatus = emailErrors.length === 0 ? "sent" : "failed";
+      requestDoc.notifiedAt = emailErrors.length === 0 ? new Date() : null;
+      requestDoc.notificationError = emailErrors.join(" | ");
+      await requestDoc.save();
+    } catch (error) {
+      console.error("Consultation notification status save error:", error);
+    }
+  });
+};
+
 export const submitConsultationRequest = async (req, res) => {
   try {
     const name = sanitize(req.body?.name);
@@ -52,8 +173,9 @@ export const submitConsultationRequest = async (req, res) => {
     const whatsapp = sanitize(req.body?.whatsapp);
     const contactMethod = sanitize(req.body?.contactMethod);
     const country = sanitize(req.body?.country);
-    const preferredDate = sanitize(req.body?.preferredDate);
-    const preferredTime = sanitize(req.body?.preferredTime);
+    const preferredDate = sanitize(req.body?.preferredDate || req.body?.date);
+    const preferredTime = sanitize(req.body?.preferredTime || req.body?.time);
+    const timeZone = sanitize(req.body?.timeZone);
     const service = sanitize(req.body?.service);
     const queryDetails = sanitize(req.body?.queryDetails);
     const source = sanitize(req.body?.source) || "Website Consultation Form";
@@ -61,7 +183,7 @@ export const submitConsultationRequest = async (req, res) => {
 
     const date = preferredDate || "To be confirmed";
     const time = preferredTime || "To be confirmed";
-    const timezone = "Asia/Kolkata";
+    const timezone = timeZone || "Asia/Kolkata";
     const notes = queryDetails;
 
     if (!name || !email || !phone || !country || !service || !queryDetails) {
@@ -91,8 +213,12 @@ export const submitConsultationRequest = async (req, res) => {
       name,
       email,
       phone,
+      whatsapp,
+      contactMethod,
       country,
       service,
+      preferredDate,
+      preferredTime,
       taxQuery: queryDetails,
       notificationRecipient: adminEmail,
     });
@@ -104,8 +230,11 @@ export const submitConsultationRequest = async (req, res) => {
       whatsapp: whatsapp || "",
       contactMethod: contactMethod || "",
       country: country || "",
+      date: preferredDate || "",
+      time: preferredTime || "",
       preferredDate: preferredDate || "",
       preferredTime: preferredTime || "",
+      timeZone: timeZone || "",
       service: service || "",
       queryDetails: queryDetails || "",
       source,
@@ -115,27 +244,7 @@ export const submitConsultationRequest = async (req, res) => {
     let webhookResult = null;
 
     try {
-      console.info(
-        `[consultation] Forwarding submission to webhook: ${CONSULTATION_WEBHOOK_URL}`
-      );
-
-      const webhookResponse = await fetch(CONSULTATION_WEBHOOK_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-        },
-        body: JSON.stringify(webhookPayload),
-      });
-
-      webhookResult = await parseWebhookResponse(webhookResponse);
-
-      if (!webhookResponse.ok) {
-        throw new Error(
-          webhookResult?.message ||
-            `Consultation webhook failed with status ${webhookResponse.status}`
-        );
-      }
+      webhookResult = await forwardConsultationToWebhook(webhookPayload);
     } catch (error) {
       console.error("Consultation webhook proxy error:", error);
       requestDoc.notificationStatus = "failed";
@@ -151,70 +260,23 @@ export const submitConsultationRequest = async (req, res) => {
     }
 
     const bookingId = String(requestDoc._id);
-    const emailErrors = [];
-    let confirmationSent = false;
-    let adminNotified = false;
 
-    try {
-      await sendEmail({
-        to: email,
-        subject: "CPA Consultation Booking Confirmed",
-        html: `
-          <h2>Hello ${name},</h2>
-          <p>Your CPA consultation has been successfully booked.</p>
-          <p><strong>Booking ID:</strong> ${bookingId}</p>
-          <p><strong>Date:</strong> ${date}</p>
-          <p><strong>Time:</strong> ${time}</p>
-          <p><strong>Timezone:</strong> ${timezone}</p>
-          <p>We will contact you shortly.</p>
-          <br/>
-          <p>Regards,<br/>NRITAX Team</p>
-        `,
-      });
-      confirmationSent = true;
-    } catch (error) {
-      const message = String(error?.message || error || "unknown");
-      console.error("Consultation confirmation email error:", message);
-      emailErrors.push(`confirmation:${message}`);
-    }
-
-    try {
-      await sendEmail({
-        to: adminEmail,
-        subject: "New CPA Consultation Booking",
-        html: `
-          <h3>New Booking Details</h3>
-          <p><strong>Booking ID:</strong> ${bookingId}</p>
-          <p><strong>Name:</strong> ${name}</p>
-          <p><strong>Email:</strong> ${email}</p>
-          <p><strong>Phone:</strong> ${phone}</p>
-          <p><strong>WhatsApp:</strong> ${whatsapp || "Not provided"}</p>
-          <p><strong>Preferred Contact Method:</strong> ${contactMethod || "Not provided"}</p>
-          <p><strong>Date:</strong> ${date}</p>
-          <p><strong>Time:</strong> ${time}</p>
-          <p><strong>Timezone:</strong> ${timezone}</p>
-          <p><strong>Country:</strong> ${country}</p>
-          <p><strong>Service:</strong> ${service}</p>
-          <p><strong>Notes:</strong> ${notes}</p>
-        `,
-      });
-      adminNotified = true;
-    } catch (error) {
-      const message = String(error?.message || error || "unknown");
-      console.error("Consultation admin email error:", message);
-      emailErrors.push(`admin:${message}`);
-    }
-
-    if (emailErrors.length === 0) {
-      requestDoc.notificationStatus = "sent";
-      requestDoc.notifiedAt = new Date();
-      requestDoc.notificationError = "";
-    } else {
-      requestDoc.notificationStatus = "failed";
-      requestDoc.notificationError = emailErrors.join(" | ");
-    }
-
-    await requestDoc.save();
+    queueConsultationEmails({
+      requestDoc,
+      bookingId,
+      adminEmail,
+      customerEmail: email,
+      name,
+      phone,
+      whatsapp,
+      contactMethod,
+      date,
+      time,
+      timezone,
+      country,
+      service,
+      notes,
+    });
 
     return res.status(200).json({
       success: true,
@@ -222,13 +284,8 @@ export const submitConsultationRequest = async (req, res) => {
         webhookResult?.message || "Consultation request submitted successfully.",
       requestId: requestDoc._id,
       email: {
-        confirmationSent,
-        adminNotified,
+        queued: true,
       },
-      warning:
-        emailErrors.length > 0
-          ? "Booking saved, but one or more emails could not be delivered. Our team will still contact you shortly."
-          : undefined,
     });
   } catch (error) {
     return res.status(500).json({

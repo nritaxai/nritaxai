@@ -1,9 +1,26 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { AuthGateCard } from "../components/AuthGateCard";
 import { CPAContact } from "../components/CPAContact";
+import { getStoredAuthToken } from "../../utils/api";
 
-export function Consult() {
+interface ConsultProps {
+  onRequireLogin: () => void;
+}
+
+export function Consult({ onRequireLogin }: ConsultProps) {
   const navigate = useNavigate();
+  const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
+
+  if (!isAuthenticated) {
+    return (
+      <AuthGateCard
+        title="Login to consult a CPA"
+        description="Please sign in to book a consultation and connect with our certified tax experts."
+        onRequireLogin={onRequireLogin}
+      />
+    );
+  }
 
   return (
     <div className="py-10">
