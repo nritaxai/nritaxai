@@ -750,7 +750,18 @@ export function Chat({ onRequireLogin }: ChatProps) {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <Card className="flex h-[78dvh] min-h-[460px] max-h-[820px] flex-col rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82">
-              <CardHeader className="flex-shrink-0">
+              <CardHeader
+                className="flex-shrink-0 cursor-pointer"
+                onClick={handleOpenPopup}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleOpenPopup();
+                  }
+                }}
+              >
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <div className="rounded-lg border border-[#CBD5E1] bg-[#E2E8F0] p-2">
@@ -843,13 +854,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
                   <Textarea
                     ref={questionInputRef}
-                    placeholder="Click here to open AI chat"
+                    placeholder="Ask me a question"
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     onKeyDown={handleQuestionKeyDown}
-                    onClick={handleOpenPopup}
-                    onFocus={handleOpenPopup}
-                    readOnly
                     className="min-h-[44px] max-h-32 resize-none border-[#E2E8F0] bg-[#F7FAFC]/90"
                     rows={1}
                   />
@@ -985,9 +993,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-[#0F172A]">AI Tax Chat</p>
-                      <p className="text-xs text-[#475569]">
-                        {isCompactViewport ? "Full-screen view on smaller screens." : "Drag to move. Resize from edges and corners."}
-                      </p>
                     </div>
                     <button
                       type="button"
