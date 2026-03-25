@@ -55,9 +55,10 @@ const ensureVisibleReply = (text: string) => {
 
 interface AIChatProps {
   onRequireLogin: () => void;
+  minimal?: boolean;
 }
 
-export function AIChat({ onRequireLogin }: AIChatProps) {
+export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   const navigate = useNavigate();
   const [question, setQuestion] = useState("");
   const [language, setLanguage] = useState("english");
@@ -403,8 +404,15 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
   ];
 
   return (
-    <div className="w-full max-w-5xl mx-auto">
-      <Card className="glass-panel mt-3 w-full h-[78dvh] max-h-[760px] flex flex-col border border-[#E2E8F0] shadow-xl overflow-hidden">
+    <div className={`mx-auto w-full ${minimal ? "h-full max-w-none" : "max-w-5xl"}`}>
+      <Card
+        className={`glass-panel flex w-full flex-col overflow-hidden ${
+          minimal
+            ? "h-full rounded-none border-0 shadow-none"
+            : "mt-3 h-[78dvh] max-h-[760px] border border-[#E2E8F0] shadow-xl"
+        }`}
+      >
+        {!minimal ? (
         <CardHeader className="flex-shrink-0 border-b border-[#E2E8F0]/80 bg-[linear-gradient(135deg,rgba(255,245,252,0.88),rgba(236,246,255,0.86))] backdrop-blur-md p-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
@@ -504,6 +512,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
           </div>
           )}
         </CardHeader>
+        ) : null}
 
         {!isAuthenticated ? (
           <CardContent className="flex-1 py-10 px-6 text-center bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)]">
@@ -520,7 +529,11 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
         <>
         <CardContent
           ref={chatContentRef}
-          className="flex-1 overflow-y-auto space-y-4 p-4 bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)]"
+          className={`flex-1 overflow-y-auto space-y-4 p-4 ${
+            minimal
+              ? "bg-white"
+              : "bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)]"
+          }`}
         >
           {messages.map((message, index) => (
             <div
@@ -628,13 +641,13 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
             )}
           </form>
         </CardFooter>
-        {isListening && (
+        {isListening && !minimal && (
           <p className="px-4 pb-4 text-xs text-red-600">Listening... tap mic again to stop.</p>
         )}
         </>
         )}
       </Card>
-      {isAuthenticated && !hasActivePaidSubscription && (
+      {!minimal && isAuthenticated && !hasActivePaidSubscription && (
         <div className="mt-2 w-full rounded-lg border border-[#2563eb]/40 bg-[#2563eb]/12 p-3 text-xs text-[#0F172A]">
           Need expert support?{" "}
           <button type="button" onClick={() => navigate("/pricing")} className="font-semibold underline underline-offset-2">
@@ -642,6 +655,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
           </button>
         </div>
       )}
+      {!minimal ? (
       <div className="mt-2 w-full bg-[#F7FAFC] border border-[#E2E8F0] rounded-lg p-3 text-xs text-[#0F172A] leading-relaxed">
           <div className="flex items-center gap-2 mb-3">
             <Shield className="size-4 text-[#0F172A]" />
@@ -659,6 +673,7 @@ export function AIChat({ onRequireLogin }: AIChatProps) {
             Please do not share sensitive information such as passwords, financial details, or identification numbers.
           </p>
         </div>
+      ) : null}
     </div>
   );
 }

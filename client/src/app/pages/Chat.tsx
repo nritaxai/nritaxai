@@ -10,12 +10,21 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square } from "lucide-react";
+import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square, X } from "lucide-react";
 import { buildApiUrl, clearStoredAuth, getStoredAuthToken, getSubscriptionStatus } from "../../utils/api";
 
 interface ChatProps {
   onRequireLogin: () => void;
 }
+
+type PopupBounds = {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+};
+
+type ResizeDirection = "left" | "right" | "bottom" | "bottom-left" | "bottom-right" | null;
 
 const GUEST_SESSION_STORAGE_KEY = "nritax_guest_chat_session";
 const CHAT_GUEST_HEADER = "x-guest-session-id";
@@ -73,6 +82,53 @@ const ensureVisibleReply = (text: string) => {
   return cleaned || "No reply was returned. Please try again.";
 };
 
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+
+const getDefaultPopupBounds = (): PopupBounds => {
+  if (typeof window === "undefined") {
+    return { width: 920, height: 680, x: 24, y: 24 };
+  }
+
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+  const width = clamp(Math.min(960, viewportWidth - 40), 420, Math.max(420, viewportWidth - 24));
+  const height = clamp(Math.min(720, viewportHeight - 40), 360, Math.max(360, viewportHeight - 24));
+
+  return {
+    width,
+    height,
+    x: Math.max(12, Math.round((viewportWidth - width) / 2)),
+    y: Math.max(12, Math.round((viewportHeight - height) / 2)),
+  };
+};
+
+const getClampedPopupBounds = (bounds: PopupBounds): PopupBounds => {
+  if (typeof window === "undefined") return bounds;
+
+  const width = clamp(bounds.width, 420, Math.max(420, window.innerWidth - 16));
+  const height = clamp(bounds.height, 360, Math.max(360, window.innerHeight - 16));
+
+  return {
+    width,
+    height,
+    x: clamp(bounds.x, 8, Math.max(8, window.innerWidth - width - 8)),
+    y: clamp(bounds.y, 8, Math.max(8, window.innerHeight - height - 8)),
+  };
+};
+
+const getViewportPopupBounds = (): PopupBounds => {
+  if (typeof window === "undefined") {
+    return { width: 920, height: 680, x: 24, y: 24 };
+  }
+
+  return {
+    width: Math.max(320, window.innerWidth - 24),
+    height: Math.max(320, window.innerHeight - 24),
+    x: 12,
+    y: 12,
+  };
+};
+
 const fallbackReplyByLanguage: Record<string, string> = {
   english:
     "### Answer\nI am temporarily unable to access live AI services.\n\n### Key Tax Points\n- Your chat request was received.\n- You can still proceed with general NRI tax planning steps.\n- For urgent cases, consult a CPA.\n\n### Next Steps\n- Re-try your question in 1-2 minutes.\n- If it persists, use CPA Consultation.\n\n### Follow-up Questions\n- Which NRI tax topic should we prioritize?\n- Do you want a checklist for DTAA documents?",
@@ -117,6 +173,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const [speechSupported, setSpeechSupported] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [isPopupOpen, setIsPopupOpen] = useState(false);
+  const [popupBounds, setPopupBounds] = useState<PopupBounds>(getDefaultPopupBounds);
+  const [isPopupExpanded, setIsPopupExpanded] = useState(false);
+  const [resizeDirection, setResizeDirection] = useState<ResizeDirection>(null);
+  const [isCompactViewport, setIsCompactViewport] = useState(
+    typeof window === "undefined" ? false : window.innerWidth < 1024
+  );
   const chatContentRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -124,6 +186,14 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const starterMessageHandledRef = useRef(false);
   const activeRequestControllerRef = useRef<AbortController | null>(null);
   const activeRequestIdRef = useRef(0);
+  const popupPanelRef = useRef<HTMLDivElement>(null);
+  const popupDragRef = useRef<{ offsetX: number; offsetY: number } | null>(null);
+  const popupResizeRef = useRef<{
+    direction: Exclude<ResizeDirection, null>;
+    startX: number;
+    startY: number;
+    startBounds: PopupBounds;
+  } | null>(null);
 
   const getWelcomeMessage = () => welcomeByLanguage[language] || welcomeByLanguage.english;
 
@@ -452,7 +522,53 @@ export function Chat({ onRequireLogin }: ChatProps) {
       onRequireLogin();
       return;
     }
+    setPopupBounds(isCompactViewport ? getViewportPopupBounds() : getDefaultPopupBounds());
+    setIsPopupExpanded(false);
+    setResizeDirection(null);
     setIsPopupOpen(true);
+  };
+
+  const handlePopupHeaderPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (isPopupExpanded || isCompactViewport || popupResizeRef.current) return;
+    popupDragRef.current = {
+      offsetX: event.clientX - popupBounds.x,
+      offsetY: event.clientY - popupBounds.y,
+    };
+  };
+
+  const handlePopupExpandToggle = () => {
+    if (typeof window === "undefined" || isCompactViewport) return;
+
+    if (isPopupExpanded) {
+      setPopupBounds(getDefaultPopupBounds());
+      setIsPopupExpanded(false);
+      return;
+    }
+
+    setPopupBounds({
+      width: Math.max(420, window.innerWidth - 24),
+      height: Math.max(360, window.innerHeight - 24),
+      x: 12,
+      y: 12,
+    });
+    setIsPopupExpanded(true);
+  };
+
+  const handleResizePointerDown = (
+    direction: Exclude<ResizeDirection, null>,
+    event: React.PointerEvent<HTMLDivElement>
+  ) => {
+    if (isCompactViewport) return;
+    event.preventDefault();
+    event.stopPropagation();
+    popupResizeRef.current = {
+      direction,
+      startX: event.clientX,
+      startY: event.clientY,
+      startBounds: popupBounds,
+    };
+    setResizeDirection(direction);
+    document.body.style.userSelect = "none";
   };
 
   useEffect(() => {
@@ -469,6 +585,119 @@ export function Chat({ onRequireLogin }: ChatProps) {
     void submitQuestion(starterMessage);
     navigate(location.pathname, { replace: true, state: null });
   }, [location.pathname, location.state, navigate]);
+
+  useEffect(() => {
+    const handlePointerMove = (event: PointerEvent) => {
+      if (popupResizeRef.current) {
+        const { direction, startX, startY, startBounds } = popupResizeRef.current;
+        const deltaX = event.clientX - startX;
+        const deltaY = event.clientY - startY;
+        let nextBounds = { ...startBounds };
+
+        if (direction === "right" || direction === "bottom-right") {
+          nextBounds.width = startBounds.width + deltaX;
+        }
+
+        if (direction === "left" || direction === "bottom-left") {
+          nextBounds.width = startBounds.width - deltaX;
+          nextBounds.x = startBounds.x + deltaX;
+        }
+
+        if (direction === "bottom" || direction === "bottom-left" || direction === "bottom-right") {
+          nextBounds.height = startBounds.height + deltaY;
+        }
+
+        setPopupBounds(getClampedPopupBounds(nextBounds));
+        return;
+      }
+
+      if (!popupDragRef.current || isPopupExpanded) return;
+
+      setPopupBounds((current) => {
+        const nextX = clamp(
+          event.clientX - popupDragRef.current!.offsetX,
+          8,
+          Math.max(8, window.innerWidth - current.width - 8)
+        );
+        const nextY = clamp(
+          event.clientY - popupDragRef.current!.offsetY,
+          8,
+          Math.max(8, window.innerHeight - current.height - 8)
+        );
+        return { ...current, x: nextX, y: nextY };
+      });
+    };
+
+    const handlePointerUp = () => {
+      popupDragRef.current = null;
+      popupResizeRef.current = null;
+      setResizeDirection(null);
+      document.body.style.userSelect = "";
+    };
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [isPopupExpanded]);
+
+  useEffect(() => {
+    if (!isPopupOpen || !popupPanelRef.current || isPopupExpanded) return;
+
+    const panel = popupPanelRef.current;
+    const observer = new ResizeObserver(() => {
+      const nextWidth = panel.offsetWidth;
+      const nextHeight = panel.offsetHeight;
+      setPopupBounds((current) => {
+        if (current.width === nextWidth && current.height === nextHeight) return current;
+        return {
+          ...current,
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
+    });
+
+    observer.observe(panel);
+    return () => observer.disconnect();
+  }, [isPopupOpen, isPopupExpanded]);
+
+  useEffect(() => {
+    if (!isPopupOpen) {
+      popupResizeRef.current = null;
+      popupDragRef.current = null;
+      setResizeDirection(null);
+      document.body.style.userSelect = "";
+    }
+  }, [isPopupOpen]);
+
+  useEffect(() => {
+    const handleWindowResize = () => {
+      if (typeof window === "undefined") return;
+      const compact = window.innerWidth < 1024;
+      setIsCompactViewport(compact);
+
+      setPopupBounds((current) => {
+        if (compact) {
+          return getViewportPopupBounds();
+        }
+
+        if (isPopupExpanded) {
+          return getViewportPopupBounds();
+        }
+
+        return getClampedPopupBounds(current);
+      });
+    };
+
+    handleWindowResize();
+    window.addEventListener("resize", handleWindowResize);
+    return () => {
+      window.removeEventListener("resize", handleWindowResize);
+    };
+  }, [isPopupExpanded]);
 
   if (!isAuthenticated) {
     return (
@@ -730,10 +959,75 @@ export function Chat({ onRequireLogin }: ChatProps) {
         </div>
 
         <Dialog open={isPopupOpen} onOpenChange={setIsPopupOpen}>
-          <DialogContent className="max-h-[94vh] max-w-[min(1200px,96vw)] overflow-hidden border border-[#E2E8F0] bg-white p-0 shadow-2xl">
+          <DialogContent
+            className="left-0 top-0 max-w-none translate-x-0 translate-y-0 border-0 bg-transparent p-0 shadow-none duration-0 [&>button]:hidden"
+            style={{
+              width: popupBounds.width,
+              height: popupBounds.height,
+              left: popupBounds.x,
+              top: popupBounds.y,
+            }}
+          >
             <DialogTitle className="sr-only">AI Chat Popup</DialogTitle>
-            <div className="max-h-[94vh] overflow-auto rounded-2xl bg-white p-2">
-              <AIChat onRequireLogin={onRequireLogin} />
+            <div
+              ref={popupPanelRef}
+              className={`flex h-full overflow-hidden rounded-2xl border border-[#CBD5E1] bg-white shadow-2xl ${
+                resizeDirection ? "select-none" : ""
+              } ${isCompactViewport ? "rounded-none" : ""}`}
+            >
+              <div className="flex h-full w-full flex-col overflow-hidden">
+                <div
+                  className="cursor-move border-b border-[#E2E8F0] bg-[#F7FAFC] px-4 py-3 select-none"
+                  onPointerDown={handlePopupHeaderPointerDown}
+                  onDoubleClick={isCompactViewport ? undefined : handlePopupExpandToggle}
+                  title="Drag to move. Double-click to expand or restore."
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#0F172A]">AI Tax Chat</p>
+                      <p className="text-xs text-[#475569]">
+                        {isCompactViewport ? "Full-screen view on smaller screens." : "Drag to move. Resize from edges and corners."}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsPopupOpen(false)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full border border-[#CBD5E1] bg-white text-[#0F172A] shadow-sm transition hover:bg-[#F8FAFC]"
+                      aria-label="Close AI chat popup"
+                      title="Close"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </div>
+                <div className="min-h-0 flex-1">
+                  <AIChat onRequireLogin={onRequireLogin} minimal />
+                </div>
+              </div>
+              {!isCompactViewport ? (
+                <>
+                  <div
+                    className="absolute bottom-3 left-0 top-3 z-20 w-2 cursor-ew-resize"
+                    onPointerDown={(event) => handleResizePointerDown("left", event)}
+                  />
+                  <div
+                    className="absolute bottom-3 right-0 top-3 z-20 w-2 cursor-ew-resize"
+                    onPointerDown={(event) => handleResizePointerDown("right", event)}
+                  />
+                  <div
+                    className="absolute bottom-0 left-3 right-3 z-20 h-2 cursor-ns-resize"
+                    onPointerDown={(event) => handleResizePointerDown("bottom", event)}
+                  />
+                  <div
+                    className="absolute bottom-0 left-0 z-20 h-4 w-4 cursor-nesw-resize"
+                    onPointerDown={(event) => handleResizePointerDown("bottom-left", event)}
+                  />
+                  <div
+                    className="absolute bottom-0 right-0 z-20 h-4 w-4 cursor-nwse-resize"
+                    onPointerDown={(event) => handleResizePointerDown("bottom-right", event)}
+                  />
+                </>
+              ) : null}
             </div>
           </DialogContent>
         </Dialog>
