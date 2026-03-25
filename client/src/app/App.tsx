@@ -142,15 +142,18 @@ export default function App() {
 
   useEffect(() => {
     if (location.pathname !== "/home") return;
-    const message = sessionStorage.getItem("subscription_popup");
+    const message =
+      sessionStorage.getItem("auth_popup") ||
+      sessionStorage.getItem("subscription_popup");
     if (!message) return;
 
     setSuccessPopup(message);
+    sessionStorage.removeItem("auth_popup");
     sessionStorage.removeItem("subscription_popup");
 
     const timeout = window.setTimeout(() => {
       setSuccessPopup(null);
-    }, 2200);
+    }, 2000);
 
     return () => window.clearTimeout(timeout);
   }, [location.pathname]);
@@ -176,10 +179,9 @@ export default function App() {
     const authMode = params.get("auth_mode") === "signup" ? "signup" : "login";
 
     if (authError) {
-      setSuccessPopup(decodeURIComponent(authError));
-      const timeout = window.setTimeout(() => setSuccessPopup(null), 2600);
+      sessionStorage.setItem("auth_popup", decodeURIComponent(authError));
       navigate("/home", { replace: true });
-      return () => window.clearTimeout(timeout);
+      return;
     }
 
     if (!token || !encodedUser) {
@@ -194,19 +196,18 @@ export default function App() {
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("auth-changed"));
       setIsAuthenticated(true);
-      setSuccessPopup(
+      sessionStorage.setItem(
+        "auth_popup",
         authMode === "signup"
           ? `Account created successfully! WELCOME ${user?.name || "User"}`
           : `WELCOME ${user?.name || "User"}!`
       );
     } catch (error) {
       console.error("[linkedin-auth] failed to hydrate auth result", error);
-      setSuccessPopup("LinkedIn authentication failed");
+      sessionStorage.setItem("auth_popup", "LinkedIn authentication failed");
     }
 
-    const timeout = window.setTimeout(() => setSuccessPopup(null), 2600);
     navigate("/home", { replace: true });
-    return () => window.clearTimeout(timeout);
   }, [location.search, navigate]);
 
   useLayoutEffect(() => {
