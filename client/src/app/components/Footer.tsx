@@ -1,5 +1,5 @@
 ﻿import { Link } from "react-router-dom";
-import { AlertTriangle, Lock, Mail, Shield } from "lucide-react";
+import { AlertTriangle, Lock, Shield } from "lucide-react";
 
 import { renderTextWithShortForms } from "../utils/shortForms";
 
@@ -20,7 +20,7 @@ export function Footer() {
   return (
     <footer className="mt-auto bg-slate-900 text-slate-200">
       <div className="mx-auto max-w-6xl px-4 py-16 md:px-6">
-        <div className="mb-12 grid grid-cols-1 gap-8 md:grid-cols-4">
+        <div className="mb-12 grid grid-cols-1 gap-8 md:grid-cols-3">
           <div>
             <div className="mb-4 flex items-center">
               <img
@@ -67,24 +67,6 @@ export function Footer() {
                   </Link>
                 </li>
               ))}
-            </ul>
-          </div>
-
-          <div>
-            <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-white">Contact</h3>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <a href="mailto:ask@nritax.ai" className="flex items-center gap-2 text-slate-400 transition-colors hover:text-white">
-                  <Mail className="size-4" />
-                  ask@nritax.ai
-                </a>
-              </li>
-              <li>
-                <a href="https://wa.me/62" className="text-slate-400 transition-colors hover:text-white">
-                  WhatsApp: +62-xxx-xxxx-xxxx
-                </a>
-              </li>
-              <li className="text-slate-400">Jakarta, Indonesia</li>
             </ul>
           </div>
         </div>
