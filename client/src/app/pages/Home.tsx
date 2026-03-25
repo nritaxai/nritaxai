@@ -128,7 +128,7 @@ export function Home({ onRequireLogin }: HomeProps) {
           <div className="mb-12 text-center">
             {userName ? (
               <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-blue-700">
-                WELCOME {renderTextWithShortForms(userName)}
+                WELCOME! {renderTextWithShortForms(userName)}
               </p>
             ) : null}
             <span className="reveal-drop rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{renderTextWithShortForms(heroContent.badge)}</span>

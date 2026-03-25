@@ -272,7 +272,7 @@ export function Header({ onLogin }: HeaderProps) {
                     title="Open profile"
                   >
                     {renderUserAvatar("h-11 w-11", "size-5")}
-                    <span>WELCOME {user.name}</span>
+                    <span>WELCOME! {user.name}</span>
                   </Link>
                   <Button
                     variant="outline"

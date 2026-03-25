@@ -199,7 +199,7 @@ export default function App() {
       sessionStorage.setItem(
         "auth_popup",
         authMode === "signup"
-          ? `Account created successfully! WELCOME ${user?.name || "User"}`
+          ? `Account created successfully! WELCOME ${user?.name || "User"}!`
           : `WELCOME ${user?.name || "User"}!`
       );
     } catch (error) {
