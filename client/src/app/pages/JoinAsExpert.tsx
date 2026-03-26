@@ -1,6 +1,6 @@
-import { type FormEvent, useEffect, useState } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Paperclip, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -64,11 +64,13 @@ const isValidMobileNumber = (value: string) => {
 
 export function JoinAsExpert() {
   const navigate = useNavigate();
+  const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const [formData, setFormData] = useState<ExpertFormData>(INITIAL_FORM_DATA);
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [uploadedResume, setUploadedResume] = useState<{ name: string; dataUrl: string } | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -123,6 +125,48 @@ export function JoinAsExpert() {
     if (errorMessage) setErrorMessage("");
   };
 
+  const handleResumeFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const isAllowedType =
+      [
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ].includes(file.type) || /\.(pdf|doc|docx)$/i.test(file.name);
+
+    if (!isAllowedType) {
+      setUploadedResume(null);
+      setErrorMessage("Please upload resume files in PDF, DOC, or DOCX format.");
+      return;
+    }
+
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = () => reject(new Error("Unable to read the selected resume file."));
+        reader.readAsDataURL(file);
+      });
+
+      setUploadedResume({ name: file.name, dataUrl });
+      setFieldValue("resumeLink", "");
+    } catch (error: any) {
+      setUploadedResume(null);
+      setErrorMessage(error?.message || "Unable to read the selected resume file.");
+    } finally {
+      event.target.value = "";
+    }
+  };
+
+  const clearUploadedResume = () => {
+    setUploadedResume(null);
+    if (resumeInputRef.current) {
+      resumeInputRef.current.value = "";
+    }
+  };
+
   const validateForm = () => {
     const nextErrors: Partial<Record<FieldKey, string>> = {};
 
@@ -165,7 +209,7 @@ export function JoinAsExpert() {
         servicesOffered: trimValue(formData.servicesOffered),
         linkedinOrWebsite: trimValue(formData.linkedinOrWebsite),
         shortBio: trimValue(formData.shortBio),
-        resumeLink: trimValue(formData.resumeLink),
+        resumeLink: uploadedResume?.dataUrl || trimValue(formData.resumeLink),
       };
 
       const response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
@@ -188,6 +232,7 @@ export function JoinAsExpert() {
         ...INITIAL_FORM_DATA,
         country: detectUserCountry(),
       });
+      setUploadedResume(null);
     } catch (error: any) {
       setErrorMessage(error?.message || "Unable to submit expert registration right now.");
     } finally {
@@ -400,8 +445,46 @@ export function JoinAsExpert() {
                     id="resumeLink"
                     value={formData.resumeLink}
                     onChange={(e) => setFieldValue("resumeLink", e.target.value)}
+                    disabled={Boolean(uploadedResume)}
                     placeholder="Link to resume or portfolio"
                   />
+                  <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-[#0F172A]">Upload resume from desktop</p>
+                        <p className="text-xs text-[#0F172A]/70">Accepted formats: PDF, DOC, DOCX</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="gap-2"
+                        onClick={() => resumeInputRef.current?.click()}
+                      >
+                        <Paperclip className="size-4" />
+                        Choose File
+                      </Button>
+                    </div>
+                    <input
+                      ref={resumeInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                      className="hidden"
+                      onChange={handleResumeFileChange}
+                    />
+                    {uploadedResume ? (
+                      <div className="mt-3 flex items-center justify-between rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm text-[#1D4ED8]">
+                        <span className="truncate pr-3">{uploadedResume.name}</span>
+                        <button
+                          type="button"
+                          onClick={clearUploadedResume}
+                          className="inline-flex items-center gap-1 text-xs font-medium hover:underline"
+                        >
+                          <X className="size-3.5" />
+                          Remove
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
