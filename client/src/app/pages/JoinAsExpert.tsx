@@ -194,7 +194,7 @@ export function JoinAsExpert() {
 
         <div className="mb-8 max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#2563eb]">Expert Onboarding</p>
-          <h1 className="mt-2 text-3xl text-[#0F172A] sm:text-4xl">Join as an Expert</h1>
+          <h1 className="mt-2 text-3xl text-[#0F172A] sm:text-4xl">Join Our Expert Team</h1>
           <p className="mt-3 text-base leading-7 text-[#0F172A]">
             Join NRITAX as a Chartered Accountant or expert and help NRI users with tax and compliance services.
           </p>
