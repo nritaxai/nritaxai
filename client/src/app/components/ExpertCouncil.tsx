@@ -1,4 +1,5 @@
-import { Linkedin } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { ArrowRight, Linkedin } from "lucide-react";
 
 interface Expert {
   id: string;
@@ -55,6 +56,8 @@ const expertTeam: Expert[] = [
 ];
 
 export function ExpertCouncil() {
+  const navigate = useNavigate();
+
   return (
     <section className="bg-gray-50 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
@@ -84,6 +87,23 @@ export function ExpertCouncil() {
               </a>
             </div>
           ))}
+        </div>
+
+        <div className="mt-10 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-sm md:p-8">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700">Join Our Team</p>
+          <h3 className="mt-3 text-2xl font-bold text-slate-900">Join as an Expert</h3>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+            Are you a Chartered Accountant or cross-border tax specialist? Apply to support NRI users with tax,
+            compliance, and advisory services.
+          </p>
+          <button
+            type="button"
+            onClick={() => navigate("/join-as-expert")}
+            className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
+          >
+            Join as an Expert
+            <ArrowRight className="size-4" />
+          </button>
         </div>
       </div>
     </section>

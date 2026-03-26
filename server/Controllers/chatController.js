@@ -22,7 +22,7 @@ const client = new OpenAI({
   },
 });
 
-const MAX_CONTEXT_MESSAGES = Number(process.env.CHAT_CONTEXT_MESSAGES || 2);
+const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 12), 8);
 const MAX_STORED_MESSAGES = 100;
 const chatSessionMemory = new Map();
 const chatSessionStore = new Map();
@@ -378,8 +378,22 @@ const ensureStructuredSections = (text = "", language = "english") => {
   return repairStructuredSections(out, language);
 };
 
-const getResponseCacheKey = ({ userId = "", language = "", knowledgeSource = "", message = "" }) =>
-  `${String(userId)}|${String(language)}|${String(knowledgeSource)}|${String(message).trim().toLowerCase()}`;
+const buildContextFingerprint = (messages = []) =>
+  normalizeStoredMessages(messages)
+    .slice(-6)
+    .map((msg) => `${msg.role}:${String(msg.content || "").trim().toLowerCase().replace(/\s+/g, " ").slice(0, 180)}`)
+    .join("|");
+
+const getResponseCacheKey = ({
+  userId = "",
+  language = "",
+  knowledgeSource = "",
+  message = "",
+  contextFingerprint = "",
+}) =>
+  `${String(userId)}|${String(language)}|${String(knowledgeSource)}|${String(contextFingerprint)}|${String(message)
+    .trim()
+    .toLowerCase()}`;
 
 const getCachedResponse = (cacheKey) => {
   const row = responseCache.get(cacheKey);
@@ -902,6 +916,9 @@ const mergeSessionMessages = (persistedMessages = [], memoryMessages = []) => {
 const toAssistantMessages = (messages = []) =>
   messages.map((msg) => ({ role: toAssistantRole(msg.role), content: msg.content }));
 
+const buildContextualMessages = (sessionMessages = [], message = "") =>
+  [...toAssistantMessages(sessionMessages), { role: "user", content: message }].slice(-MAX_CONTEXT_MESSAGES);
+
 const syncSessionStores = async ({
   userId,
   language,
@@ -1165,6 +1182,7 @@ export const chatWithAI = async (req, res) => {
       language: rawLanguage,
       knowledgeSource,
       message,
+      contextFingerprint: buildContextFingerprint(sessionMessages),
     });
     const repeatedReply = getInstantRepeatReply(sessionMessages, message);
     if (repeatedReply) {
@@ -1203,10 +1221,7 @@ export const chatWithAI = async (req, res) => {
         ? matches.map((match) => `${match.text}`).join("\n\n")
         : "";
 
-      const priorSessionMessages = toAssistantMessages(sessionMessages);
-      const contextualMessages = [...priorSessionMessages, { role: "user", content: message }].slice(
-        -MAX_CONTEXT_MESSAGES
-      );
+      const contextualMessages = buildContextualMessages(sessionMessages, message);
       const dtaaReplyRaw = await generateGeneralTaxReply({
         model,
         selectedLanguage,
@@ -1233,10 +1248,7 @@ export const chatWithAI = async (req, res) => {
       });
     }
 
-    const priorSessionMessages = toAssistantMessages(sessionMessages);
-    const contextualMessages = [...priorSessionMessages, { role: "user", content: message }].slice(
-      -MAX_CONTEXT_MESSAGES
-    );
+    const contextualMessages = buildContextualMessages(sessionMessages, message);
 
     const reply = await generateGeneralTaxReply({
       model,

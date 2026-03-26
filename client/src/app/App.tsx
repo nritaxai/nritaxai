@@ -21,6 +21,7 @@ const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login
 const Profile = lazy(() => import("./pages/Profile").then((m) => ({ default: m.Profile })));
 const CheckoutPage = lazy(() => import("./pages/CheckoutPage"));
 const Consult = lazy(() => import("./pages/Consult").then((m) => ({ default: m.Consult })));
+const JoinAsExpert = lazy(() => import("./pages/JoinAsExpert"));
 const Reschedule = lazy(() => import("./pages/Reschedule").then((m) => ({ default: m.Reschedule })));
 const Cancel = lazy(() => import("./pages/Cancel").then((m) => ({ default: m.Cancel })));
 const Builder = lazy(() => import("./pages/Builder").then((m) => ({ default: m.Builder })));
@@ -365,6 +366,7 @@ export default function App() {
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
             <Route path="/consult" element={withPageScaffold(<Consult onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/join-as-expert" element={withPageScaffold(<JoinAsExpert />)} />
             <Route path="/reschedule" element={withPageScaffold(<Reschedule />)} />
             <Route path="/cancel" element={withPageScaffold(<Cancel />)} />
             <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
