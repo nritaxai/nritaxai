@@ -52,11 +52,14 @@ const INITIAL_FORM_DATA: ExpertFormData = {
   resumeLink: "",
 };
 
+const toTitleCase = (value: string) =>
+  trimValue(value)
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+
 const isValidMobileNumber = (value: string) => {
-  const trimmed = trimValue(value);
-  if (!/^[+\d\s()-]+$/.test(trimmed)) return false;
-  const digits = trimmed.replace(/\D/g, "");
-  return digits.length >= 8 && digits.length <= 15;
+  const digits = trimValue(value).replace(/\D/g, "");
+  return digits.length === 10;
 };
 
 export function JoinAsExpert() {
@@ -96,7 +99,19 @@ export function JoinAsExpert() {
   }, []);
 
   const setFieldValue = (key: keyof ExpertFormData, value: string) => {
-    setFormData((prev) => ({ ...prev, [key]: value }));
+    let nextValue = value;
+
+    if (key === "mobileNumber") {
+      nextValue = value.replace(/\D/g, "").slice(0, 10);
+    }
+    if (key === "profession" || key === "areaOfExpertise") {
+      nextValue = value.toUpperCase();
+    }
+    if (key === "city" || key === "state") {
+      nextValue = toTitleCase(value);
+    }
+
+    setFormData((prev) => ({ ...prev, [key]: nextValue }));
     if (key in fieldErrors) {
       setFieldErrors((prev) => {
         const next = { ...prev };
@@ -113,7 +128,7 @@ export function JoinAsExpert() {
 
     if (!trimValue(formData.fullName)) nextErrors.fullName = "Full name is required.";
     if (!isValidMobileNumber(formData.mobileNumber)) {
-      nextErrors.mobileNumber = "Enter a valid mobile number.";
+      nextErrors.mobileNumber = "Enter a valid 10-digit mobile number";
     }
     if (!isValidEmail(formData.email)) nextErrors.email = "Enter a valid email address.";
     if (!trimValue(formData.profession)) nextErrors.profession = "Profession is required.";
@@ -166,7 +181,7 @@ export function JoinAsExpert() {
         throw new Error(result?.message || "Unable to submit expert registration right now.");
       }
 
-      setSuccessMessage(trimValue(result?.message) || "Your expert registration has been submitted successfully.");
+      setSuccessMessage("Application Submitted");
       setErrorMessage("");
       setFieldErrors({});
       setFormData({
@@ -209,9 +224,16 @@ export function JoinAsExpert() {
           </CardHeader>
           <CardContent>
             {successMessage ? (
-              <div className="mb-6 flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-800">
+                <div className="flex items-start gap-3">
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
-                <p>{successMessage}</p>
+                  <div>
+                    <p className="text-sm font-semibold">{successMessage}</p>
+                    <p className="mt-1 text-sm">
+                      Thank you for applying as an expert. Our team will contact you soon.
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : null}
             {errorMessage ? (
@@ -357,7 +379,7 @@ export function JoinAsExpert() {
                     id="servicesOffered"
                     value={formData.servicesOffered}
                     onChange={(e) => setFieldValue("servicesOffered", e.target.value)}
-                    className="min-h-24"
+                    className="min-h-32"
                     placeholder="Describe the services you can provide to NRI users"
                   />
                 </div>
@@ -394,13 +416,18 @@ export function JoinAsExpert() {
                 </div>
               </div>
 
-              <div className="flex flex-col gap-3 border-t border-[#E2E8F0] pt-5 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-sm text-[#0F172A]">
-                  Your details will be reviewed by our team before onboarding.
+              <div className="border-t border-[#E2E8F0] pt-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <Button type="submit" className="h-11 px-6" disabled={loading}>
+                    {loading ? "Submitting..." : "Submit Application"}
+                  </Button>
+                  <p className="text-sm text-[#0F172A]">
+                    Your details will be reviewed by our team before onboarding.
+                  </p>
+                </div>
+                <p className="mt-3 text-sm text-[#0F172A]/80">
+                  Your information is secure and used only for onboarding purposes.
                 </p>
-                <Button type="submit" className="h-11 px-6" disabled={loading}>
-                  {loading ? "Submitting..." : "Submit Application"}
-                </Button>
               </div>
             </form>
           </CardContent>
