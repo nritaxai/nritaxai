@@ -5,7 +5,8 @@ export const CONSULTATION_WEBHOOKS = {
 } as const;
 
 export const EXPERT_ONBOARDING_WEBHOOK =
-  "https://n8n.caloganathan.com/webhook/expert-onboarding";
+  String(import.meta.env.VITE_EXPERT_ONBOARDING_WEBHOOK || "https://n8n.caloganathan.com/webhook/expert-onboarding")
+    .trim();
 
 export const AVAILABLE_CONSULTATION_TIME_SLOTS = [
   "09:00",
@@ -73,6 +74,18 @@ const padTimePart = (value: number) => `${value}`.padStart(2, "0");
 export const trimValue = (value: unknown) => String(value ?? "").trim();
 
 export const isValidEmail = (value: string) => EMAIL_PATTERN.test(trimValue(value));
+
+export const isValidUrl = (value: string) => {
+  const trimmed = trimValue(value);
+  if (!trimmed) return false;
+
+  try {
+    const parsed = new URL(trimmed);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+};
 
 export const getBrowserTimeZone = () => {
   if (typeof Intl === "undefined" || typeof Intl.DateTimeFormat !== "function") {

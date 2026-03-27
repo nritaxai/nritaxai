@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
-import { EXPERT_ONBOARDING_WEBHOOK, isValidEmail, trimValue } from "../utils/consultationWorkflow";
+import { EXPERT_ONBOARDING_WEBHOOK, isValidEmail, isValidUrl, trimValue } from "../utils/consultationWorkflow";
 
 type ExpertFormData = {
   fullName: string;
@@ -24,7 +24,6 @@ type ExpertFormData = {
   servicesOffered: string;
   linkedinOrWebsite: string;
   shortBio: string;
-  resumeLink: string;
 };
 
 type FieldKey =
@@ -32,7 +31,8 @@ type FieldKey =
   | "mobileNumber"
   | "email"
   | "profession"
-  | "areaOfExpertise";
+  | "areaOfExpertise"
+  | "linkedinOrWebsite";
 
 const INITIAL_FORM_DATA: ExpertFormData = {
   fullName: "",
@@ -49,7 +49,11 @@ const INITIAL_FORM_DATA: ExpertFormData = {
   servicesOffered: "",
   linkedinOrWebsite: "",
   shortBio: "",
-  resumeLink: "",
+};
+
+type ExpertOnboardingResponse = {
+  success?: boolean;
+  message?: string;
 };
 
 const toTitleCase = (value: string) =>
@@ -70,7 +74,7 @@ export function JoinAsExpert() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [uploadedResume, setUploadedResume] = useState<{ name: string; dataUrl: string } | null>(null);
+  const [uploadedResume, setUploadedResume] = useState<File | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -125,7 +129,7 @@ export function JoinAsExpert() {
     if (errorMessage) setErrorMessage("");
   };
 
-  const handleResumeFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const handleResumeFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -139,25 +143,14 @@ export function JoinAsExpert() {
     if (!isAllowedType) {
       setUploadedResume(null);
       setErrorMessage("Please upload resume files in PDF, DOC, or DOCX format.");
+      event.target.value = "";
       return;
     }
 
-    try {
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result || ""));
-        reader.onerror = () => reject(new Error("Unable to read the selected resume file."));
-        reader.readAsDataURL(file);
-      });
-
-      setUploadedResume({ name: file.name, dataUrl });
-      setFieldValue("resumeLink", "");
-    } catch (error: any) {
-      setUploadedResume(null);
-      setErrorMessage(error?.message || "Unable to read the selected resume file.");
-    } finally {
-      event.target.value = "";
-    }
+    setUploadedResume(file);
+    setSuccessMessage("");
+    setErrorMessage("");
+    event.target.value = "";
   };
 
   const clearUploadedResume = () => {
@@ -178,6 +171,9 @@ export function JoinAsExpert() {
     if (!trimValue(formData.profession)) nextErrors.profession = "Profession is required.";
     if (!trimValue(formData.areaOfExpertise)) {
       nextErrors.areaOfExpertise = "Area of expertise is required.";
+    }
+    if (trimValue(formData.linkedinOrWebsite) && !isValidUrl(formData.linkedinOrWebsite)) {
+      nextErrors.linkedinOrWebsite = "Enter a valid URL.";
     }
 
     setFieldErrors(nextErrors);
@@ -209,23 +205,39 @@ export function JoinAsExpert() {
         servicesOffered: trimValue(formData.servicesOffered),
         linkedinOrWebsite: trimValue(formData.linkedinOrWebsite),
         shortBio: trimValue(formData.shortBio),
-        resumeLink: uploadedResume?.dataUrl || trimValue(formData.resumeLink),
       };
+
+      const multipartData = new FormData();
+      multipartData.append("fullName", payload.fullName);
+      multipartData.append("mobileNumber", payload.mobileNumber);
+      multipartData.append("email", payload.email);
+      multipartData.append("profession", payload.profession);
+      multipartData.append("areaOfExpertise", payload.areaOfExpertise);
+      multipartData.append("yearsOfExperience", payload.yearsOfExperience);
+      multipartData.append("qualification", payload.qualification);
+      multipartData.append("firmName", payload.firmName);
+      multipartData.append("country", payload.country);
+      multipartData.append("state", payload.state);
+      multipartData.append("city", payload.city);
+      multipartData.append("servicesOffered", payload.servicesOffered);
+      multipartData.append("linkedinOrWebsite", payload.linkedinOrWebsite);
+      multipartData.append("shortBio", payload.shortBio);
+
+      if (uploadedResume) {
+        multipartData.append("resume", uploadedResume);
+      }
 
       const response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
+        body: multipartData,
       });
 
-      const result = (await response.json().catch(() => null)) as { message?: string } | null;
-      if (!response.ok) {
+      const result = (await response.json().catch(() => null)) as ExpertOnboardingResponse | null;
+      if (!response.ok || result?.success === false) {
         throw new Error(result?.message || "Unable to submit expert registration right now.");
       }
 
-      setSuccessMessage("Application Submitted");
+      setSuccessMessage(result?.message || "Your application has been submitted successfully.");
       setErrorMessage("");
       setFieldErrors({});
       setFormData({
@@ -435,19 +447,16 @@ export function JoinAsExpert() {
                     id="linkedinOrWebsite"
                     value={formData.linkedinOrWebsite}
                     onChange={(e) => setFieldValue("linkedinOrWebsite", e.target.value)}
+                    aria-invalid={fieldErrors.linkedinOrWebsite ? true : undefined}
                     placeholder="LinkedIn or website URL"
                   />
+                  {fieldErrors.linkedinOrWebsite ? (
+                    <p className="text-sm text-red-600">{fieldErrors.linkedinOrWebsite}</p>
+                  ) : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="resumeLink">Resume Link</Label>
-                  <Input
-                    id="resumeLink"
-                    value={formData.resumeLink}
-                    onChange={(e) => setFieldValue("resumeLink", e.target.value)}
-                    disabled={Boolean(uploadedResume)}
-                    placeholder="Link to resume or portfolio"
-                  />
+                  <Label htmlFor="resumeUpload">Resume</Label>
                   <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -465,6 +474,7 @@ export function JoinAsExpert() {
                       </Button>
                     </div>
                     <input
+                      id="resumeUpload"
                       ref={resumeInputRef}
                       type="file"
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
