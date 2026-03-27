@@ -50,7 +50,7 @@ type ExpertOnboardingResponse = {
   message?: string;
 };
 
-export function JoinAsExpert() {
+export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
@@ -113,7 +113,6 @@ export function JoinAsExpert() {
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setResumeFile(file);
-    setSuccessMessage("");
     setShowErrorBanner(false);
   };
 
@@ -195,10 +194,10 @@ export function JoinAsExpert() {
         body: formData,
       });
 
-      const data = (await response.json().catch(() => null)) as ExpertOnboardingResponse | null;
+      const data = (await response.json()) as ExpertOnboardingResponse;
       console.log("Webhook response:", data);
 
-      if (response.ok && data?.success) {
+      if (response.ok && data.success) {
         setSuccessMessage("Your application has been submitted successfully.");
         setValues(initialValues);
         setResumeFile(null);
@@ -507,4 +506,4 @@ export function JoinAsExpert() {
   );
 }
 
-export default JoinAsExpert;
+export default JoinAsExpertPage;
