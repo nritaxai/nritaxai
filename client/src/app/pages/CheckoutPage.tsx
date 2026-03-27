@@ -153,7 +153,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
     storedUser = {};
   }
   const userCountry = String(storedUser?.countryOfResidence || "");
-  const countryCurrency = resolveCurrencyByCountry(userCountry);
+  const effectiveCurrencyCountry = String(billingCountry || userCountry).trim();
+  const countryCurrency = resolveCurrencyByCountry(effectiveCurrencyCountry);
   const displayCurrency =
     currencyOverride === "auto" ? countryCurrency : resolveCurrencyByCode(currencyOverride);
   const isIndiaBilling = isIndiaCountry(billingCountry);
