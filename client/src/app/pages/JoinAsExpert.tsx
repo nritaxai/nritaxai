@@ -50,11 +50,6 @@ type ExpertOnboardingResponse = {
   message?: string;
 };
 
-const toTitleCase = (value: string) =>
-  trimValue(value)
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-
 export function JoinAsExpert() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
@@ -101,12 +96,6 @@ export function JoinAsExpert() {
     if (name === "mobileNumber") {
       nextValue = value.replace(/\D/g, "").slice(0, 10);
     }
-    if (name === "profession" || name === "areaOfExpertise") {
-      nextValue = value.toUpperCase();
-    }
-    if (name === "city" || name === "state") {
-      nextValue = toTitleCase(value);
-    }
 
     setValues((prev) => ({
       ...prev,
@@ -121,31 +110,14 @@ export function JoinAsExpert() {
     setShowErrorBanner(false);
   };
 
-  const handleResumeFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const isAllowedType =
-      [
-        "application/pdf",
-        "application/msword",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      ].includes(file.type) || /\.(pdf|doc|docx)$/i.test(file.name);
-
-    if (!isAllowedType) {
-      setResumeFile(null);
-      setShowErrorBanner(true);
-      event.target.value = "";
-      return;
-    }
-
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
     setResumeFile(file);
     setSuccessMessage("");
     setShowErrorBanner(false);
-    event.target.value = "";
   };
 
-  const clearUploadedResume = () => {
+  const handleRemoveFile = () => {
     setResumeFile(null);
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
@@ -224,6 +196,7 @@ export function JoinAsExpert() {
       });
 
       const data = (await response.json().catch(() => null)) as ExpertOnboardingResponse | null;
+      console.log("Webhook response:", data);
 
       if (response.ok && data?.success) {
         setSuccessMessage("Your application has been submitted successfully.");
@@ -234,7 +207,8 @@ export function JoinAsExpert() {
       } else {
         setShowErrorBanner(true);
       }
-    } catch {
+    } catch (error) {
+      console.error("Submit error:", error);
       setShowErrorBanner(true);
     } finally {
       setLoading(false);
@@ -481,14 +455,14 @@ export function JoinAsExpert() {
                       type="file"
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       className="hidden"
-                      onChange={handleResumeFileChange}
+                      onChange={handleFileChange}
                     />
                     {resumeFile ? (
                       <div className="mt-3 flex items-center justify-between rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm text-[#1D4ED8]">
                         <span className="truncate pr-3">{resumeFile.name}</span>
                         <button
                           type="button"
-                          onClick={clearUploadedResume}
+                          onClick={handleRemoveFile}
                           className="inline-flex items-center gap-1 text-xs font-medium hover:underline"
                         >
                           <X className="size-3.5" />
