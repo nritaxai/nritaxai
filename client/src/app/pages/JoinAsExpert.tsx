@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
-import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkflow";
+import { trimValue } from "../utils/consultationWorkflow";
 
 type ExpertFormData = {
   fullName: string;
@@ -26,15 +26,9 @@ type ExpertFormData = {
   shortBio: string;
 };
 
-type FieldKey =
-  | "fullName"
-  | "mobileNumber"
-  | "email"
-  | "profession"
-  | "areaOfExpertise"
-  | "linkedinOrWebsite";
+type FieldKey = keyof ExpertFormData;
 
-const INITIAL_FORM_DATA: ExpertFormData = {
+const initialValues: ExpertFormData = {
   fullName: "",
   mobileNumber: "",
   email: "",
@@ -64,12 +58,12 @@ const toTitleCase = (value: string) =>
 export function JoinAsExpert() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
-  const [formData, setFormData] = useState<ExpertFormData>(INITIAL_FORM_DATA);
-  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [values, setValues] = useState<ExpertFormData>(initialValues);
+  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [showErrorBanner, setShowErrorBanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [uploadedResume, setUploadedResume] = useState<File | null>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -77,7 +71,7 @@ export function JoinAsExpert() {
     try {
       const rawUser = localStorage.getItem("user");
       if (!rawUser) {
-        setFormData((prev) => ({
+        setValues((prev) => ({
           ...prev,
           country: prev.country || detectUserCountry(),
         }));
@@ -85,43 +79,46 @@ export function JoinAsExpert() {
       }
 
       const parsedUser = JSON.parse(rawUser);
-      setFormData((prev) => ({
+      setValues((prev) => ({
         ...prev,
         fullName: prev.fullName || trimValue(parsedUser?.name),
         email: prev.email || trimValue(parsedUser?.email),
         country: prev.country || trimValue(parsedUser?.countryOfResidence) || detectUserCountry(),
       }));
     } catch {
-      setFormData((prev) => ({
+      setValues((prev) => ({
         ...prev,
         country: prev.country || detectUserCountry(),
       }));
     }
   }, []);
 
-  const setFieldValue = (key: keyof ExpertFormData, value: string) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
     let nextValue = value;
 
-    if (key === "mobileNumber") {
+    if (name === "mobileNumber") {
       nextValue = value.replace(/\D/g, "").slice(0, 10);
     }
-    if (key === "profession" || key === "areaOfExpertise") {
+    if (name === "profession" || name === "areaOfExpertise") {
       nextValue = value.toUpperCase();
     }
-    if (key === "city" || key === "state") {
+    if (name === "city" || name === "state") {
       nextValue = toTitleCase(value);
     }
 
-    setFormData((prev) => ({ ...prev, [key]: nextValue }));
-    if (key in fieldErrors) {
-      setFieldErrors((prev) => {
-        const next = { ...prev };
-        delete next[key as FieldKey];
-        return next;
-      });
-    }
-    if (successMessage) setSuccessMessage("");
-    if (errorMessage) setErrorMessage("");
+    setValues((prev) => ({
+      ...prev,
+      [name]: nextValue,
+    }));
+
+    setErrors((prev) => ({
+      ...prev,
+      [name]: "",
+    }));
+
+    setShowErrorBanner(false);
   };
 
   const handleResumeFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -136,121 +133,109 @@ export function JoinAsExpert() {
       ].includes(file.type) || /\.(pdf|doc|docx)$/i.test(file.name);
 
     if (!isAllowedType) {
-      setUploadedResume(null);
-      setErrorMessage("Please upload resume files in PDF, DOC, or DOCX format.");
+      setResumeFile(null);
+      setShowErrorBanner(true);
       event.target.value = "";
       return;
     }
 
-    setUploadedResume(file);
+    setResumeFile(file);
     setSuccessMessage("");
-    setErrorMessage("");
+    setShowErrorBanner(false);
     event.target.value = "";
   };
 
   const clearUploadedResume = () => {
-    setUploadedResume(null);
+    setResumeFile(null);
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
     }
   };
 
   const validateForm = (values: ExpertFormData) => {
-    const errors: Partial<Record<FieldKey, string>> = {};
+    const newErrors: Partial<Record<FieldKey, string>> = {};
 
     if (!values.fullName || values.fullName.trim() === "") {
-      errors.fullName = "Full name is required";
+      newErrors.fullName = "Full name is required";
     }
 
-    if (!values.mobileNumber || !/^\d{10}$/.test(values.mobileNumber)) {
-      errors.mobileNumber = "Enter a valid 10-digit mobile number";
+    if (!values.mobileNumber || !/^\d{10}$/.test(values.mobileNumber.trim())) {
+      newErrors.mobileNumber = "Enter a valid 10-digit mobile number";
     }
 
-    if (!values.email || !/^\S+@\S+\.\S+$/.test(values.email)) {
-      errors.email = "Enter a valid email address";
+    if (!values.email || !/^\S+@\S+\.\S+$/.test(values.email.trim())) {
+      newErrors.email = "Enter a valid email address";
     }
 
     if (!values.profession || values.profession.trim() === "") {
-      errors.profession = "Profession is required";
+      newErrors.profession = "Profession is required";
     }
 
     if (!values.areaOfExpertise || values.areaOfExpertise.trim() === "") {
-      errors.areaOfExpertise = "Area of expertise is required";
+      newErrors.areaOfExpertise = "Area of expertise is required";
     }
 
-    if (values.linkedinOrWebsite && !/^https?:\/\/.+/.test(values.linkedinOrWebsite)) {
-      errors.linkedinOrWebsite = "Enter a valid URL";
+    if (
+      values.linkedinOrWebsite &&
+      values.linkedinOrWebsite.trim() !== "" &&
+      !/^https?:\/\/.+/.test(values.linkedinOrWebsite.trim())
+    ) {
+      newErrors.linkedinOrWebsite = "Enter a valid URL";
     }
 
-    return errors;
+    return newErrors;
   };
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    setShowErrorBanner(false);
+    setSuccessMessage("");
+
     if (loading) return;
 
-    setSuccessMessage("");
-    setErrorMessage("");
+    console.log("Submitting values:", values);
 
-    const values: ExpertFormData = {
-      fullName: trimValue(formData.fullName),
-      mobileNumber: trimValue(formData.mobileNumber),
-      email: trimValue(formData.email),
-      profession: trimValue(formData.profession),
-      areaOfExpertise: trimValue(formData.areaOfExpertise),
-      yearsOfExperience: trimValue(formData.yearsOfExperience),
-      qualification: trimValue(formData.qualification),
-      firmName: trimValue(formData.firmName),
-      country: trimValue(formData.country),
-      state: trimValue(formData.state),
-      city: trimValue(formData.city),
-      servicesOffered: trimValue(formData.servicesOffered),
-      linkedinOrWebsite: trimValue(formData.linkedinOrWebsite),
-      shortBio: trimValue(formData.shortBio),
-    };
+    const validationErrors = validateForm(values);
+    console.log("Validation errors:", validationErrors);
 
-    console.log(values);
-
-    const errors = validateForm(values);
-    if (Object.keys(errors).length > 0) {
-      setFieldErrors(errors);
-      setErrorMessage("Please fill all required fields correctly.");
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      setShowErrorBanner(true);
       return;
     }
 
-    setFieldErrors({});
-
+    setErrors({});
+    setShowErrorBanner(false);
     setLoading(true);
+
     try {
-      const multipartData = new FormData();
+      const formData = new FormData();
       Object.entries(values).forEach(([key, value]) => {
-        multipartData.append(key, value || "");
+        formData.append(key, value || "");
       });
 
-      if (uploadedResume) {
-        multipartData.append("resume", uploadedResume);
+      if (resumeFile) {
+        formData.append("resume", resumeFile);
       }
 
-      const response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
+      const response = await fetch("https://n8n.caloganathan.com/webhook/expert-onboarding", {
         method: "POST",
-        body: multipartData,
+        body: formData,
       });
 
-      const result = (await response.json().catch(() => null)) as ExpertOnboardingResponse | null;
-      if (!response.ok || result?.success === false) {
-        throw new Error(result?.message || "Unable to submit expert registration right now.");
+      const data = (await response.json().catch(() => null)) as ExpertOnboardingResponse | null;
+
+      if (response.ok && data?.success) {
+        setSuccessMessage("Your application has been submitted successfully.");
+        setValues(initialValues);
+        setResumeFile(null);
+        setErrors({});
+        setShowErrorBanner(false);
+      } else {
+        setShowErrorBanner(true);
       }
-
-      setSuccessMessage(result?.message || "Your application has been submitted successfully.");
-      setErrorMessage("");
-      setFieldErrors({});
-      setFormData({
-        ...INITIAL_FORM_DATA,
-        country: detectUserCountry(),
-      });
-      setUploadedResume(null);
-    } catch (error: any) {
-      setErrorMessage(error?.message || "Unable to submit expert registration right now.");
+    } catch {
+      setShowErrorBanner(true);
     } finally {
       setLoading(false);
     }
@@ -297,11 +282,11 @@ export function JoinAsExpert() {
                 </div>
               </div>
             ) : null}
-            {errorMessage ? (
+            {showErrorBanner && (
               <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMessage}
+                Please fill all required fields.
               </div>
-            ) : null}
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid gap-5 md:grid-cols-2">
@@ -309,62 +294,67 @@ export function JoinAsExpert() {
                   <Label htmlFor="fullName">Full Name *</Label>
                   <Input
                     id="fullName"
-                    value={formData.fullName}
-                    onChange={(e) => setFieldValue("fullName", e.target.value)}
-                    aria-invalid={fieldErrors.fullName ? true : undefined}
+                    name="fullName"
+                    value={values.fullName}
+                    onChange={handleChange}
+                    aria-invalid={errors.fullName ? true : undefined}
                     placeholder="Enter your full name"
                   />
-                  {fieldErrors.fullName ? <p className="text-sm text-red-600">{fieldErrors.fullName}</p> : null}
+                  {errors.fullName ? <p className="text-sm text-red-600">{errors.fullName}</p> : null}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="mobileNumber">Mobile Number *</Label>
                   <Input
                     id="mobileNumber"
-                    value={formData.mobileNumber}
-                    onChange={(e) => setFieldValue("mobileNumber", e.target.value)}
-                    aria-invalid={fieldErrors.mobileNumber ? true : undefined}
+                    name="mobileNumber"
+                    value={values.mobileNumber}
+                    onChange={handleChange}
+                    aria-invalid={errors.mobileNumber ? true : undefined}
                     placeholder="Enter your mobile number"
                   />
-                  {fieldErrors.mobileNumber ? <p className="text-sm text-red-600">{fieldErrors.mobileNumber}</p> : null}
+                  {errors.mobileNumber ? <p className="text-sm text-red-600">{errors.mobileNumber}</p> : null}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
-                    value={formData.email}
-                    onChange={(e) => setFieldValue("email", e.target.value)}
-                    aria-invalid={fieldErrors.email ? true : undefined}
+                    value={values.email}
+                    onChange={handleChange}
+                    aria-invalid={errors.email ? true : undefined}
                     placeholder="Enter your email address"
                   />
-                  {fieldErrors.email ? <p className="text-sm text-red-600">{fieldErrors.email}</p> : null}
+                  {errors.email ? <p className="text-sm text-red-600">{errors.email}</p> : null}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="profession">Profession *</Label>
                   <Input
                     id="profession"
-                    value={formData.profession}
-                    onChange={(e) => setFieldValue("profession", e.target.value)}
-                    aria-invalid={fieldErrors.profession ? true : undefined}
+                    name="profession"
+                    value={values.profession}
+                    onChange={handleChange}
+                    aria-invalid={errors.profession ? true : undefined}
                     placeholder="CA, CPA, Tax Advisor, Lawyer..."
                   />
-                  {fieldErrors.profession ? <p className="text-sm text-red-600">{fieldErrors.profession}</p> : null}
+                  {errors.profession ? <p className="text-sm text-red-600">{errors.profession}</p> : null}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="areaOfExpertise">Area of Expertise *</Label>
                   <Input
                     id="areaOfExpertise"
-                    value={formData.areaOfExpertise}
-                    onChange={(e) => setFieldValue("areaOfExpertise", e.target.value)}
-                    aria-invalid={fieldErrors.areaOfExpertise ? true : undefined}
+                    name="areaOfExpertise"
+                    value={values.areaOfExpertise}
+                    onChange={handleChange}
+                    aria-invalid={errors.areaOfExpertise ? true : undefined}
                     placeholder="DTAA, FEMA, NRI filing, property tax, capital gains..."
                   />
-                  {fieldErrors.areaOfExpertise ? (
-                    <p className="text-sm text-red-600">{fieldErrors.areaOfExpertise}</p>
+                  {errors.areaOfExpertise ? (
+                    <p className="text-sm text-red-600">{errors.areaOfExpertise}</p>
                   ) : null}
                 </div>
 
@@ -372,8 +362,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="yearsOfExperience">Years of Experience</Label>
                   <Input
                     id="yearsOfExperience"
-                    value={formData.yearsOfExperience}
-                    onChange={(e) => setFieldValue("yearsOfExperience", e.target.value)}
+                    name="yearsOfExperience"
+                    value={values.yearsOfExperience}
+                    onChange={handleChange}
                     placeholder="e.g. 8 years"
                   />
                 </div>
@@ -382,8 +373,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="qualification">Qualification</Label>
                   <Input
                     id="qualification"
-                    value={formData.qualification}
-                    onChange={(e) => setFieldValue("qualification", e.target.value)}
+                    name="qualification"
+                    value={values.qualification}
+                    onChange={handleChange}
                     placeholder="CA, CPA, ACCA, LLM..."
                   />
                 </div>
@@ -392,8 +384,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="firmName">Firm Name</Label>
                   <Input
                     id="firmName"
-                    value={formData.firmName}
-                    onChange={(e) => setFieldValue("firmName", e.target.value)}
+                    name="firmName"
+                    value={values.firmName}
+                    onChange={handleChange}
                     placeholder="Enter your firm name"
                   />
                 </div>
@@ -402,9 +395,10 @@ export function JoinAsExpert() {
                   <Label htmlFor="country">Country</Label>
                   <Input
                     id="country"
+                    name="country"
                     list="expert-country-options"
-                    value={formData.country}
-                    onChange={(e) => setFieldValue("country", e.target.value)}
+                    value={values.country}
+                    onChange={handleChange}
                     placeholder="Select or type your country"
                   />
                   <datalist id="expert-country-options">
@@ -418,8 +412,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="state">State</Label>
                   <Input
                     id="state"
-                    value={formData.state}
-                    onChange={(e) => setFieldValue("state", e.target.value)}
+                    name="state"
+                    value={values.state}
+                    onChange={handleChange}
                     placeholder="Enter your state"
                   />
                 </div>
@@ -428,8 +423,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
-                    value={formData.city}
-                    onChange={(e) => setFieldValue("city", e.target.value)}
+                    name="city"
+                    value={values.city}
+                    onChange={handleChange}
                     placeholder="Enter your city"
                   />
                 </div>
@@ -438,8 +434,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="servicesOffered">Services Offered</Label>
                   <Textarea
                     id="servicesOffered"
-                    value={formData.servicesOffered}
-                    onChange={(e) => setFieldValue("servicesOffered", e.target.value)}
+                    name="servicesOffered"
+                    value={values.servicesOffered}
+                    onChange={handleChange}
                     className="min-h-32"
                     placeholder="Describe the services you can provide to NRI users"
                   />
@@ -449,13 +446,14 @@ export function JoinAsExpert() {
                   <Label htmlFor="linkedinOrWebsite">LinkedIn / Website</Label>
                   <Input
                     id="linkedinOrWebsite"
-                    value={formData.linkedinOrWebsite}
-                    onChange={(e) => setFieldValue("linkedinOrWebsite", e.target.value)}
-                    aria-invalid={fieldErrors.linkedinOrWebsite ? true : undefined}
+                    name="linkedinOrWebsite"
+                    value={values.linkedinOrWebsite}
+                    onChange={handleChange}
+                    aria-invalid={errors.linkedinOrWebsite ? true : undefined}
                     placeholder="LinkedIn or website URL"
                   />
-                  {fieldErrors.linkedinOrWebsite ? (
-                    <p className="text-sm text-red-600">{fieldErrors.linkedinOrWebsite}</p>
+                  {errors.linkedinOrWebsite ? (
+                    <p className="text-sm text-red-600">{errors.linkedinOrWebsite}</p>
                   ) : null}
                 </div>
 
@@ -485,9 +483,9 @@ export function JoinAsExpert() {
                       className="hidden"
                       onChange={handleResumeFileChange}
                     />
-                    {uploadedResume ? (
+                    {resumeFile ? (
                       <div className="mt-3 flex items-center justify-between rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm text-[#1D4ED8]">
-                        <span className="truncate pr-3">{uploadedResume.name}</span>
+                        <span className="truncate pr-3">{resumeFile.name}</span>
                         <button
                           type="button"
                           onClick={clearUploadedResume}
@@ -505,8 +503,9 @@ export function JoinAsExpert() {
                   <Label htmlFor="shortBio">Short Bio</Label>
                   <Textarea
                     id="shortBio"
-                    value={formData.shortBio}
-                    onChange={(e) => setFieldValue("shortBio", e.target.value)}
+                    name="shortBio"
+                    value={values.shortBio}
+                    onChange={handleChange}
                     className="min-h-28"
                     placeholder="Briefly introduce your background and expertise"
                   />
