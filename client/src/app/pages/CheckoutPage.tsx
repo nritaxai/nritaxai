@@ -5,7 +5,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { CheckCircle2, CreditCard, Lock, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
-import { buildApiUrl } from "../../utils/api";
+import { buildApiUrl, clearStoredAuth } from "../../utils/api";
 import {
   convertInrToCurrency,
   formatCurrency,
@@ -22,6 +22,7 @@ type PromoCode = {
   code: string;
   discountPercent: number;
   description: string;
+  billing?: BillingType;
 };
 type UserPayload = {
   name?: string;
@@ -32,7 +33,7 @@ type UserPayload = {
 const PROMO_CODES: PromoCode[] = [
   { code: "SANDBOX10", discountPercent: 10, description: "10% off on any plan (test only)" },
   { code: "SANDBOX20", discountPercent: 20, description: "20% off on any plan (test only)" },
-  { code: "SANDBOXY25", discountPercent: 25, description: "25% off on yearly billing (test only)" },
+  { code: "SANDBOXY25", discountPercent: 25, description: "25% off on yearly billing (test only)", billing: "yearly" },
   { code: "SANDBOX15", discountPercent: 15, description: "15% off on any plan (test only)" },
 ];
 
@@ -130,6 +131,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [promoMessage, setPromoMessage] = useState<string>("");
   const [promoError, setPromoError] = useState<string>("");
   const [checkoutError, setCheckoutError] = useState<string>("");
+  const [sessionMessage, setSessionMessage] = useState<string>("");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [hasPrefilledUser, setHasPrefilledUser] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "success" | "failed">("idle");
@@ -210,10 +212,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   }, [isAuthenticated, hasPrefilledUser, countryCode]);
 
   React.useEffect(() => {
-    if (appliedPromo?.code === "SANDBOXY25" && billing !== "yearly") {
+    if (appliedPromo?.billing && appliedPromo.billing !== billing) {
       setAppliedPromo(null);
       setPromoMessage("");
-      setPromoError("SANDBOXY25 was removed because billing is not yearly.");
+      setPromoError(`${appliedPromo.code} was removed because billing changed.`);
     }
   }, [billing, appliedPromo]);
 
@@ -234,13 +236,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
       return;
     }
 
-    if (found.code === "SANDBOXY25" && billing !== "yearly") {
-      setPromoError("SANDBOXY25 is valid only for yearly billing.");
+    if (found.billing && found.billing !== billing) {
+      setPromoError(`${found.code} is valid only for ${found.billing} billing.`);
       setPromoMessage("");
       setAppliedPromo(null);
       return;
     }
-
     setAppliedPromo(found);
     setPromoError("");
     setPromoMessage(`${found.code} applied: ${found.discountPercent}% off.`);
@@ -249,6 +250,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const handleProceedToPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setCheckoutError("");
+    setSessionMessage("");
 
     if (!email.trim() || !fullName.trim() || !phone.trim()) {
       setCheckoutError("Please fill Email, Full Name, and Phone to continue.");
@@ -300,12 +302,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
     setPaymentStatus("idle");
 
     try {
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        setCheckoutError("Unable to load payment SDK. Please try again.");
-        return;
-      }
-
       const { data } = await axios.post(
         buildApiUrl("/api/subscription/create-subscription"),
         {
@@ -328,7 +324,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
       const serverPayable = Number((Number(data?.amount || 0) / 100).toFixed(2));
       const clientPayable = Number(finalTotal.toFixed(2));
-      if (!Number.isFinite(serverPayable) || serverPayable <= 0) {
+      if (!Number.isFinite(serverPayable) || serverPayable < 0) {
         setCheckoutError("Invalid payment amount from server. Please try again.");
         return;
       }
@@ -342,6 +338,17 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
       }
       if ((appliedPromo?.code || null) !== (data?.promoCode || null)) {
         setCheckoutError("Promo code mismatch detected. Please apply promo again and retry.");
+        return;
+      }
+
+      if (serverPayable <= 0) {
+        setCheckoutError("Invalid payment amount from server. Please try again.");
+        return;
+      }
+
+      const scriptLoaded = await loadRazorpayScript();
+      if (!scriptLoaded) {
+        setCheckoutError("Unable to load payment SDK. Please try again.");
         return;
       }
 
@@ -361,6 +368,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
             return;
           } catch (error: any) {
             lastError = error;
+            if (error?.response?.status === 401) {
+              clearStoredAuth();
+              setSessionMessage("Your session expired. Please sign in again.");
+              onRequireLogin();
+              throw error;
+            }
             if (attempt < retries) {
               await new Promise((resolve) => setTimeout(resolve, 500 * (attempt + 1)));
             }
@@ -417,6 +430,13 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
     } catch (error: any) {
       console.error(error.response?.data || error);
       setPaymentStatus("failed");
+      if (error?.response?.status === 401) {
+        clearStoredAuth();
+        setSessionMessage("Your session expired. Please sign in again.");
+        onRequireLogin();
+        setCheckoutError("Your session expired. Please sign in again.");
+        return;
+      }
       setCheckoutError(error.response?.data?.message || "Unable to start payment.");
     } finally {
       setIsProcessingPayment(false);
@@ -468,7 +488,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
           <Badge className="bg-[#2563eb]/12 text-[#0F172A] border-[#2563eb]/40 mb-4">Secure Checkout</Badge>
           <h1 className="text-3xl sm:text-4xl text-[#0F172A] tracking-tight mb-3">Complete Your Subscription</h1>
           <p className="text-[#0F172A] max-w-2xl mx-auto">
-            Confirm your plan, enter billing details, and continue to secure Razorpay payment.
+            Confirm your plan, enter billing details, and continue to payment or free promo redemption.
           </p>
         </div>
 
@@ -486,6 +506,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 <Badge className="ml-auto bg-[#2563eb] text-[#0F172A]">{selectedPlan.badge}</Badge>
               )}
             </div>
+
 
             <div className="inline-flex bg-[#3b82f6] p-1 rounded-xl mb-6">
               <button
@@ -566,6 +587,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 <p className="text-sm text-[#0F172A]">You can edit pre-filled details before payment.</p>
               </div>
             </div>
+
+            {sessionMessage ? (
+              <p className="mb-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                {sessionMessage}
+              </p>
+            ) : null}
 
             <form className="space-y-5" onSubmit={handleProceedToPayment}>
               <div className="grid sm:grid-cols-2 gap-4">
