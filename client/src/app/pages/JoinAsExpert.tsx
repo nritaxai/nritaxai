@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
-import { EXPERT_ONBOARDING_WEBHOOK, isValidEmail, isValidUrl, trimValue } from "../utils/consultationWorkflow";
+import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkflow";
 
 type ExpertFormData = {
   fullName: string;
@@ -60,11 +60,6 @@ const toTitleCase = (value: string) =>
   trimValue(value)
     .toLowerCase()
     .replace(/\b\w/g, (char) => char.toUpperCase());
-
-const isValidMobileNumber = (value: string) => {
-  const digits = trimValue(value).replace(/\D/g, "");
-  return digits.length === 10;
-};
 
 export function JoinAsExpert() {
   const navigate = useNavigate();
@@ -160,24 +155,34 @@ export function JoinAsExpert() {
     }
   };
 
-  const validateForm = () => {
-    const nextErrors: Partial<Record<FieldKey, string>> = {};
+  const validateForm = (values: ExpertFormData) => {
+    const errors: Partial<Record<FieldKey, string>> = {};
 
-    if (!trimValue(formData.fullName)) nextErrors.fullName = "Full name is required.";
-    if (!isValidMobileNumber(formData.mobileNumber)) {
-      nextErrors.mobileNumber = "Enter a valid 10-digit mobile number";
-    }
-    if (!isValidEmail(formData.email)) nextErrors.email = "Enter a valid email address.";
-    if (!trimValue(formData.profession)) nextErrors.profession = "Profession is required.";
-    if (!trimValue(formData.areaOfExpertise)) {
-      nextErrors.areaOfExpertise = "Area of expertise is required.";
-    }
-    if (trimValue(formData.linkedinOrWebsite) && !isValidUrl(formData.linkedinOrWebsite)) {
-      nextErrors.linkedinOrWebsite = "Enter a valid URL.";
+    if (!values.fullName || values.fullName.trim() === "") {
+      errors.fullName = "Full name is required";
     }
 
-    setFieldErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
+    if (!values.mobileNumber || !/^\d{10}$/.test(values.mobileNumber)) {
+      errors.mobileNumber = "Enter a valid 10-digit mobile number";
+    }
+
+    if (!values.email || !/^\S+@\S+\.\S+$/.test(values.email)) {
+      errors.email = "Enter a valid email address";
+    }
+
+    if (!values.profession || values.profession.trim() === "") {
+      errors.profession = "Profession is required";
+    }
+
+    if (!values.areaOfExpertise || values.areaOfExpertise.trim() === "") {
+      errors.areaOfExpertise = "Area of expertise is required";
+    }
+
+    if (values.linkedinOrWebsite && !/^https?:\/\/.+/.test(values.linkedinOrWebsite)) {
+      errors.linkedinOrWebsite = "Enter a valid URL";
+    }
+
+    return errors;
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -186,42 +191,41 @@ export function JoinAsExpert() {
 
     setSuccessMessage("");
     setErrorMessage("");
-    if (!validateForm()) return;
+
+    const values: ExpertFormData = {
+      fullName: trimValue(formData.fullName),
+      mobileNumber: trimValue(formData.mobileNumber),
+      email: trimValue(formData.email),
+      profession: trimValue(formData.profession),
+      areaOfExpertise: trimValue(formData.areaOfExpertise),
+      yearsOfExperience: trimValue(formData.yearsOfExperience),
+      qualification: trimValue(formData.qualification),
+      firmName: trimValue(formData.firmName),
+      country: trimValue(formData.country),
+      state: trimValue(formData.state),
+      city: trimValue(formData.city),
+      servicesOffered: trimValue(formData.servicesOffered),
+      linkedinOrWebsite: trimValue(formData.linkedinOrWebsite),
+      shortBio: trimValue(formData.shortBio),
+    };
+
+    console.log(values);
+
+    const errors = validateForm(values);
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      setErrorMessage("Please fill all required fields correctly.");
+      return;
+    }
+
+    setFieldErrors({});
 
     setLoading(true);
     try {
-      const payload: ExpertFormData = {
-        fullName: trimValue(formData.fullName),
-        mobileNumber: trimValue(formData.mobileNumber),
-        email: trimValue(formData.email),
-        profession: trimValue(formData.profession),
-        areaOfExpertise: trimValue(formData.areaOfExpertise),
-        yearsOfExperience: trimValue(formData.yearsOfExperience),
-        qualification: trimValue(formData.qualification),
-        firmName: trimValue(formData.firmName),
-        country: trimValue(formData.country),
-        state: trimValue(formData.state),
-        city: trimValue(formData.city),
-        servicesOffered: trimValue(formData.servicesOffered),
-        linkedinOrWebsite: trimValue(formData.linkedinOrWebsite),
-        shortBio: trimValue(formData.shortBio),
-      };
-
       const multipartData = new FormData();
-      multipartData.append("fullName", payload.fullName);
-      multipartData.append("mobileNumber", payload.mobileNumber);
-      multipartData.append("email", payload.email);
-      multipartData.append("profession", payload.profession);
-      multipartData.append("areaOfExpertise", payload.areaOfExpertise);
-      multipartData.append("yearsOfExperience", payload.yearsOfExperience);
-      multipartData.append("qualification", payload.qualification);
-      multipartData.append("firmName", payload.firmName);
-      multipartData.append("country", payload.country);
-      multipartData.append("state", payload.state);
-      multipartData.append("city", payload.city);
-      multipartData.append("servicesOffered", payload.servicesOffered);
-      multipartData.append("linkedinOrWebsite", payload.linkedinOrWebsite);
-      multipartData.append("shortBio", payload.shortBio);
+      Object.entries(values).forEach(([key, value]) => {
+        multipartData.append(key, value || "");
+      });
 
       if (uploadedResume) {
         multipartData.append("resume", uploadedResume);
