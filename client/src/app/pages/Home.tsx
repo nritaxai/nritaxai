@@ -123,7 +123,7 @@ export function Home({ onRequireLogin }: HomeProps) {
 
   return (
     <main className="min-h-screen">
-      <section className="bg-gradient-to-b from-gray-50 to-white py-16 md:py-24">
+      <section className="bg-gradient-to-b from-gray-50 to-white pt-4 pb-16 md:pt-6 md:pb-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
             {userName ? (
