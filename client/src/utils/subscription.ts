@@ -4,7 +4,7 @@ import {
   PLAN_KEYS,
   PLAN_ORDER,
   normalizePlanKey,
-} from "../../../shared/subscriptionConfig.js";
+} from "../shared/subscriptionConfig.js";
 
 export type PlanKey = "starter" | "professional" | "enterprise";
 export type FeatureKey = (typeof FEATURE_KEYS)[keyof typeof FEATURE_KEYS];
