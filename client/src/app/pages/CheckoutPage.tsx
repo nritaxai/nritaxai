@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
@@ -112,6 +112,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const navigate = useNavigate();
   const isIosNativeApp = IS_IOS_NATIVE_APP;
   const currencyFromQuery = searchParams.get("currency");
+  const hasSyncedCurrencyFromQuery = useRef(false);
 
   const [plan, setPlan] = useState<PlanType>(normalizePlan(searchParams.get("plan")));
   const [billing, setBilling] = useState<BillingType>("monthly");
@@ -176,6 +177,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
     localStorage.setItem("pricing_currency_override", currencyOverride);
   }, [currencyOverride]);
 
+  const handleCurrencyOverrideChange = (nextCurrency: string) => {
+    localStorage.setItem("pricing_currency_override", nextCurrency);
+    setCurrencyOverride(nextCurrency);
+  };
+
   React.useEffect(() => {
     if (!isIndiaBilling && currencyOverride === "INR") {
       setCurrencyOverride("auto");
@@ -197,7 +203,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   }, [searchParams]);
 
   React.useEffect(() => {
-    if (!currencyFromQuery) return;
+    if (!currencyFromQuery || hasSyncedCurrencyFromQuery.current) return;
+    hasSyncedCurrencyFromQuery.current = true;
+    localStorage.setItem("pricing_currency_override", currencyFromQuery);
     setCurrencyOverride(currencyFromQuery);
   }, [currencyFromQuery]);
 
@@ -546,7 +554,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
             <div className="mb-4">
               <p className="mb-2 text-sm text-[#0F172A]">Display Currency</p>
-              <Select value={currencyOverride} onValueChange={setCurrencyOverride}>
+              <Select value={currencyOverride} onValueChange={handleCurrencyOverrideChange}>
                 <SelectTrigger className="bg-[#F7FAFC] border-[#E2E8F0]">
                   <SelectValue />
                 </SelectTrigger>
