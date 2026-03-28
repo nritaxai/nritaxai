@@ -189,12 +189,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   };
 
   React.useEffect(() => {
-    if (!isIndiaBilling && currencyOverride === "INR") {
-      setCurrencyOverride("USD");
-    }
-  }, [isIndiaBilling, currencyOverride]);
-
-  React.useEffect(() => {
     const syncAuth = () => setIsAuthenticated(Boolean(localStorage.getItem("token")));
     window.addEventListener("storage", syncAuth);
     window.addEventListener("auth-changed", syncAuth);
@@ -309,11 +303,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
     if (selectedCountryCode.trim() === "+91" && gstNumber.trim() && !/^\d/.test(gstNumber.trim())) {
       setCheckoutError("For India (+91), GST number should start with digits.");
-      return;
-    }
-
-    if (!isIndiaBilling && displayCurrency.code === "INR") {
-      setCheckoutError("For non-India billing country, currency cannot be INR.");
       return;
     }
 
