@@ -92,6 +92,13 @@ const buildReferralCode = (user: Record<string, unknown>) => {
   return `NRI${base}`;
 };
 
+const resolveStoredCheckoutCurrency = (value: string | null) => {
+  const normalized = String(value || "").trim().toUpperCase();
+  return SUPPORTED_CURRENCIES.includes(normalized as (typeof SUPPORTED_CURRENCIES)[number])
+    ? normalized
+    : "USD";
+};
+
 const loadRazorpayScript = async () => {
   if ((window as any).Razorpay) return true;
   return new Promise<boolean>((resolve) => {
@@ -138,7 +145,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [hasPrefilledUser, setHasPrefilledUser] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "success" | "failed">("idle");
   const [currencyOverride, setCurrencyOverride] = useState<string>(
-    () => currencyFromQuery || localStorage.getItem("pricing_currency_override") || "auto"
+    () => resolveStoredCheckoutCurrency(currencyFromQuery || localStorage.getItem("pricing_currency_override"))
   );
 
   const selectedPlan = PLAN_META[plan];
@@ -157,8 +164,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const userCountry = String(storedUser?.countryOfResidence || "");
   const effectiveCurrencyCountry = String(billingCountry || userCountry).trim();
   const countryCurrency = resolveCurrencyByCountry(effectiveCurrencyCountry);
-  const displayCurrency =
-    currencyOverride === "auto" ? countryCurrency : resolveCurrencyByCode(currencyOverride);
+  const displayCurrency = resolveCurrencyByCode(currencyOverride || countryCurrency.code);
   const isIndiaBilling = isIndiaCountry(billingCountry);
   const autoCountryCode = resolveCountryCodeByCountry(billingCountry || userCountry);
   const selectedCountryCode = countryCode === "auto" ? autoCountryCode : countryCode;
@@ -184,7 +190,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
   React.useEffect(() => {
     if (!isIndiaBilling && currencyOverride === "INR") {
-      setCurrencyOverride("auto");
+      setCurrencyOverride("USD");
     }
   }, [isIndiaBilling, currencyOverride]);
 
@@ -205,8 +211,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   React.useEffect(() => {
     if (!currencyFromQuery || hasSyncedCurrencyFromQuery.current) return;
     hasSyncedCurrencyFromQuery.current = true;
-    localStorage.setItem("pricing_currency_override", currencyFromQuery);
-    setCurrencyOverride(currencyFromQuery);
+    const nextCurrency = resolveStoredCheckoutCurrency(currencyFromQuery);
+    localStorage.setItem("pricing_currency_override", nextCurrency);
+    setCurrencyOverride(nextCurrency);
   }, [currencyFromQuery]);
 
   React.useEffect(() => {
@@ -559,7 +566,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="auto">Auto ({countryCurrency.code})</SelectItem>
                   {SUPPORTED_CURRENCIES.map((code) => (
                     <SelectItem key={code} value={code}>
                       {code}
