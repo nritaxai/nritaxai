@@ -10,7 +10,8 @@ import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { TaxReportPDF } from "./TaxReportPDF";
-import { buildApiUrl, clearStoredAuth, getSubscriptionStatus } from "../../utils/api";
+import { buildApiUrl, clearStoredAuth, getMySubscription } from "../../utils/api";
+import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
 
 const getStoredUserName = () => {
   try {
@@ -67,7 +68,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   const [isAuthenticated, setIsAuthenticated] = useState(
     Boolean(localStorage.getItem("token"))
   );
-  const [subscription, setSubscription] = useState<{ plan?: string; status?: string } | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
   const [messages, setMessages] = useState<Array<{ role: "user" | "ai"; content: string }>>([
     {
       role: "ai",
@@ -138,7 +139,11 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
     setMessages([{ role: "ai", content: welcomeMessage }]);
   };
   const hasActivePaidSubscription =
-    Boolean(subscription?.plan && subscription.plan !== "FREE" && subscription?.status === "active");
+    Boolean(subscription?.plan && subscription.plan !== PLAN_KEYS.STARTER && subscription?.subscriptionStatus === "active");
+  const starterLimitReached =
+    subscription?.plan === PLAN_KEYS.STARTER &&
+    subscription?.remaining?.chatMessages !== null &&
+    Number(subscription?.remaining?.chatMessages || 0) <= 0;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -242,8 +247,8 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
       setSubscription(null);
       return;
     }
-    getSubscriptionStatus()
-      .then((data: any) => setSubscription(data?.subscription ?? null))
+    getMySubscription()
+      .then((data: any) => setSubscription(data ?? null))
       .catch((error: any) => {
         setSubscription(null);
         if (error?.response?.status === 401) {
@@ -303,6 +308,10 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   const submitQuestion = async (forcedQuestion?: string) => {
     const effectiveQuestion = typeof forcedQuestion === "string" ? forcedQuestion.trim() : question.trim();
     if (!effectiveQuestion) return;
+    if (starterLimitReached) {
+      setSessionMessage("Free plan limit reached. Upgrade to Professional.");
+      return;
+    }
 
     if (!isAuthenticated) {
       setMessages((prev) => [
@@ -346,6 +355,9 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
       );
 
       if (activeRequestIdRef.current !== requestId) return;
+      if (response.data?.usage) {
+        setSubscription(response.data.usage);
+      }
       const aiReply = ensureVisibleReply(response.data.reply);
       setMessages((prev) => [...prev, { role: "ai", content: aiReply }]);
     } catch (error: any) {
@@ -353,6 +365,11 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         return;
       }
       if (activeRequestIdRef.current !== requestId) return;
+      if (error.response?.status === 403 && error.response?.data?.usage) {
+        setSubscription(error.response.data.usage);
+        setSessionMessage(error.response?.data?.error || "Free plan limit reached. Upgrade to Professional.");
+        return;
+      }
       if (error.response?.status === 401) {
         clearStoredAuth();
         setSessionMessage("Your session expired. Please sign in again.");
@@ -471,6 +488,12 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
               {sessionMessage}
             </p>
           ) : null}
+          {subscription ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Badge className="bg-white/70 text-[#0F172A]">Current Plan: {subscription.currentPlan?.displayName || "Starter"}</Badge>
+              <Badge className="bg-white/70 text-[#0F172A]">{getRemainingChatLabel(subscription)}</Badge>
+            </div>
+          ) : null}
 
           {isAuthenticated && (
           <div className="flex flex-col md:flex-row md:items-center gap-2 mt-4">
@@ -504,6 +527,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                   size="sm"
                   className="h-auto py-1.5 px-2.5 text-xs text-left whitespace-nowrap shrink-0"
                   onClick={() => handleStarterQuestionSelect(item)}
+                  disabled={starterLimitReached}
                 >
                   {item}
                 </Button>
@@ -607,6 +631,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
               onKeyDown={handleKeyDown}
               className="resize-none min-h-[52px] max-h-40 border-0 bg-transparent focus-visible:ring-0 text-[#0F172A] placeholder:text-[#0F172A]"
               rows={1}
+              disabled={starterLimitReached}
             />
             <Button
               type="button"
@@ -614,7 +639,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
               variant={isListening ? "destructive" : "outline"}
               className="flex-shrink-0 h-10 w-10 rounded-full"
               onClick={toggleVoiceInput}
-              disabled={!speechSupported}
+              disabled={!speechSupported || starterLimitReached}
               title={speechSupported ? "Voice input" : "Voice input not supported in this browser"}
             >
               {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
@@ -631,11 +656,14 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                 <Square className="size-4 fill-current" />
               </Button>
             ) : (
-              <Button type="submit" size="icon" className="flex-shrink-0 h-10 w-10 rounded-full">
+              <Button type="submit" size="icon" className="flex-shrink-0 h-10 w-10 rounded-full" disabled={starterLimitReached}>
                 <Send className="size-5" />
               </Button>
             )}
           </form>
+          {starterLimitReached ? (
+            <p className="mt-2 text-sm text-amber-900">Free plan limit reached. Upgrade to Professional.</p>
+          ) : null}
         </CardFooter>
         {isListening && !minimal && (
           <p className="px-4 pb-4 text-xs text-red-600">Listening... tap mic again to stop.</p>

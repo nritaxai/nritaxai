@@ -4,8 +4,10 @@ import {
   cancelSubscription,
   createSubscription,
   getRazorpayDebugConfig,
+  getMySubscription,
   getSubscriptionStatus,
   razorpayWebhook,
+  subscribeToPlan,
   verifySubscriptionPayment,
 } from "../Controllers/subscriptionController.js";
 
@@ -14,6 +16,8 @@ const router = express.Router();
 // Create subscription (protected route)
 router.post("/create-subscription", protect, createSubscription);
 router.post("/verify-subscription", protect, verifySubscriptionPayment);
+router.get("/me", protect, getMySubscription);
+router.post("/subscribe", protect, subscribeToPlan);
 router.get("/status", protect, getSubscriptionStatus);
 router.post("/cancel", protect, cancelSubscription);
 router.get("/debug-config", protect, getRazorpayDebugConfig);

@@ -7,6 +7,12 @@ import OpenAI from "openai";
 import pdfParse from "pdf-parse";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
+import { CHAT_MODEL_KEYS, PLAN_KEYS } from "../../shared/subscriptionConfig.js";
+import {
+  checkAndConsumeChatUsage,
+  getSubscriptionSummary,
+  normalizeUserSubscriptionState,
+} from "../Utils/subscriptionAccess.js";
 
 const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 20000);
 const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
@@ -34,7 +40,6 @@ const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embe
 const RAG_MAX_PER_PAGE = Number(process.env.RAG_MAX_PER_PAGE || 2);
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
 const CHAT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || 1400), 900);
-const FREE_MONTHLY_QUERY_LIMIT = Number(process.env.FREE_MONTHLY_QUERY_LIMIT || 10);
 let dtaaChunksCache = null;
 let dtaaTokenIndexCache = null;
 let dtaaIndexMtimeCache = null;
@@ -57,46 +62,13 @@ const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
 const INDEX_PATH = path.join(STORAGE_DIR, "pdf_index.json");
 const ROOT_DIR = path.resolve(".");
 
-const isSameMonthYear = (a, b) =>
-  a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth();
-
-const normalizeUsageWindow = (userDoc) => {
-  const now = new Date();
-  const lastResetRaw = userDoc?.usage?.lastReset;
-  const lastReset = lastResetRaw ? new Date(lastResetRaw) : null;
-  const hasValidLastReset = lastReset && !Number.isNaN(lastReset.getTime());
-
-  if (!userDoc.usage) {
-    userDoc.usage = { queriesUsed: 0, lastReset: now };
-    return true;
-  }
-
-  if (!hasValidLastReset || !isSameMonthYear(lastReset, now)) {
-    userDoc.usage.queriesUsed = 0;
-    userDoc.usage.lastReset = now;
-    return true;
-  }
-
-  if (!Number.isFinite(userDoc.usage.queriesUsed) || userDoc.usage.queriesUsed < 0) {
-    userDoc.usage.queriesUsed = 0;
-    return true;
-  }
-
-  return false;
-};
-
-const buildUsagePayload = (userDoc) => {
-  const queriesUsed = Number(userDoc?.usage?.queriesUsed || 0);
-  const plan = String(userDoc?.subscription?.plan || "FREE").toUpperCase();
-  const isFreePlan = plan === "FREE";
-
-  return {
-    plan,
-    queriesUsed,
-    monthlyLimit: isFreePlan ? FREE_MONTHLY_QUERY_LIMIT : null,
-    remaining: isFreePlan ? Math.max(0, FREE_MONTHLY_QUERY_LIMIT - queriesUsed) : null,
-    lastReset: userDoc?.usage?.lastReset || null,
-  };
+const CHAT_MODEL_BY_TIER = {
+  [CHAT_MODEL_KEYS.BASIC]:
+    modelMap[String(process.env.CHAT_MODEL_STARTER || "gpt-4o-mini").toLowerCase()] || modelMap["gpt-4o-mini"],
+  [CHAT_MODEL_KEYS.STANDARD]:
+    modelMap[String(process.env.CHAT_MODEL_PROFESSIONAL || "gpt-4o").toLowerCase()] || modelMap["gpt-4o"],
+  [CHAT_MODEL_KEYS.PREMIUM]:
+    modelMap[String(process.env.CHAT_MODEL_ENTERPRISE || "gpt-4o").toLowerCase()] || modelMap["gpt-4o"],
 };
 
 const tokenize = (text = "") =>
@@ -1099,7 +1071,7 @@ export const chatWithAI = async (req, res) => {
     const rawKnowledgeSource =
       typeof req.body?.knowledgeSource === "string" ? req.body.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "dtaa" ? "dtaa" : "general";
-    const model = DEFAULT_CHAT_MODEL;
+    let model = DEFAULT_CHAT_MODEL;
     const userId = getSessionActorId(req);
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
     const sessionMessages = await loadSessionMessages({
@@ -1163,17 +1135,40 @@ export const chatWithAI = async (req, res) => {
     }
 
     const isGuestUser = userId.startsWith("guest:");
-    const userDoc = isGuestUser ? null : await User.findById(req.user?._id).select("subscription usage");
+    if (isGuestUser) {
+      return res.status(401).json({
+        error: "Authentication required.",
+      });
+    }
+
+    const userDoc = isGuestUser
+      ? null
+      : await User.findById(req.user?._id).select(
+          "subscription usage plan subscriptionStatus subscriptionStartDate subscriptionEndDate chatUsageCount chatUsageMonth cpaUsageCount cpaUsageMonth"
+        );
     if (!isGuestUser && !userDoc) {
       return res.status(404).json({
         error: "User not found",
       });
     }
 
+    let subscriptionSummary = null;
     if (userDoc) {
-      const usageWindowUpdated = normalizeUsageWindow(userDoc);
+      const usageWindowUpdated = normalizeUserSubscriptionState(userDoc);
       if (usageWindowUpdated) {
         await userDoc.save();
+      }
+      subscriptionSummary = getSubscriptionSummary(userDoc);
+      model = CHAT_MODEL_BY_TIER[subscriptionSummary.currentPlan.modelTier] || DEFAULT_CHAT_MODEL;
+      if (
+        subscriptionSummary.plan === PLAN_KEYS.STARTER &&
+        subscriptionSummary.remaining.chatMessages !== null &&
+        subscriptionSummary.remaining.chatMessages <= 0
+      ) {
+        return res.status(403).json({
+          error: "Free plan limit reached. Upgrade to Professional.",
+          usage: subscriptionSummary,
+        });
       }
     }
 
@@ -1189,7 +1184,7 @@ export const chatWithAI = async (req, res) => {
       return res.status(200).json({
         reply: ensureStructuredSections(sanitizeAiReply(repeatedReply), rawLanguage),
         cached: true,
-        usage: userDoc ? buildUsagePayload(userDoc) : null,
+        usage: subscriptionSummary,
       });
     }
     const cachedReply = getCachedResponse(cacheKey);
@@ -1197,20 +1192,28 @@ export const chatWithAI = async (req, res) => {
       return res.status(200).json({
         reply: ensureStructuredSections(sanitizeAiReply(cachedReply), rawLanguage),
         cached: true,
-        usage: userDoc ? buildUsagePayload(userDoc) : null,
+        usage: subscriptionSummary,
       });
     }
 
     const finalizeReply = async (reply, extra = {}) => {
       const cleanedReply = ensureStructuredSections(sanitizeAiReply(reply), rawLanguage);
+      let latestUsage = subscriptionSummary;
       if (userDoc) {
-        userDoc.usage.queriesUsed = Number(userDoc.usage.queriesUsed || 0) + 1;
-        await userDoc.save();
+        const usageResult = await checkAndConsumeChatUsage(userDoc);
+        if (!usageResult.allowed) {
+          return res.status(403).json({
+            error: usageResult.message,
+            usage: usageResult.summary,
+          });
+        }
+        latestUsage = usageResult.summary;
+        model = CHAT_MODEL_BY_TIER[usageResult.modelTier] || model;
       }
       return res.status(200).json({
         reply: cleanedReply,
         ...extra,
-        usage: userDoc ? buildUsagePayload(userDoc) : null,
+        usage: latestUsage,
       });
     };
 

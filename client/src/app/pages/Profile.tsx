@@ -19,8 +19,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
-import { changePassword, deleteAccount, getSubscriptionStatus, getUserProfile, updateUserProfile } from "../../utils/api";
+import { changePassword, deleteAccount, getMySubscription, getUserProfile, updateUserProfile } from "../../utils/api";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
+import { getPlanLabel, type SubscriptionMe } from "../../utils/subscription";
 
 type ProfileData = {
   name: string;
@@ -37,15 +38,6 @@ type ProfileData = {
     lastReset?: string;
   };
   createdAt?: string;
-};
-
-type SubscriptionData = {
-  plan: "FREE" | "PRO" | "PREMIUM";
-  status: "active" | "inactive" | "cancelled" | "expired" | "trial";
-  provider: "razorpay";
-  subscriptionId?: string | null;
-  currentPeriodStart?: string | null;
-  currentPeriodEnd?: string | null;
 };
 
 const formatDate = (value?: string | null) => {
@@ -148,7 +140,7 @@ export function Profile() {
   }, []);
 
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
   const [name, setName] = useState("");
   const [profileImage, setProfileImage] = useState("");
   const [phone, setPhone] = useState("");
@@ -230,9 +222,9 @@ export function Profile() {
       if (!active) return;
       setSubscriptionLoading(true);
       try {
-        const response = await getSubscriptionStatus();
+        const response = await getMySubscription();
         if (!active) return;
-        setSubscription(response?.subscription || null);
+        setSubscription(response || null);
       } catch (subscriptionError) {
         if (!active) return;
         console.error("subscription status load failed", subscriptionError);
@@ -615,7 +607,7 @@ export function Profile() {
                 <div className="flex flex-wrap gap-2">
                   <Badge className="bg-[#2563eb]/12 text-[#0F172A] border-[#2563eb]/40">
                     <Crown className="size-3 mr-1" />
-                    {subscription?.plan || "FREE"} Plan
+                    {getPlanLabel(subscription?.plan)} Plan
                   </Badge>
                 </div>
               </div>
@@ -876,17 +868,17 @@ export function Profile() {
             <CardContent className="space-y-4">
               <div className="rounded-lg border border-[#E2E8F0] p-3">
                 <p className="text-xs text-[#0F172A] mb-1">Current Plan</p>
-                <p className="text-lg text-[#0F172A]">{subscriptionLoading ? "Loading..." : subscription?.plan || "FREE"}</p>
+                <p className="text-lg text-[#0F172A]">{subscriptionLoading ? "Loading..." : getPlanLabel(subscription?.plan)}</p>
               </div>
 
               <div className="rounded-lg border border-[#E2E8F0] p-3 space-y-3">
                 <div className="flex items-center gap-2 text-sm text-[#0F172A]">
                   <CalendarDays className="size-4 text-[#0F172A]" />
-                  <span>Start: {formatDate(subscription?.currentPeriodStart)}</span>
+                  <span>Start: {formatDate(subscription?.subscriptionStartDate)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-[#0F172A]">
                   <CalendarDays className="size-4 text-[#0F172A]" />
-                  <span>Renewal: {formatDate(subscription?.currentPeriodEnd)}</span>
+                  <span>Renewal: {formatDate(subscription?.subscriptionEndDate)}</span>
                 </div>
               </div>
 
@@ -894,10 +886,10 @@ export function Profile() {
                 <p className="text-xs text-[#0F172A] mb-1">Usage</p>
                 <p className="text-[#0F172A] flex items-center gap-2">
                   <Sparkles className="size-4 text-[#2563eb]" />
-                  Queries used: {profile?.usage?.queriesUsed ?? 0}
+                  Chat used this month: {subscription?.usage?.chatUsageCount ?? 0}
                 </p>
                 <p className="text-xs text-[#0F172A] mt-2">
-                  Last reset: {formatDate(profile?.usage?.lastReset)}
+                  Remaining messages: {subscription?.remaining?.chatMessages === null ? "Unlimited" : subscription?.remaining?.chatMessages ?? 0}
                 </p>
               </div>
 

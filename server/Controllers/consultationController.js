@@ -1,6 +1,8 @@
 import ConsultationRequest from "../Models/consultationRequestModel.js";
 import { CONSULTATION_WEBHOOK_URL } from "../Config/consultation.js";
 import { sendEmail } from "../src/utils/emailService.js";
+import User from "../Models/userModel.js";
+import { incrementCpaUsage } from "../Utils/subscriptionAccess.js";
 
 const sanitize = (value) => (typeof value === "string" ? value.trim() : "");
 const DEFAULT_ADMIN_EMAIL = "admin@nritax.ai";
@@ -167,6 +169,14 @@ const queueConsultationEmails = ({
 
 export const submitConsultationRequest = async (req, res) => {
   try {
+    const user = await User.findById(req.user?._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
     const name = sanitize(req.body?.name);
     const email = sanitize(req.body?.email).toLowerCase();
     const phone = sanitize(req.body?.phone);
@@ -260,6 +270,7 @@ export const submitConsultationRequest = async (req, res) => {
     }
 
     const bookingId = String(requestDoc._id);
+    await incrementCpaUsage(user);
 
     queueConsultationEmails({
       requestDoc,

@@ -167,6 +167,18 @@ export const getSubscriptionStatus = async () => {
   return getRequest("/api/subscription/status");
 };
 
+export const getMySubscription = async () => {
+  return getRequest("/api/subscription/me");
+};
+
+export const subscribeToPlan = async (payload: { plan: "professional" | "enterprise" }) => {
+  return postRequest("/api/subscription/subscribe", payload);
+};
+
+export const cancelMySubscription = async () => {
+  return postRequest("/api/subscription/cancel", {});
+};
+
 export const changePassword = async (payload: {
   oldPassword?: string;
   newPassword: string;

@@ -5,6 +5,7 @@ import { OAuth2Client } from "google-auth-library";
 import { generateToken } from "../Utils/generateToken.js";
 import User from "../Models/userModel.js";
 import { sendEmail } from "../src/utils/emailService.js";
+import { getSubscriptionSummary, normalizeUserSubscriptionState } from "../Utils/subscriptionAccess.js";
 
 const PROFILE_LANGUAGES = new Set(["english", "hindi", "tamil", "indonesian"]);
 const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i;
@@ -380,7 +381,9 @@ const buildPasswordResetUrl = (req, token) => {
 
 const toSafeUser = (userDoc) => {
   if (!userDoc) return null;
+  normalizeUserSubscriptionState(userDoc);
   const user = typeof userDoc.toObject === "function" ? userDoc.toObject() : userDoc;
+  const subscriptionSummary = getSubscriptionSummary(user);
   return {
     _id: user._id,
     name: user.name,
@@ -392,6 +395,14 @@ const toSafeUser = (userDoc) => {
     bio: user.bio || "",
     linkedinProfile: user.linkedinProfile || "",
     provider: user.provider || "local",
+    plan: user.plan || subscriptionSummary.plan,
+    subscriptionStatus: user.subscriptionStatus || subscriptionSummary.subscriptionStatus,
+    subscriptionStartDate: user.subscriptionStartDate || subscriptionSummary.subscriptionStartDate,
+    subscriptionEndDate: user.subscriptionEndDate || subscriptionSummary.subscriptionEndDate,
+    chatUsageCount: user.chatUsageCount ?? subscriptionSummary.usage.chatUsageCount,
+    chatUsageMonth: user.chatUsageMonth || subscriptionSummary.usage.chatUsageMonth,
+    cpaUsageCount: user.cpaUsageCount ?? subscriptionSummary.usage.cpaUsageCount,
+    cpaUsageMonth: user.cpaUsageMonth || subscriptionSummary.usage.cpaUsageMonth,
     subscription: user.subscription,
     usage: user.usage,
     createdAt: user.createdAt,
@@ -738,7 +749,6 @@ export const linkedinCallback = async (req, res) => {
   const statePayload = decodeLinkedInState(req.query?.state);
   const frontendOrigin = resolveFrontendOrigin(statePayload?.frontendOrigin);
   const mode = statePayload?.mode === "signup" ? "signup" : "login";
-
   try {
     const errorMessage = sanitizeString(req.query?.error_description || req.query?.error);
     if (errorMessage) {

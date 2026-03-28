@@ -83,6 +83,43 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    plan: {
+      type: String,
+      enum: ["starter", "professional", "enterprise"],
+      default: "starter",
+    },
+    subscriptionStatus: {
+      type: String,
+      enum: ["active", "inactive", "canceled"],
+      default: "active",
+    },
+    subscriptionStartDate: {
+      type: Date,
+      default: null,
+    },
+    subscriptionEndDate: {
+      type: Date,
+      default: null,
+    },
+    chatUsageCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    chatUsageMonth: {
+      type: Date,
+      default: Date.now,
+    },
+    cpaUsageCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    cpaUsageMonth: {
+      type: Date,
+      default: Date.now,
+    },
+
     // ---------------- Subscription ----------------
     subscription: {
       plan: {

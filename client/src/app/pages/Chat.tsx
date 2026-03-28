@@ -11,7 +11,8 @@ import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square, X } from "lucide-react";
-import { buildApiUrl, clearStoredAuth, getStoredAuthToken, getSubscriptionStatus } from "../../utils/api";
+import { buildApiUrl, clearStoredAuth, getMySubscription, getStoredAuthToken } from "../../utils/api";
+import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
 
 interface ChatProps {
   onRequireLogin: () => void;
@@ -154,7 +155,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const [question, setQuestion] = useState("");
   const [language, setLanguage] = useState("english");
   const knowledgeSource = "dtaa";
-  const [subscription, setSubscription] = useState<{ plan?: string; status?: string } | null>(null);
+  const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
   const welcomeByLanguage: Record<string, string> = {
     english: `Hi${userName ? ` ${userName}` : ""}! I am your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
     tamil: `Vanakkam${userName ? ` ${userName}` : ""}! Naan ungal AI chat assistant. DTAA vidhigal, NRI vari kelvigal, matrum vari thittamidhalil naan uthava tayaaraga irukkiren. Indru naan ungalukku eppadi uthavalam?`,
@@ -280,7 +281,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
   const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
   const hasActivePaidSubscription =
-    Boolean(subscription?.plan && subscription.plan !== "FREE" && subscription?.status === "active");
+    Boolean(subscription?.plan && subscription.plan !== PLAN_KEYS.STARTER && subscription?.subscriptionStatus === "active");
+  const starterLimitReached =
+    subscription?.plan === PLAN_KEYS.STARTER &&
+    subscription?.remaining?.chatMessages !== null &&
+    Number(subscription?.remaining?.chatMessages || 0) <= 0;
 
   useEffect(() => {
     const syncUser = () => setUserName(getStoredUserName());
@@ -369,8 +374,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
       setSubscription(null);
       return;
     }
-    getSubscriptionStatus()
-      .then((data: any) => setSubscription(data?.subscription ?? null))
+    getMySubscription()
+      .then((data: any) => setSubscription(data ?? null))
       .catch((error: any) => {
         setSubscription(null);
         if (error?.response?.status === 401) {
@@ -437,6 +442,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
       onRequireLogin();
       return;
     }
+    if (starterLimitReached) {
+      setProviderWarning("Free plan limit reached. Upgrade to Professional.");
+      return;
+    }
 
     const effectiveQuestion = typeof forcedQuestion === "string" ? forcedQuestion.trim() : question.trim();
     if (!effectiveQuestion) return;
@@ -459,6 +468,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
       );
       if (activeRequestIdRef.current !== requestId) return;
       setProviderWarning("");
+      if (response.data?.usage) {
+        setSubscription(response.data.usage);
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -469,6 +481,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
         return;
       }
       if (activeRequestIdRef.current !== requestId) return;
+      if (error?.response?.status === 403 && error?.response?.data?.usage) {
+        setSubscription(error.response.data.usage);
+        setProviderWarning(error.response?.data?.error || "Free plan limit reached. Upgrade to Professional.");
+        return;
+      }
       if (error.response?.status === 401) {
         clearStoredAuth();
         setSessionMessage("Your session expired. Please sign in again.");
@@ -786,6 +803,16 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     {providerWarning}
                   </p>
                 ) : null}
+                {subscription ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
+                      Current Plan: {subscription.currentPlan?.displayName || "Starter"}
+                    </Badge>
+                    <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
+                      {getRemainingChatLabel(subscription)}
+                    </Badge>
+                  </div>
+                ) : null}
                 {sessionMessage ? (
                   <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                     {sessionMessage}
@@ -854,12 +881,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
                   <Textarea
                     ref={questionInputRef}
-                    placeholder="Ask me a question"
+                    placeholder={starterLimitReached ? "Free plan limit reached. Upgrade to Professional." : "Ask me a question"}
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     onKeyDown={handleQuestionKeyDown}
                     className="min-h-[44px] max-h-32 resize-none border-[#E2E8F0] bg-[#F7FAFC]/90"
                     rows={1}
+                    disabled={starterLimitReached}
                   />
                   <Button
                     type="button"
@@ -867,7 +895,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     variant={isListening ? "destructive" : "outline"}
                     className="h-10 w-10 flex-shrink-0 border-[#E2E8F0]"
                     onClick={toggleVoiceInput}
-                    disabled={!speechSupported}
+                    disabled={!speechSupported || starterLimitReached}
                     title={speechSupported ? "Voice input" : "Voice input not supported in this browser"}
                   >
                     {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
@@ -888,12 +916,21 @@ export function Chat({ onRequireLogin }: ChatProps) {
                       type="submit"
                       size="icon"
                       className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95"
+                      disabled={starterLimitReached}
                     >
                       <Send className="size-5" />
                     </Button>
                   )}
                 </form>
               </CardFooter>
+              {starterLimitReached ? (
+                <div className="border-t border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
+                  Free plan limit reached. Upgrade to Professional for unlimited AI chat.
+                  <Button type="button" variant="link" className="ml-2 h-auto p-0 text-amber-900" onClick={() => navigate("/pricing")}>
+                    Upgrade to Professional
+                  </Button>
+                </div>
+              ) : null}
               {isListening && (
                 <p className="px-6 pb-4 text-xs text-red-600">Listening... tap mic again to stop.</p>
               )}

@@ -7,28 +7,11 @@ import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { convertInrToCurrency, formatCurrency, formatInr, resolveCurrencyByCode, SUPPORTED_CURRENCIES } from "../../utils/currency";
 import { GSTIN, IS_IOS_NATIVE_APP } from "../../config/appConfig";
-import { getStoredAuthToken, getSubscriptionStatus } from "../../utils/api";
+import { getMySubscription, getStoredAuthToken, subscribeToPlan } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
+import { CLIENT_PLAN_CONFIG, CLIENT_PLAN_ORDER, getPlanLabel, isCurrentPlan, type PlanKey, type SubscriptionMe } from "../../utils/subscription";
 
-type PlanName = "free" | "pro" | "enterprise";
 type BillingCycle = "monthly" | "yearly";
-
-type PlanFeature = {
-  text: string;
-  included: boolean;
-};
-
-type Plan = {
-  name: PlanName;
-  label: string;
-  badge: string;
-  monthlyInr?: number;
-  yearlyInr?: number;
-  description: string;
-  cta: string;
-  popular?: boolean;
-  features: PlanFeature[];
-};
 
 interface PricingProps {
   onRequireLogin: () => void;
@@ -41,73 +24,45 @@ export function Pricing({ onRequireLogin }: PricingProps) {
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [syncMessage, setSyncMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
+  const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
+  const [activatingPlan, setActivatingPlan] = useState<PlanKey | null>(null);
   const [currencyOverride, setCurrencyOverride] = useState<string>(
     () => localStorage.getItem("pricing_currency_override") || "INR"
   );
 
-  const plans: Plan[] = [
-    {
-      name: "free",
-      label: "Starter",
-      badge: "Best For First-Time Users",
-      monthlyInr: 0,
-      yearlyInr: 0,
-      description: "Start with essential NRI tax tools and updates.",
-      cta: "Get Started",
-      features: [
-        { text: "5 AI chat messages per month", included: true },
-        { text: "Basic DTAA information", included: true },
-        { text: "Tax calculators", included: true },
-        { text: "Email support", included: true },
-        { text: "Access to tax updates", included: true },
-        { text: "Unlimited AI chat", included: false },
-        { text: "CPA consultation", included: false },
-      ],
-    },
-    {
-      name: "pro",
-      label: "Professional",
-      badge: "MOST SELECTED",
-      monthlyInr: 999,
-      yearlyInr: 9999,
-      description: "For NRIs who need ongoing planning and faster support.",
-      cta: "Choose Pro",
-      popular: true,
-      features: [
-        { text: "Unlimited AI chat", included: true },
-        { text: "Annual plan includes extra 2 months free", included: true },
-        { text: "Advanced DTAA guidance", included: true },
-        { text: "All tax calculators", included: true },
-        { text: "Priority email support", included: true },
-        { text: "Personalized tax insights", included: true },
-        { text: "Dedicated advisor", included: false },
-      ],
-    },
-    {
-      name: "enterprise",
-      label: "Enterprise",
-      badge: "For Complex Portfolios",
-      description: "Complete solution for high-touch tax and compliance needs.",
-      cta: "Contact Support",
-      features: [
-        { text: "Everything in Professional", included: true },
-        { text: "Unlimited CPA consultations", included: true },
-        { text: "Dedicated advisor", included: true },
-        { text: "Priority response SLA", included: true },
-        { text: "Quarterly planning review", included: true },
-        { text: "Custom compliance workflows", included: true },
-      ],
-    },
-  ];
+  const plans = CLIENT_PLAN_ORDER.map((planKey) => {
+    const config = CLIENT_PLAN_CONFIG[planKey];
+    return {
+      name: planKey,
+      label: config.displayName,
+      badge: config.badge,
+      monthlyInr: config.monthlyPriceInr,
+      yearlyInr: config.yearlyPriceInr,
+      description:
+        planKey === "starter"
+          ? "Start with essential NRI tax tools and updates."
+          : planKey === "professional"
+          ? "For NRIs who need ongoing planning and faster support."
+          : "Complete solution for high-touch tax and compliance needs.",
+      cta:
+        planKey === "starter"
+          ? "Included"
+          : planKey === "professional"
+          ? "Activate Professional"
+          : "Activate Enterprise",
+      popular: planKey === "professional",
+      features: config.pricingFeatures,
+    };
+  });
 
-  const getMonthlyDisplay = (plan: Plan) => {
+  const getMonthlyDisplay = (plan: { monthlyInr?: number | null; yearlyInr?: number | null }) => {
     if (typeof plan.monthlyInr !== "number") return null;
     if (billingCycle === "monthly") return plan.monthlyInr;
     if (typeof plan.yearlyInr !== "number") return plan.monthlyInr;
     return Math.round(plan.yearlyInr / 12);
   };
 
-  const getYearlySavingsPercent = (monthlyInr?: number, yearlyInr?: number) => {
+  const getYearlySavingsPercent = (monthlyInr?: number | null, yearlyInr?: number | null) => {
     if (typeof monthlyInr !== "number" || typeof yearlyInr !== "number" || monthlyInr <= 0) return 0;
     const monthlyCost = monthlyInr * 12;
     return Math.round(((monthlyCost - yearlyInr) / monthlyCost) * 100);
@@ -140,13 +95,9 @@ export function Pricing({ onRequireLogin }: PricingProps) {
     setCurrencyOverride(nextCurrency);
   };
 
-  const handleSelect = (planName: PlanName) => {
-    if (planName === "free") {
+  const handleSelect = async (planName: PlanKey) => {
+    if (planName === "starter") {
       navigate("/home");
-      return;
-    }
-    if (planName === "enterprise") {
-      navigate("/consult");
       return;
     }
     if (!isAuthenticated) {
@@ -154,21 +105,53 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       return;
     }
     if (isIosNativeApp) return;
-    navigate(`/checkout?plan=${planName}&currency=${encodeURIComponent(currencyOverride)}`);
+    if (isCurrentPlan(subscription, planName)) return;
+
+    setActivatingPlan(planName);
+    setSyncMessage("");
+    try {
+      const data: any = await subscribeToPlan({ plan: planName });
+      const nextDetails = data?.subscriptionDetails || null;
+      setSubscription(nextDetails);
+      if (typeof window !== "undefined" && nextDetails) {
+        const storedUserRaw = localStorage.getItem("user");
+        const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+        localStorage.setItem(
+          "user",
+          JSON.stringify({
+            ...storedUser,
+            plan: nextDetails.plan,
+            subscriptionStatus: nextDetails.subscriptionStatus,
+            subscriptionStartDate: nextDetails.subscriptionStartDate,
+            subscriptionEndDate: nextDetails.subscriptionEndDate,
+            subscription: data?.subscription || storedUser.subscription,
+          })
+        );
+        window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new Event("auth-changed"));
+        window.dispatchEvent(new Event("user-updated"));
+      }
+      setSyncMessage(`${getPlanLabel(planName)} plan is now active.`);
+    } catch {
+      setSyncMessage("Unable to activate the selected plan right now.");
+    } finally {
+      setActivatingPlan(null);
+    }
   };
 
   const handleRestoreSubscription = async () => {
     setSyncMessage("");
     setIsSyncing(true);
     try {
-      const data: any = await getSubscriptionStatus();
-      const subscription = data?.subscription || null;
+      const data: any = await getMySubscription();
+      const subscriptionDetails = data || null;
+      setSubscription(subscriptionDetails);
       const isActivePaid = Boolean(
-        subscription?.status === "active" && subscription?.plan && subscription?.plan !== "FREE"
+        subscriptionDetails?.subscriptionStatus === "active" && subscriptionDetails?.plan !== "starter"
       );
       setSyncMessage(
         isActivePaid
-          ? `Subscription restored: ${subscription.plan} plan is active.`
+          ? `Subscription restored: ${getPlanLabel(subscriptionDetails?.plan)} plan is active.`
           : "No active paid subscription found for this account."
       );
       window.dispatchEvent(new Event("auth-changed"));
@@ -178,6 +161,16 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       setIsSyncing(false);
     }
   };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setSubscription(null);
+      return;
+    }
+    getMySubscription()
+      .then((data: any) => setSubscription(data || null))
+      .catch(() => setSubscription(null));
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -268,6 +261,8 @@ export function Pricing({ onRequireLogin }: PricingProps) {
           const monthlyDisplay = getMonthlyDisplay(plan);
           const yearlySavings = getYearlySavingsPercent(plan.monthlyInr, plan.yearlyInr);
           const isPopular = Boolean(plan.popular);
+          const isActivePlan = isCurrentPlan(subscription, plan.name);
+          const isButtonDisabled = isActivePlan || activatingPlan === plan.name;
 
           return (
             <motion.div
@@ -289,6 +284,10 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 <div className="absolute -top-4 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full bg-blue-500 px-6 py-2 text-sm font-bold text-white shadow-lg">
                   <Zap className="h-4 w-4" />
                   {plan.badge}
+                </div>
+              ) : isActivePlan ? (
+                <div className="absolute right-4 top-4 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
+                  CURRENT PLAN
                 </div>
               ) : plan.name === "enterprise" ? (
                 <div className="absolute right-4 top-4 rounded-full bg-blue-500 px-3 py-1 text-xs font-bold text-white">
@@ -350,17 +349,23 @@ export function Pricing({ onRequireLogin }: PricingProps) {
 
               <button
                 onClick={() => handleSelect(plan.name)}
+                disabled={isButtonDisabled}
                 className={`block w-full rounded-md py-3 text-center font-semibold transition-all ${
                   isPopular
                     ? "bg-white text-blue-700 hover:bg-gray-50"
                     : plan.name === "enterprise"
                     ? "bg-blue-500 text-white hover:bg-blue-600"
                     : "border border-blue-600 text-blue-600 hover:bg-blue-50"
-                }`}
+                } ${isButtonDisabled ? "cursor-not-allowed opacity-70" : ""}`}
               >
-                {isIosNativeApp && plan.name === "pro" ? "Subscribe on Website" : plan.cta}
-                {plan.name === "pro" ? <ArrowRight className="ml-2 inline h-4 w-4" /> : null}
+                {isActivePlan ? "Current Plan" : activatingPlan === plan.name ? "Activating..." : plan.cta}
+                {plan.name === "professional" && !isActivePlan ? <ArrowRight className="ml-2 inline h-4 w-4" /> : null}
               </button>
+              {isActivePlan ? (
+                <p className={`mt-3 text-sm ${isPopular ? "text-blue-100" : "text-[#475569]"}`}>
+                  Your current plan is active. You cannot select the same plan again.
+                </p>
+              ) : null}
             </motion.div>
           );
         })}

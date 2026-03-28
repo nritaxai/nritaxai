@@ -1,9 +1,24 @@
 import crypto from "crypto";
 import User from "../Models/userModel.js";
 import razorpay from "../Config/razorpay.js";
+import {
+  PLAN_KEYS,
+  SUBSCRIPTION_STATUSES,
+  getLegacyPlanCode,
+  getPlanConfig,
+  normalizePlanKey,
+} from "../../shared/subscriptionConfig.js";
+import {
+  activatePlan,
+  downgradeToStarter,
+  getSubscriptionSummary,
+  normalizeUserSubscriptionState,
+} from "../Utils/subscriptionAccess.js";
 
 const PLAN_ALIAS = {
-  pro: "PRO",
+  pro: PLAN_KEYS.PROFESSIONAL,
+  professional: PLAN_KEYS.PROFESSIONAL,
+  enterprise: PLAN_KEYS.ENTERPRISE,
 };
 
 const PROMO_CODES = {
@@ -26,8 +41,8 @@ const PROMO_CODES = {
 };
 
 const mapPlanFromRazorpayPlanId = (planId) => {
-  if (planId && planId === process.env.RAZORPAY_PRO_PLAN_ID) return "PRO";
-  return "FREE";
+  if (planId && planId === process.env.RAZORPAY_PRO_PLAN_ID) return getLegacyPlanCode(PLAN_KEYS.PROFESSIONAL);
+  return getLegacyPlanCode(PLAN_KEYS.STARTER);
 };
 
 const EVENT_STATUS_MAP = {
@@ -60,7 +75,7 @@ const resolvePlanMeta = ({ plan }) => {
   const normalizedPlan = String(plan).toLowerCase();
   const mappedPlan = PLAN_ALIAS[normalizedPlan];
   if (!mappedPlan) return null;
-  return { planName: mappedPlan };
+  return { planKey: mappedPlan, planName: getLegacyPlanCode(mappedPlan) };
 };
 
 const normalizeText = (value) => String(value || "").trim();
@@ -189,6 +204,23 @@ const syncUserSubscriptionFromRazorpayEntity = (user, subscriptionEntity) => {
 
   user.subscription.currentPeriodStart = toDateOrNull(subscriptionEntity.current_start);
   user.subscription.currentPeriodEnd = toDateOrNull(subscriptionEntity.current_end);
+  if (subscriptionEntity.plan_id) {
+    const legacyPlan = mapPlanFromRazorpayPlanId(subscriptionEntity.plan_id);
+    user.plan =
+      legacyPlan === "PRO"
+        ? PLAN_KEYS.PROFESSIONAL
+        : legacyPlan === "PREMIUM"
+        ? PLAN_KEYS.ENTERPRISE
+        : PLAN_KEYS.STARTER;
+  }
+  user.subscriptionStatus =
+    getRazorpayStatus(subscriptionEntity.status) === "cancelled"
+      ? SUBSCRIPTION_STATUSES.CANCELED
+      : getRazorpayStatus(subscriptionEntity.status) === "expired"
+      ? SUBSCRIPTION_STATUSES.INACTIVE
+      : SUBSCRIPTION_STATUSES.ACTIVE;
+  user.subscriptionStartDate = toDateOrNull(subscriptionEntity.current_start);
+  user.subscriptionEndDate = toDateOrNull(subscriptionEntity.current_end);
 };
 
 export const createSubscription = async (req, res) => {
@@ -202,7 +234,13 @@ export const createSubscription = async (req, res) => {
     if (!meta) {
       return res.status(400).json({
         success: false,
-        message: "Invalid plan. Only `pro` is supported.",
+        message: "Invalid plan. Only `professional` checkout is supported here.",
+      });
+    }
+    if (meta.planKey !== PLAN_KEYS.PROFESSIONAL) {
+      return res.status(400).json({
+        success: false,
+        message: "Enterprise activation is handled separately. Please contact support.",
       });
     }
 
@@ -252,6 +290,7 @@ export const createSubscription = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    normalizeUserSubscriptionState(user);
 
     const discountPaise = Math.round((baseAmountInPaise * discountPercent) / 100);
     const amountInPaise = Math.max(100, baseAmountInPaise - discountPaise);
@@ -265,6 +304,7 @@ export const createSubscription = async (req, res) => {
         userId: String(user._id),
         userEmail: user.email,
         plan: meta.planName,
+        planKey: meta.planKey,
         billing,
         billingCountry: billingCountry || "UNKNOWN",
         billingState: billingState || "NA",
@@ -291,6 +331,7 @@ export const createSubscription = async (req, res) => {
       currency: order.currency,
       razorpayKey: process.env.RAZORPAY_KEY_ID,
       plan: meta.planName,
+      planKey: meta.planKey,
       billing,
       promoCode: promoCode || null,
       discountPercent,
@@ -343,6 +384,7 @@ export const verifySubscriptionPayment = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+    normalizeUserSubscriptionState(user);
 
     let orderBilling = String(billing || "monthly").toLowerCase();
     try {
@@ -369,6 +411,10 @@ export const verifySubscriptionPayment = async (req, res) => {
     user.subscription.status = "active";
     user.subscription.currentPeriodStart = start;
     user.subscription.currentPeriodEnd = end;
+    user.plan = PLAN_KEYS.PROFESSIONAL;
+    user.subscriptionStatus = SUBSCRIPTION_STATUSES.ACTIVE;
+    user.subscriptionStartDate = start;
+    user.subscriptionEndDate = end;
 
     await user.save();
 
@@ -376,6 +422,7 @@ export const verifySubscriptionPayment = async (req, res) => {
       success: true,
       message: "Payment verified successfully",
       subscription: user.subscription,
+      subscriptionDetails: getSubscriptionSummary(user),
     });
   } catch (error) {
     console.error("verifySubscriptionPayment error:", error);
@@ -389,9 +436,23 @@ export const verifySubscriptionPayment = async (req, res) => {
 
 export const cancelSubscription = async (req, res) => {
   try {
-    return res.status(400).json({
-      success: false,
-      message: "Cancellation is not applicable for one-time payments.",
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    downgradeToStarter(user);
+    user.subscription.plan = "FREE";
+    user.subscription.status = "active";
+    user.subscription.currentPeriodStart = null;
+    user.subscription.currentPeriodEnd = null;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Subscription canceled. Your account has been downgraded to Starter.",
+      subscription: user.subscription,
+      subscriptionDetails: getSubscriptionSummary(user),
     });
   } catch (error) {
     console.error("cancelSubscription error:", error);
@@ -405,14 +466,21 @@ export const cancelSubscription = async (req, res) => {
 
 export const getSubscriptionStatus = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("subscription");
+    const user = await User.findById(req.user._id).select(
+      "subscription plan subscriptionStatus subscriptionStartDate subscriptionEndDate chatUsageCount chatUsageMonth cpaUsageCount cpaUsageMonth"
+    );
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
+    }
+    const changed = normalizeUserSubscriptionState(user);
+    if (changed) {
+      await user.save();
     }
 
     return res.status(200).json({
       success: true,
       subscription: user.subscription,
+      subscriptionDetails: getSubscriptionSummary(user),
     });
   } catch (error) {
     console.error("getSubscriptionStatus error:", error);
@@ -420,6 +488,68 @@ export const getSubscriptionStatus = async (req, res) => {
       success: false,
       message: "Failed to fetch subscription status",
       error: error.message,
+    });
+  }
+};
+
+export const getMySubscription = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).select(
+      "subscription plan subscriptionStatus subscriptionStartDate subscriptionEndDate chatUsageCount chatUsageMonth cpaUsageCount cpaUsageMonth"
+    );
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    const changed = normalizeUserSubscriptionState(user);
+    if (changed) {
+      await user.save();
+    }
+    return res.status(200).json({
+      success: true,
+      ...getSubscriptionSummary(user),
+    });
+  } catch (error) {
+    console.error("getMySubscription error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch subscription details",
+    });
+  }
+};
+
+export const subscribeToPlan = async (req, res) => {
+  try {
+    const nextPlan = normalizePlanKey(req.body?.plan);
+    if (![PLAN_KEYS.PROFESSIONAL, PLAN_KEYS.ENTERPRISE].includes(nextPlan)) {
+      return res.status(400).json({
+        success: false,
+        message: "Only professional or enterprise plans can be activated.",
+      });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    activatePlan(user, nextPlan);
+    user.subscription.plan = getLegacyPlanCode(nextPlan);
+    user.subscription.status = "active";
+    user.subscription.currentPeriodStart = user.subscriptionStartDate;
+    user.subscription.currentPeriodEnd = user.subscriptionEndDate;
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${getPlanConfig(nextPlan).displayName} plan activated.`,
+      subscription: user.subscription,
+      subscriptionDetails: getSubscriptionSummary(user),
+    });
+  } catch (error) {
+    console.error("subscribeToPlan error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to activate plan",
     });
   }
 };
