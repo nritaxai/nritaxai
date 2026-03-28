@@ -738,6 +738,25 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 </p>
               </div>
 
+              <div className="rounded-xl border border-[#E2E8F0] bg-[#F7FAFC] p-4">
+                <label className="block text-sm font-medium text-[#0F172A] mb-2">Promo Code</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promo}
+                    onChange={(e) => setPromo(e.target.value)}
+                    placeholder="ENTER PROMO CODE"
+                    className="flex-1 h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
+                  />
+                  <Button type="button" onClick={handleApplyPromo} className="h-11 px-5">
+                    Apply
+                  </Button>
+                </div>
+
+                {promoMessage && <p className="text-sm text-[#2563eb] mt-2">{promoMessage}</p>}
+                {promoError && <p className="text-sm text-red-600 mt-2">{promoError}</p>}
+              </div>
+
               {checkoutError && (
                 <p className="text-sm text-red-600 rounded-lg bg-red-50 border border-red-200 p-3">
                   {checkoutError}
