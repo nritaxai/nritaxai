@@ -507,7 +507,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
           <Badge className="bg-[#2563eb]/12 text-[#0F172A] border-[#2563eb]/40 mb-4">Secure Checkout</Badge>
           <h1 className="text-3xl sm:text-4xl text-[#0F172A] tracking-tight mb-3">Complete Your Subscription</h1>
           <p className="text-[#0F172A] max-w-2xl mx-auto">
-            Confirm your plan, enter billing details, and continue to payment or free promo redemption.
+            Confirm your plan, enter billing details, and continue to payment.
           </p>
         </div>
 
@@ -736,30 +736,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 <p className="mt-1 text-xs text-[#0F172A]">
                   This code is unique per user and tied to active subscription context.
                 </p>
-              </div>
-
-              <div className="rounded-xl border border-[#E2E8F0] bg-[#F7FAFC] p-4">
-                <label className="block text-sm font-medium text-[#0F172A] mb-2">Promo Code</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={promo}
-                    onChange={(e) => setPromo(e.target.value)}
-                    placeholder="ENTER PROMO CODE"
-                    className="flex-1 h-11 border border-[#E2E8F0] rounded-lg px-3.5 bg-[#F7FAFC] focus:ring-2 focus:ring-[#2563eb] focus:border-[#2563eb]/400 outline-none"
-                  />
-                  <Button type="button" onClick={handleApplyPromo} className="h-11 px-5">
-                    Apply
-                  </Button>
-                </div>
-
-                {promoMessage && <p className="text-sm text-[#2563eb] mt-2">{promoMessage}</p>}
-                {promoError && <p className="text-sm text-red-600 mt-2">{promoError}</p>}
-
-                <div className="mt-3 text-xs text-[#0F172A] space-y-1">
-                  <p className="font-medium text-[#0F172A]">Available promo codes</p>
-                  <p>SANDBOX10, SANDBOX20, SANDBOXY25, SANDBOX15</p>
-                </div>
               </div>
 
               {checkoutError && (
