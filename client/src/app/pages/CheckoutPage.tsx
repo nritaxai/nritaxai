@@ -111,6 +111,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const isIosNativeApp = IS_IOS_NATIVE_APP;
+  const currencyFromQuery = searchParams.get("currency");
 
   const [plan, setPlan] = useState<PlanType>(normalizePlan(searchParams.get("plan")));
   const [billing, setBilling] = useState<BillingType>("monthly");
@@ -136,7 +137,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [hasPrefilledUser, setHasPrefilledUser] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "success" | "failed">("idle");
   const [currencyOverride, setCurrencyOverride] = useState<string>(
-    () => localStorage.getItem("pricing_currency_override") || "auto"
+    () => currencyFromQuery || localStorage.getItem("pricing_currency_override") || "auto"
   );
 
   const selectedPlan = PLAN_META[plan];
@@ -194,6 +195,11 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   React.useEffect(() => {
     setPlan(normalizePlan(searchParams.get("plan")));
   }, [searchParams]);
+
+  React.useEffect(() => {
+    if (!currencyFromQuery) return;
+    setCurrencyOverride(currencyFromQuery);
+  }, [currencyFromQuery]);
 
   React.useEffect(() => {
     if (!isAuthenticated) {

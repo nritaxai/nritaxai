@@ -135,6 +135,11 @@ export function Pricing({ onRequireLogin }: PricingProps) {
     localStorage.setItem("pricing_currency_override", currencyOverride);
   }, [currencyOverride]);
 
+  const handleCurrencyOverrideChange = (nextCurrency: string) => {
+    localStorage.setItem("pricing_currency_override", nextCurrency);
+    setCurrencyOverride(nextCurrency);
+  };
+
   const handleSelect = (planName: PlanName) => {
     if (planName === "free") {
       navigate("/home");
@@ -149,7 +154,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       return;
     }
     if (isIosNativeApp) return;
-    navigate(`/checkout?plan=${planName}`);
+    navigate(`/checkout?plan=${planName}&currency=${encodeURIComponent(currencyOverride)}`);
   };
 
   const handleRestoreSubscription = async () => {
@@ -219,7 +224,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
         </div>
         <div className="mx-auto mt-4 max-w-xs text-left">
           <p className="mb-2 text-sm text-[#0F172A]">Display Currency</p>
-          <Select value={currencyOverride} onValueChange={setCurrencyOverride}>
+          <Select value={currencyOverride} onValueChange={handleCurrencyOverrideChange}>
             <SelectTrigger className="bg-white border-gray-300">
               <SelectValue />
             </SelectTrigger>
