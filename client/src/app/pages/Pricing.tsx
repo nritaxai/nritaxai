@@ -7,7 +7,7 @@ import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { convertInrToCurrency, formatCurrency, formatInr, resolveCurrencyByCode, SUPPORTED_CURRENCIES } from "../../utils/currency";
 import { GSTIN, IS_IOS_NATIVE_APP } from "../../config/appConfig";
-import { getMySubscription, getStoredAuthToken, subscribeToPlan } from "../../utils/api";
+import { getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { CLIENT_PLAN_CONFIG, CLIENT_PLAN_ORDER, getPlanLabel, isCurrentPlan, type PlanKey, type SubscriptionMe } from "../../utils/subscription";
 
@@ -25,7 +25,6 @@ export function Pricing({ onRequireLogin }: PricingProps) {
   const [syncMessage, setSyncMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
   const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
-  const [activatingPlan, setActivatingPlan] = useState<PlanKey | null>(null);
   const [currencyOverride, setCurrencyOverride] = useState<string>(
     () => localStorage.getItem("pricing_currency_override") || "INR"
   );
@@ -48,8 +47,8 @@ export function Pricing({ onRequireLogin }: PricingProps) {
         planKey === "starter"
           ? "Included"
           : planKey === "professional"
-          ? "Activate Professional"
-          : "Activate Enterprise",
+          ? "Continue to Checkout"
+          : "Contact Enterprise",
       popular: planKey === "professional",
       features: config.pricingFeatures,
     };
@@ -107,36 +106,12 @@ export function Pricing({ onRequireLogin }: PricingProps) {
     if (isIosNativeApp) return;
     if (isCurrentPlan(subscription, planName)) return;
 
-    setActivatingPlan(planName);
-    setSyncMessage("");
-    try {
-      const data: any = await subscribeToPlan({ plan: planName });
-      const nextDetails = data?.subscriptionDetails || null;
-      setSubscription(nextDetails);
-      if (typeof window !== "undefined" && nextDetails) {
-        const storedUserRaw = localStorage.getItem("user");
-        const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
-        localStorage.setItem(
-          "user",
-          JSON.stringify({
-            ...storedUser,
-            plan: nextDetails.plan,
-            subscriptionStatus: nextDetails.subscriptionStatus,
-            subscriptionStartDate: nextDetails.subscriptionStartDate,
-            subscriptionEndDate: nextDetails.subscriptionEndDate,
-            subscription: data?.subscription || storedUser.subscription,
-          })
-        );
-        window.dispatchEvent(new Event("storage"));
-        window.dispatchEvent(new Event("auth-changed"));
-        window.dispatchEvent(new Event("user-updated"));
-      }
-      setSyncMessage(`${getPlanLabel(planName)} plan is now active.`);
-    } catch {
-      setSyncMessage("Unable to activate the selected plan right now.");
-    } finally {
-      setActivatingPlan(null);
+    if (planName === "professional") {
+      navigate(`/checkout?plan=pro&currency=${encodeURIComponent(currencyOverride)}`);
+      return;
     }
+
+    window.location.href = "mailto:ask@nritax.ai?subject=Enterprise%20Plan%20Inquiry%20-%20NRITAX.AI";
   };
 
   const handleRestoreSubscription = async () => {
@@ -262,7 +237,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
           const yearlySavings = getYearlySavingsPercent(plan.monthlyInr, plan.yearlyInr);
           const isPopular = Boolean(plan.popular);
           const isActivePlan = isCurrentPlan(subscription, plan.name);
-          const isButtonDisabled = isActivePlan || activatingPlan === plan.name;
+          const isButtonDisabled = isActivePlan;
 
           return (
             <motion.div
@@ -358,7 +333,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                     : "border border-blue-600 text-blue-600 hover:bg-blue-50"
                 } ${isButtonDisabled ? "cursor-not-allowed opacity-70" : ""}`}
               >
-                {isActivePlan ? "Current Plan" : activatingPlan === plan.name ? "Activating..." : plan.cta}
+                {isActivePlan ? "Current Plan" : plan.cta}
                 {plan.name === "professional" && !isActivePlan ? <ArrowRight className="ml-2 inline h-4 w-4" /> : null}
               </button>
               {isActivePlan ? (

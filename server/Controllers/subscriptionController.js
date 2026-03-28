@@ -9,7 +9,6 @@ import {
   normalizePlanKey,
 } from "../../shared/subscriptionConfig.js";
 import {
-  activatePlan,
   downgradeToStarter,
   getSubscriptionSummary,
   normalizeUserSubscriptionState,
@@ -523,33 +522,25 @@ export const subscribeToPlan = async (req, res) => {
     if (![PLAN_KEYS.PROFESSIONAL, PLAN_KEYS.ENTERPRISE].includes(nextPlan)) {
       return res.status(400).json({
         success: false,
-        message: "Only professional or enterprise plans can be activated.",
+        message: "Only professional or enterprise plans can be requested.",
+      });
+    }
+    if (nextPlan === PLAN_KEYS.ENTERPRISE) {
+      return res.status(400).json({
+        success: false,
+        message: "Enterprise activation is handled separately. Please contact support.",
       });
     }
 
-    const user = await User.findById(req.user._id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    activatePlan(user, nextPlan);
-    user.subscription.plan = getLegacyPlanCode(nextPlan);
-    user.subscription.status = "active";
-    user.subscription.currentPeriodStart = user.subscriptionStartDate;
-    user.subscription.currentPeriodEnd = user.subscriptionEndDate;
-    await user.save();
-
-    return res.status(200).json({
-      success: true,
-      message: `${getPlanConfig(nextPlan).displayName} plan activated.`,
-      subscription: user.subscription,
-      subscriptionDetails: getSubscriptionSummary(user),
+    return res.status(402).json({
+      success: false,
+      message: `${getPlanConfig(nextPlan).displayName} plan is activated only after successful payment verification.`,
     });
   } catch (error) {
     console.error("subscribeToPlan error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to activate plan",
+      message: "Failed to process subscription request",
     });
   }
 };
