@@ -7,10 +7,22 @@ const PLAN_ALIAS = {
 };
 
 const PROMO_CODES = {
-  SANDBOX10: 10,
-  SANDBOX15: 15,
-  SANDBOX20: 20,
-  SANDBOXY25: 25,
+  SANDBOX10: {
+    discountPercent: 10,
+  },
+  SANDBOX15: {
+    discountPercent: 15,
+  },
+  SANDBOX20: {
+    discountPercent: 20,
+  },
+  SANDBOX99: {
+    discountPercent: 99,
+  },
+  SANDBOXY25: {
+    discountPercent: 25,
+    billing: "yearly",
+  },
 };
 
 const mapPlanFromRazorpayPlanId = (planId) => {
@@ -219,11 +231,8 @@ export const createSubscription = async (req, res) => {
           message: "SANDBOXY25 is valid only for yearly billing.",
         });
       }
-      discountPercent = PROMO_CODES[promoCode];
+      discountPercent = PROMO_CODES[promoCode].discountPercent;
     }
-
-    const discountPaise = Math.round((baseAmountInPaise * discountPercent) / 100);
-    const amountInPaise = Math.max(100, baseAmountInPaise - discountPaise);
     const billingCountry = normalizeText(req.body?.billingCountry);
     const billingState = normalizeText(req.body?.billingState);
     const countryCode = normalizeText(req.body?.countryCode);
@@ -243,6 +252,9 @@ export const createSubscription = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
+
+    const discountPaise = Math.round((baseAmountInPaise * discountPercent) / 100);
+    const amountInPaise = Math.max(100, baseAmountInPaise - discountPaise);
 
     const order = await razorpay.orders.create({
       amount: amountInPaise,
