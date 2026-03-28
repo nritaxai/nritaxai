@@ -31,10 +31,10 @@ type UserPayload = {
 };
 
 const PROMO_CODES: PromoCode[] = [
-  { code: "SANDBOX10", discountPercent: 10, description: "10% off on any plan (test only)" },
-  { code: "SANDBOX20", discountPercent: 20, description: "20% off on any plan (test only)" },
-  { code: "SANDBOXY25", discountPercent: 25, description: "25% off on yearly billing (test only)", billing: "yearly" },
-  { code: "SANDBOX15", discountPercent: 15, description: "15% off on any plan (test only)" },
+  { code: "NRITAX10", discountPercent: 10, description: "10% off on any plan (test only)" },
+  { code: "NRITAX20", discountPercent: 20, description: "20% off on any plan (test only)" },
+  { code: "NRITAXY25", discountPercent: 25, description: "25% off on yearly billing (test only)", billing: "yearly" },
+  { code: "NRITAX15", discountPercent: 15, description: "15% off on any plan (test only)" },
   { code: "NRITAX99", discountPercent: 99, description: "99% off on any plan (test only)" },
 ];
 

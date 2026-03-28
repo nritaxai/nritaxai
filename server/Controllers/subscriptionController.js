@@ -21,19 +21,19 @@ const PLAN_ALIAS = {
 };
 
 const PROMO_CODES = {
-  SANDBOX10: {
+  NRITAX10: {
     discountPercent: 10,
   },
-  SANDBOX15: {
+  NRITAX15: {
     discountPercent: 15,
   },
-  SANDBOX20: {
+  NRITAX20: {
     discountPercent: 20,
   },
   NRITAX99: {
     discountPercent: 99,
   },
-  SANDBOXY25: {
+  NRITAXY25: {
     discountPercent: 25,
     billing: "yearly",
   },
@@ -262,10 +262,10 @@ export const createSubscription = async (req, res) => {
           message: "Invalid promo code.",
         });
       }
-      if (promoCode === "SANDBOXY25" && billing !== "yearly") {
+      if (promoCode === "NRITAXY25" && billing !== "yearly") {
         return res.status(400).json({
           success: false,
-          message: "SANDBOXY25 is valid only for yearly billing.",
+          message: "NRITAXY25 is valid only for yearly billing.",
         });
       }
       discountPercent = PROMO_CODES[promoCode].discountPercent;
