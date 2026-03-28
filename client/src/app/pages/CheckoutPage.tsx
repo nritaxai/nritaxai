@@ -376,7 +376,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
         let lastError: any = null;
         for (let attempt = 0; attempt <= retries; attempt += 1) {
           try {
-            await axios.post(
+            const verifyResponse = await axios.post(
               buildApiUrl("/api/subscription/verify-subscription"),
               payload,
               {
@@ -385,7 +385,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 },
               }
             );
-            return;
+            return verifyResponse.data;
           } catch (error: any) {
             lastError = error;
             if (error?.response?.status === 401) {
@@ -414,7 +414,26 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
         },
         handler: async (response: any) => {
           try {
-            await verifyPaymentWithRetry({ ...response, plan, billing });
+            const verificationData = await verifyPaymentWithRetry({ ...response, plan, billing });
+            const verifiedSubscription = verificationData?.subscription || null;
+            if (verifiedSubscription && typeof window !== "undefined") {
+              try {
+                const storedUserRaw = localStorage.getItem("user");
+                const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+                localStorage.setItem(
+                  "user",
+                  JSON.stringify({
+                    ...storedUser,
+                    subscription: verifiedSubscription,
+                  })
+                );
+                window.dispatchEvent(new Event("storage"));
+                window.dispatchEvent(new Event("auth-changed"));
+                window.dispatchEvent(new Event("user-updated"));
+              } catch {
+                // Ignore malformed localStorage payload.
+              }
+            }
             setPaymentStatus("success");
             setCheckoutError("");
             sessionStorage.setItem("subscription_popup", "Payment successful. Your plan has been activated.");
