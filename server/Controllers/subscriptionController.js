@@ -16,7 +16,7 @@ const PROMO_CODES = {
   SANDBOX20: {
     discountPercent: 20,
   },
-  SANDBOX99: {
+  NRITAX99: {
     discountPercent: 99,
   },
   SANDBOXY25: {

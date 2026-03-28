@@ -35,7 +35,7 @@ const PROMO_CODES: PromoCode[] = [
   { code: "SANDBOX20", discountPercent: 20, description: "20% off on any plan (test only)" },
   { code: "SANDBOXY25", discountPercent: 25, description: "25% off on yearly billing (test only)", billing: "yearly" },
   { code: "SANDBOX15", discountPercent: 15, description: "15% off on any plan (test only)" },
-  { code: "SANDBOX99", discountPercent: 99, description: "99% off on any plan (test only)" },
+  { code: "NRITAX99", discountPercent: 99, description: "99% off on any plan (test only)" },
 ];
 
 const PLAN_META: Record<
