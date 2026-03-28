@@ -119,6 +119,10 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       minFractionDigits: 0,
       maxFractionDigits: 0,
     });
+  const pricingCurrencyNote =
+    displayCurrency.code === "INR"
+      ? "Prices are billed in INR. Payment providers may convert this to your local currency and forex charges may apply."
+      : `Prices are shown in ${displayCurrency.code}. Final payment is still charged in INR, and your bank or payment provider may apply conversion and forex charges.`;
 
   const getDisplayPriceLine = (inrValue: number) => {
     if (displayCurrency.code === "INR") {
@@ -228,9 +232,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
             </SelectContent>
           </Select>
         </div>
-        <p className="mt-4 text-sm text-[#64748B]">
-          Prices are billed in INR. Payment providers may convert this to your local currency and forex charges may apply.
-        </p>
+        <p className="mt-4 text-sm text-[#64748B]">{pricingCurrencyNote}</p>
       </motion.div>
 
       {isIosNativeApp && (

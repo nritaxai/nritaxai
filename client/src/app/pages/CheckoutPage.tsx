@@ -162,6 +162,14 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const selectedCountryCode = countryCode === "auto" ? autoCountryCode : countryCode;
   const formatDisplayAmount = (inrValue: number) =>
     formatCurrency(convertInrToCurrency(inrValue, displayCurrency), displayCurrency);
+  const displayCurrencyHeadline =
+    displayCurrency.code === "INR"
+      ? "Prices are shown in INR."
+      : `Prices are shown in ${displayCurrency.code}.`;
+  const billingCurrencyHeadline =
+    displayCurrency.code === "INR"
+      ? "Final billed amount will be charged in INR."
+      : "Final billed amount will still be charged in INR by Razorpay and may be converted by your payment provider.";
 
   React.useEffect(() => {
     localStorage.setItem("pricing_currency_override", currencyOverride);
@@ -572,8 +580,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
               <p className="flex items-center gap-2"><ShieldCheck className="size-4 text-[#2563eb]" /> Encrypted and secure checkout flow</p>
               <p className="flex items-center gap-2"><CreditCard className="size-4 text-[#2563eb]" /> Powered by Razorpay</p>
               <p className="text-xs">
-                Prices are shown in INR. Final billed amount may be converted to your local currency by your payment
-                provider. Forex charges may apply.
+                {displayCurrencyHeadline} {billingCurrencyHeadline} Forex charges may apply.
               </p>
             </div>
           </aside>
