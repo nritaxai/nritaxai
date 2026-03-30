@@ -45,6 +45,8 @@ const initialValues: ExpertFormData = {
   shortBio: "",
 };
 
+const EXPERT_ONBOARDING_WEBHOOK_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
+
 type ExpertOnboardingResponse = {
   success?: boolean;
   message?: string;
@@ -116,10 +118,12 @@ export function JoinAsExpertPage() {
     const file = e.target.files?.[0] || null;
     setResumeFile(file);
     setShowErrorBanner(false);
+    setErrorMessage("");
   };
 
   const handleRemoveFile = () => {
     setResumeFile(null);
+    setErrorMessage("");
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
     }
@@ -201,7 +205,7 @@ export function JoinAsExpertPage() {
       formData.append("areaOfExpertise", areaOfExpertise);
       formData.append("resume", resumeFile);
 
-      const response = await fetch("https://n8n.caloganathan.com/webhook/expert-onboarding", {
+      const response = await fetch(EXPERT_ONBOARDING_WEBHOOK_URL, {
         method: "POST",
         body: formData,
       });
@@ -467,6 +471,7 @@ export function JoinAsExpertPage() {
                     </div>
                     <input
                       id="resumeUpload"
+                      name="resume"
                       ref={resumeInputRef}
                       type="file"
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
