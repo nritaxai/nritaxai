@@ -1,5 +1,5 @@
 {
-  "name": "Expert Onboarding to Google Sheets",
+  "name": "Expert Onboarding with Resume Upload",
   "nodes": [
     {
       "parameters": {
@@ -72,6 +72,16 @@
                 "type": "string",
                 "operation": "notEmpty"
               }
+            },
+            {
+              "id": "f59ea4bc-f77e-4892-ba2d-5a8c29d5c106",
+              "leftValue": "={{ !!$binary.resume }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
             }
           ],
           "combinator": "and"
@@ -89,36 +99,73 @@
     },
     {
       "parameters": {
+        "resource": "file",
+        "operation": "upload",
+        "binaryData": true,
+        "binaryPropertyName": "resume",
+        "name": "={{ $binary.resume.fileName }}",
+        "parents": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
+        "options": {}
+      },
+      "id": "7f7f7f70-93fd-4c56-ad06-fd12ed3cf707",
+      "name": "Upload Resume",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        760,
+        180
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "YOUR_GOOGLE_DRIVE_CREDENTIAL_ID",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
         "assignments": {
           "assignments": [
             {
               "id": "4d7450d1-19d9-4390-914b-87953a5f9201",
               "name": "fullName",
-              "value": "={{ $json.fullName }}",
+              "value": "={{ $node[\"Webhook\"].json[\"fullName\"] }}",
               "type": "string"
             },
             {
               "id": "e0e4a95d-e166-4461-8764-03e38579a102",
               "name": "mobileNumber",
-              "value": "={{ $json.mobileNumber }}",
+              "value": "={{ $node[\"Webhook\"].json[\"mobileNumber\"] }}",
               "type": "string"
             },
             {
               "id": "0df85ed1-630f-43ac-a82f-585bebfe9203",
               "name": "email",
-              "value": "={{ $json.email }}",
+              "value": "={{ $node[\"Webhook\"].json[\"email\"] }}",
               "type": "string"
             },
             {
               "id": "56cd4cd5-d3c2-42bb-bc12-faf2afed9204",
               "name": "profession",
-              "value": "={{ $json.profession }}",
+              "value": "={{ $node[\"Webhook\"].json[\"profession\"] }}",
               "type": "string"
             },
             {
               "id": "8e676bda-5fe7-4d0e-bf31-c3edb65a9205",
               "name": "areaOfExpertise",
-              "value": "={{ $json.areaOfExpertise }}",
+              "value": "={{ $node[\"Webhook\"].json[\"areaOfExpertise\"] }}",
+              "type": "string"
+            },
+            {
+              "id": "cfbf2473-a6cf-4f4a-9b45-7b51beea9206",
+              "name": "resumeFileName",
+              "value": "={{ $node[\"Upload Resume\"].json[\"name\"] || $node[\"Webhook\"].binary[\"resume\"].fileName }}",
+              "type": "string"
+            },
+            {
+              "id": "dfcfe602-b432-4c42-bcb7-9d9d302b9207",
+              "name": "resumeLink",
+              "value": "={{ $node[\"Upload Resume\"].json[\"webViewLink\"] || ('https://drive.google.com/file/d/' + $node[\"Upload Resume\"].json[\"id\"] + '/view') }}",
               "type": "string"
             },
             {
@@ -136,7 +183,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        760,
+        1020,
         180
       ]
     },
@@ -156,12 +203,14 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "fullName": "={{ $json.fullName }}",
-            "mobileNumber": "={{ $json.mobileNumber }}",
-            "email": "={{ $json.email }}",
-            "profession": "={{ $json.profession }}",
-            "areaOfExpertise": "={{ $json.areaOfExpertise }}",
-            "createdAt": "={{ $json.createdAt }}"
+            "fullName": "={{ $node[\"Webhook\"].json[\"fullName\"] }}",
+            "mobileNumber": "={{ $node[\"Webhook\"].json[\"mobileNumber\"] }}",
+            "email": "={{ $node[\"Webhook\"].json[\"email\"] }}",
+            "profession": "={{ $node[\"Webhook\"].json[\"profession\"] }}",
+            "areaOfExpertise": "={{ $node[\"Webhook\"].json[\"areaOfExpertise\"] }}",
+            "resumeFileName": "={{ $node[\"Upload Resume\"].json[\"name\"] || $node[\"Webhook\"].binary[\"resume\"].fileName }}",
+            "resumeLink": "={{ $node[\"Upload Resume\"].json[\"webViewLink\"] || ('https://drive.google.com/file/d/' + $node[\"Upload Resume\"].json[\"id\"] + '/view') }}",
+            "createdAt": "={{ $now }}"
           },
           "matchingColumns": [],
           "schema": [
@@ -211,6 +260,24 @@
               "canBeUsedToMatch": true
             },
             {
+              "id": "resumeFileName",
+              "displayName": "resumeFileName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resumeLink",
+              "displayName": "resumeLink",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
               "id": "createdAt",
               "displayName": "createdAt",
               "required": false,
@@ -230,7 +297,7 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1020,
+        1280,
         180
       ],
       "credentials": {
@@ -243,7 +310,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Expert onboarding saved successfully\"\n}",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Expert onboarding saved successfully\",\n  \"resumeLink\": $node[\"Upload Resume\"].json[\"webViewLink\"] || ('https://drive.google.com/file/d/' + $node[\"Upload Resume\"].json[\"id\"] + '/view')\n}",
         "options": {
           "responseCode": 200
         }
@@ -253,14 +320,14 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.2,
       "position": [
-        1280,
+        1540,
         180
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields\"\n}",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields or resume file\"\n}",
         "options": {
           "responseCode": 400
         }
@@ -291,7 +358,7 @@
       "main": [
         [
           {
-            "node": "Format Data",
+            "node": "Upload Resume",
             "type": "main",
             "index": 0
           }
@@ -299,6 +366,17 @@
         [
           {
             "node": "Respond to Webhook (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Resume": {
+      "main": [
+        [
+          {
+            "node": "Format Data",
             "type": "main",
             "index": 0
           }
