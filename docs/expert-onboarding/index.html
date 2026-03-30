@@ -225,6 +225,11 @@
           <label for="areaOfExpertise">Area of expertise</label>
           <input id="areaOfExpertise" name="areaOfExpertise" type="text" required />
         </div>
+
+        <div class="field full-width">
+          <label for="resume">Resume</label>
+          <input id="resume" name="resume" type="file" required />
+        </div>
       </div>
 
       <div id="statusMessage" class="status" aria-live="polite"></div>
@@ -252,20 +257,29 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      const formData = {
+      const formValues = {
         fullName: form.fullName.value.trim(),
         mobileNumber: form.mobileNumber.value.trim(),
         email: form.email.value.trim(),
         profession: form.profession.value.trim(),
         areaOfExpertise: form.areaOfExpertise.value.trim()
       };
+      const selectedFile = form.resume.files[0];
 
-      const hasEmptyValue = Object.values(formData).some((value) => value === "");
+      const hasEmptyValue = Object.values(formValues).some((value) => value === "");
 
-      if (hasEmptyValue) {
-        setStatus("Please fill in all required fields.", "error");
+      if (hasEmptyValue || !selectedFile) {
+        setStatus("Please fill in all required fields and upload your resume.", "error");
         return;
       }
+
+      const formData = new FormData();
+      formData.append("fullName", formValues.fullName);
+      formData.append("mobileNumber", formValues.mobileNumber);
+      formData.append("email", formValues.email);
+      formData.append("profession", formValues.profession);
+      formData.append("areaOfExpertise", formValues.areaOfExpertise);
+      formData.append("resume", selectedFile);
 
       submitButton.disabled = true;
       submitButton.textContent = "Submitting...";
@@ -274,10 +288,7 @@
       try {
         const response = await fetch(WEBHOOK_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify(formData)
+          body: formData
         });
 
         let result;
@@ -296,7 +307,10 @@
         }
 
         if (result && result.success === true) {
-          setStatus(result.message || "Expert onboarding saved successfully.", "success");
+          const successMessage = result.resumeLink
+            ? (result.message || "Expert onboarding saved successfully.") + " Resume: " + result.resumeLink
+            : (result.message || "Expert onboarding saved successfully.");
+          setStatus(successMessage, "success");
           form.reset();
           return;
         }
