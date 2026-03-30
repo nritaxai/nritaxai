@@ -48,6 +48,7 @@ const initialValues: ExpertFormData = {
 type ExpertOnboardingResponse = {
   success?: boolean;
   message?: string;
+  resumeLink?: string;
 };
 
 export function JoinAsExpertPage() {
@@ -58,6 +59,7 @@ export function JoinAsExpertPage() {
   const [showErrorBanner, setShowErrorBanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
 
   useEffect(() => {
@@ -161,16 +163,21 @@ export function JoinAsExpertPage() {
     event.preventDefault();
     setShowErrorBanner(false);
     setSuccessMessage("");
+    setErrorMessage("");
 
     if (loading) return;
 
-    console.log("Submitting values:", values);
-
     const validationErrors = validateForm(values);
-    console.log("Validation errors:", validationErrors);
+
+    if (!resumeFile) {
+      setErrorMessage("Please upload your resume.");
+      setShowErrorBanner(true);
+      return;
+    }
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
+      setErrorMessage("Please fill all required fields.");
       setShowErrorBanner(true);
       return;
     }
@@ -181,13 +188,18 @@ export function JoinAsExpertPage() {
 
     try {
       const formData = new FormData();
-      Object.entries(values).forEach(([key, value]) => {
-        formData.append(key, value || "");
-      });
+      const fullName = values.fullName.trim();
+      const mobileNumber = values.mobileNumber.trim();
+      const email = values.email.trim();
+      const profession = values.profession.trim();
+      const areaOfExpertise = values.areaOfExpertise.trim();
 
-      if (resumeFile) {
-        formData.append("resume", resumeFile);
-      }
+      formData.append("fullName", fullName);
+      formData.append("mobileNumber", mobileNumber);
+      formData.append("email", email);
+      formData.append("profession", profession);
+      formData.append("areaOfExpertise", areaOfExpertise);
+      formData.append("resume", resumeFile);
 
       const response = await fetch("https://n8n.caloganathan.com/webhook/expert-onboarding", {
         method: "POST",
@@ -195,19 +207,24 @@ export function JoinAsExpertPage() {
       });
 
       const data = (await response.json()) as ExpertOnboardingResponse;
-      console.log("Webhook response:", data);
 
       if (response.ok && data.success) {
-        setSuccessMessage("Your application has been submitted successfully.");
+        setSuccessMessage(data.message || "Your application has been submitted successfully.");
         setValues(initialValues);
         setResumeFile(null);
         setErrors({});
         setShowErrorBanner(false);
+        setErrorMessage("");
+        if (resumeInputRef.current) {
+          resumeInputRef.current.value = "";
+        }
       } else {
+        setErrorMessage(data.message || "Missing required fields or resume file.");
         setShowErrorBanner(true);
       }
     } catch (error) {
       console.error("Submit error:", error);
+      setErrorMessage("A network or server error occurred. Please try again.");
       setShowErrorBanner(true);
     } finally {
       setLoading(false);
@@ -257,7 +274,7 @@ export function JoinAsExpertPage() {
             ) : null}
             {showErrorBanner && (
               <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                Please fill all required fields.
+                {errorMessage || "Please fill all required fields."}
               </div>
             )}
 
