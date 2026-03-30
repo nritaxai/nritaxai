@@ -773,6 +773,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                   </Button>
                 </div>
 
+                <p className="mt-2 text-xs text-[#0F172A]">
+                  If you need a promo code, please contact us.
+                </p>
+
                 {promoMessage && <p className="text-sm text-[#2563eb] mt-2">{promoMessage}</p>}
                 {promoError && <p className="text-sm text-red-600 mt-2">{promoError}</p>}
               </div>
