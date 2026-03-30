@@ -10,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -51,6 +50,7 @@ const MAX_PROFILE_IMAGE_BYTES = 2 * 1024 * 1024;
 const ALLOWED_PROFILE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/jpg", "image/webp", "image/gif"]);
 const PROFILE_IMAGE_OUTPUT_SIZE = 320;
 const LINKEDIN_URL_PATTERN = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
+const DELETE_ACCOUNT_CONFIRMATION_TEXT = "DELETE MY ACCOUNT";
 
 const loadImageFromDataUrl = (dataUrl: string) =>
   new Promise<HTMLImageElement>((resolve, reject) => {
@@ -169,6 +169,10 @@ export function Profile() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
+  const [deleteAccountStep, setDeleteAccountStep] = useState<"phrase" | "confirm">("phrase");
+  const [deleteAccountConfirmationInput, setDeleteAccountConfirmationInput] = useState("");
+  const [deleteAccountDialogError, setDeleteAccountDialogError] = useState("");
   const requiresCurrentPassword = profile?.provider !== "google";
 
   const isDirty = useMemo(() => {
@@ -490,6 +494,35 @@ export function Profile() {
     } finally {
       setDeletingAccount(false);
     }
+  };
+
+  const resetDeleteAccountDialog = () => {
+    setDeleteAccountStep("phrase");
+    setDeleteAccountConfirmationInput("");
+    setDeleteAccountDialogError("");
+  };
+
+  const handleDeleteAccountDialogOpenChange = (open: boolean) => {
+    setIsDeleteAccountDialogOpen(open);
+    if (!open && !deletingAccount) {
+      resetDeleteAccountDialog();
+    }
+  };
+
+  const handleDeleteAccountPhraseSubmit = () => {
+    if (deleteAccountConfirmationInput.trim() !== DELETE_ACCOUNT_CONFIRMATION_TEXT) {
+      setDeleteAccountDialogError(`Please type "${DELETE_ACCOUNT_CONFIRMATION_TEXT}" exactly to continue.`);
+      return;
+    }
+
+    setDeleteAccountDialogError("");
+    setDeleteAccountStep("confirm");
+  };
+
+  const handleDeleteAccountCancel = () => {
+    if (deletingAccount) return;
+    setIsDeleteAccountDialogOpen(false);
+    resetDeleteAccountDialog();
   };
 
   return (
@@ -1026,7 +1059,7 @@ export function Profile() {
                 <LogOut className="size-4 mr-2" />
                 Logout
               </Button>
-              <AlertDialog>
+              <AlertDialog open={isDeleteAccountDialogOpen} onOpenChange={handleDeleteAccountDialogOpenChange}>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="destructive"
@@ -1039,19 +1072,65 @@ export function Profile() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Delete account permanently?</AlertDialogTitle>
+                    <AlertDialogTitle>
+                      {deleteAccountStep === "phrase" ? "Verify account deletion" : "Confirm account deletion"}
+                    </AlertDialogTitle>
                     <AlertDialogDescription>
-                      This action cannot be undone. Your profile and account data will be removed permanently.
+                      {deleteAccountStep === "phrase"
+                        ? `To continue, type the exact phrase "${DELETE_ACCOUNT_CONFIRMATION_TEXT}" so we know this is an intentional request.`
+                        : "This is your final confirmation. Your profile and account data will be removed permanently."}
                     </AlertDialogDescription>
                   </AlertDialogHeader>
+                  {deleteAccountStep === "phrase" ? (
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="delete-account-confirmation">Type the phrase exactly</Label>
+                        <Input
+                          id="delete-account-confirmation"
+                          value={deleteAccountConfirmationInput}
+                          onChange={(event) => {
+                            setDeleteAccountConfirmationInput(event.target.value);
+                            if (deleteAccountDialogError) {
+                              setDeleteAccountDialogError("");
+                            }
+                          }}
+                          placeholder={DELETE_ACCOUNT_CONFIRMATION_TEXT}
+                          autoComplete="off"
+                          autoCapitalize="characters"
+                          spellCheck={false}
+                        />
+                      </div>
+                      {deleteAccountDialogError ? (
+                        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                          {deleteAccountDialogError}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                      This action cannot be undone. Please confirm one more time to delete your account.
+                    </div>
+                  )}
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDeleteAccount}
+                    <AlertDialogCancel onClick={handleDeleteAccountCancel} disabled={deletingAccount}>
+                      Cancel
+                    </AlertDialogCancel>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      onClick={deleteAccountStep === "phrase" ? handleDeleteAccountPhraseSubmit : handleDeleteAccount}
+                      disabled={
+                        deletingAccount ||
+                        (deleteAccountStep === "phrase" && deleteAccountConfirmationInput.trim() !== DELETE_ACCOUNT_CONFIRMATION_TEXT)
+                      }
                       className="bg-red-600 hover:bg-red-700 focus-visible:ring-red-500"
                     >
-                      Yes, delete account
-                    </AlertDialogAction>
+                      {deleteAccountStep === "phrase"
+                        ? "Continue"
+                        : deletingAccount
+                          ? "Deleting..."
+                          : "Yes, delete account"}
+                    </Button>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
