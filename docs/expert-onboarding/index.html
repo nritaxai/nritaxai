@@ -237,7 +237,7 @@
   </section>
 
   <script>
-    const WEBHOOK_URL = "YOUR_N8N_WEBHOOK_URL";
+    const WEBHOOK_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 
     const form = document.getElementById("expertOnboardingForm");
     const submitButton = document.getElementById("submitButton");
@@ -252,7 +252,7 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
-      const payload = {
+      const formData = {
         fullName: form.fullName.value.trim(),
         mobileNumber: form.mobileNumber.value.trim(),
         email: form.email.value.trim(),
@@ -260,7 +260,7 @@
         areaOfExpertise: form.areaOfExpertise.value.trim()
       };
 
-      const hasEmptyValue = Object.values(payload).some((value) => value === "");
+      const hasEmptyValue = Object.values(formData).some((value) => value === "");
 
       if (hasEmptyValue) {
         setStatus("Please fill in all required fields.", "error");
@@ -277,7 +277,7 @@
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(formData)
         });
 
         let result;
