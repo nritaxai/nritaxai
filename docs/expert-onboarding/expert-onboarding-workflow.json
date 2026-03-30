@@ -1,0 +1,339 @@
+{
+  "name": "Expert Onboarding to Google Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "expert-onboarding",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1f1a1a9a-3d97-4e3f-a7d0-97b7c8f6c101",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "expert-onboarding"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4c5ba9de-bd2f-4219-9a5f-1b38914a0f01",
+              "leftValue": "={{ String($json.fullName || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "b424ef2a-c8d2-4eb1-8c77-75149b8e4902",
+              "leftValue": "={{ String($json.mobileNumber || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "d12cde58-3fb9-4a90-a609-5193730a0103",
+              "leftValue": "={{ String($json.email || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "bf502e9d-3d34-4a3d-8f7f-4fe038620104",
+              "leftValue": "={{ String($json.profession || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            },
+            {
+              "id": "e49d84ab-e66d-4781-aa1c-4a7b18e50105",
+              "leftValue": "={{ String($json.areaOfExpertise || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "2f2b2b0b-4ea8-4701-b8e1-a8c8d9e7d202",
+      "name": "If (Validate)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4d7450d1-19d9-4390-914b-87953a5f9201",
+              "name": "fullName",
+              "value": "={{ $json.fullName }}",
+              "type": "string"
+            },
+            {
+              "id": "e0e4a95d-e166-4461-8764-03e38579a102",
+              "name": "mobileNumber",
+              "value": "={{ $json.mobileNumber }}",
+              "type": "string"
+            },
+            {
+              "id": "0df85ed1-630f-43ac-a82f-585bebfe9203",
+              "name": "email",
+              "value": "={{ $json.email }}",
+              "type": "string"
+            },
+            {
+              "id": "56cd4cd5-d3c2-42bb-bc12-faf2afed9204",
+              "name": "profession",
+              "value": "={{ $json.profession }}",
+              "type": "string"
+            },
+            {
+              "id": "8e676bda-5fe7-4d0e-bf31-c3edb65a9205",
+              "name": "areaOfExpertise",
+              "value": "={{ $json.areaOfExpertise }}",
+              "type": "string"
+            },
+            {
+              "id": "e0f44d91-6fcf-4f76-bf5f-570406a59206",
+              "name": "createdAt",
+              "value": "={{ $now }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "3f3c3c1c-5fb9-4812-c9f2-b9d9eaf8e303",
+      "name": "Format Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        760,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "YOUR_GOOGLE_SHEET_ID"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "fullName": "={{ $json.fullName }}",
+            "mobileNumber": "={{ $json.mobileNumber }}",
+            "email": "={{ $json.email }}",
+            "profession": "={{ $json.profession }}",
+            "areaOfExpertise": "={{ $json.areaOfExpertise }}",
+            "createdAt": "={{ $json.createdAt }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "fullName",
+              "displayName": "fullName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "mobileNumber",
+              "displayName": "mobileNumber",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "profession",
+              "displayName": "profession",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "areaOfExpertise",
+              "displayName": "areaOfExpertise",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "createdAt",
+              "displayName": "createdAt",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "4f4d4d2d-60ca-4923-daf3-caeafb09f404",
+      "name": "Google Sheets (Append Row)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1020,
+        180
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": true,\n  \"message\": \"Expert onboarding saved successfully\"\n}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "5f5e5e3e-71db-4a34-ebf4-dbf0cb1af505",
+      "name": "Respond to Webhook (Success)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1280,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields\"\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "6f6f6f4f-82ec-4b45-fcf5-ec01dc2bf606",
+      "name": "Respond to Webhook (Error)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        760,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "If (Validate)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (Validate)": {
+      "main": [
+        [
+          {
+            "node": "Format Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Data": {
+      "main": [
+        [
+          {
+            "node": "Google Sheets (Append Row)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets (Append Row)": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook (Success)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {},
+  "versionId": "7f7f7f5f-93fd-4c56-ad06-fd12ed3cf707",
+  "meta": {
+    "instanceId": "expert-onboarding-template"
+  },
+  "id": "8f8f8f6f-a40e-4d67-be17-0e23fe4df808",
+  "tags": []
+}

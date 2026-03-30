@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Expert Onboarding</title>
+  <style>
+    :root {
+      --bg: #f3f7fb;
+      --card: rgba(255, 255, 255, 0.94);
+      --text: #152033;
+      --muted: #5f6f86;
+      --border: rgba(21, 32, 51, 0.12);
+      --accent: #0f766e;
+      --accent-dark: #0a5c56;
+      --danger: #b42318;
+      --success: #027a48;
+      --shadow: 0 24px 60px rgba(21, 32, 51, 0.14);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(15, 118, 110, 0.18), transparent 35%),
+        radial-gradient(circle at bottom right, rgba(14, 116, 144, 0.15), transparent 30%),
+        linear-gradient(180deg, #eef5fb 0%, #f8fbfd 100%);
+      display: grid;
+      place-items: center;
+      padding: 24px;
+    }
+
+    .panel {
+      width: min(100%, 720px);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      backdrop-filter: blur(14px);
+    }
+
+    .hero {
+      padding: 32px 32px 16px;
+      background: linear-gradient(135deg, rgba(15, 118, 110, 0.08), rgba(14, 116, 144, 0.04));
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(15, 118, 110, 0.1);
+      color: var(--accent-dark);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 16px 0 10px;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      line-height: 1.05;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+
+    form {
+      padding: 24px 32px 32px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .field.full-width {
+      grid-column: 1 / -1;
+    }
+
+    label {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      font-size: 1rem;
+      color: var(--text);
+      background: #ffffff;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: rgba(15, 118, 110, 0.5);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.14);
+      transform: translateY(-1px);
+    }
+
+    .status {
+      min-height: 24px;
+      margin: 18px 0 0;
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .status.success {
+      color: var(--success);
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .actions {
+      margin-top: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .helper {
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    button {
+      appearance: none;
+      border: none;
+      border-radius: 14px;
+      padding: 14px 20px;
+      min-width: 180px;
+      font-size: 1rem;
+      font-weight: 700;
+      color: #ffffff;
+      background: linear-gradient(135deg, var(--accent), #0e7490);
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      box-shadow: 0 16px 30px rgba(15, 118, 110, 0.22);
+    }
+
+    button:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: 0.75;
+      transform: none;
+      box-shadow: none;
+    }
+
+    @media (max-width: 640px) {
+      .hero,
+      form {
+        padding-left: 20px;
+        padding-right: 20px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <section class="panel">
+    <div class="hero">
+      <div class="eyebrow">Expert Network</div>
+      <h1>Join the expert onboarding flow</h1>
+      <p class="subtitle">
+        Share your professional details and we will route your onboarding data to the workflow instantly.
+      </p>
+    </div>
+
+    <form id="expertOnboardingForm" novalidate>
+      <div class="grid">
+        <div class="field">
+          <label for="fullName">Full name</label>
+          <input id="fullName" name="fullName" type="text" required autocomplete="name" />
+        </div>
+
+        <div class="field">
+          <label for="mobileNumber">Mobile number</label>
+          <input id="mobileNumber" name="mobileNumber" type="tel" required autocomplete="tel" />
+        </div>
+
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" required autocomplete="email" />
+        </div>
+
+        <div class="field">
+          <label for="profession">Profession</label>
+          <input id="profession" name="profession" type="text" required />
+        </div>
+
+        <div class="field full-width">
+          <label for="areaOfExpertise">Area of expertise</label>
+          <input id="areaOfExpertise" name="areaOfExpertise" type="text" required />
+        </div>
+      </div>
+
+      <div id="statusMessage" class="status" aria-live="polite"></div>
+
+      <div class="actions">
+        <p class="helper">All fields are required before submission.</p>
+        <button id="submitButton" type="submit">Submit application</button>
+      </div>
+    </form>
+  </section>
+
+  <script>
+    const WEBHOOK_URL = "YOUR_N8N_WEBHOOK_URL";
+
+    const form = document.getElementById("expertOnboardingForm");
+    const submitButton = document.getElementById("submitButton");
+    const statusMessage = document.getElementById("statusMessage");
+    const defaultButtonText = submitButton.textContent;
+
+    function setStatus(message, type) {
+      statusMessage.textContent = message;
+      statusMessage.className = "status" + (type ? " " + type : "");
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const payload = {
+        fullName: form.fullName.value.trim(),
+        mobileNumber: form.mobileNumber.value.trim(),
+        email: form.email.value.trim(),
+        profession: form.profession.value.trim(),
+        areaOfExpertise: form.areaOfExpertise.value.trim()
+      };
+
+      const hasEmptyValue = Object.values(payload).some((value) => value === "");
+
+      if (hasEmptyValue) {
+        setStatus("Please fill in all required fields.", "error");
+        return;
+      }
+
+      submitButton.disabled = true;
+      submitButton.textContent = "Submitting...";
+      setStatus("Submitting your details...", "");
+
+      try {
+        const response = await fetch(WEBHOOK_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(payload)
+        });
+
+        let result;
+        try {
+          result = await response.json();
+        } catch (parseError) {
+          result = null;
+        }
+
+        if (!response.ok) {
+          const errorMessage = result && result.message
+            ? result.message
+            : "Unable to submit your details right now. Please try again.";
+          setStatus(errorMessage, "error");
+          return;
+        }
+
+        if (result && result.success === true) {
+          setStatus(result.message || "Expert onboarding saved successfully.", "success");
+          form.reset();
+          return;
+        }
+
+        setStatus(
+          result && result.message
+            ? result.message
+            : "The request was received, but the submission could not be completed.",
+          "error"
+        );
+      } catch (error) {
+        setStatus("A network or server error occurred. Please try again in a moment.", "error");
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = defaultButtonText;
+      }
+    });
+  </script>
+</body>
+</html>
