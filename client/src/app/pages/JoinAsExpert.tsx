@@ -7,7 +7,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Textarea } from "../components/ui/textarea";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
-import { trimValue } from "../utils/consultationWorkflow";
+import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkflow";
 
 type ExpertFormData = {
   fullName: string;
@@ -27,6 +27,7 @@ type ExpertFormData = {
 };
 
 type FieldKey = keyof ExpertFormData;
+type ExpertFormFieldKey = FieldKey | "resume";
 
 const initialValues: ExpertFormData = {
   fullName: "",
@@ -45,19 +46,68 @@ const initialValues: ExpertFormData = {
   shortBio: "",
 };
 
-const EXPERT_ONBOARDING_WEBHOOK_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
-
 type ExpertOnboardingResponse = {
   success?: boolean;
   message?: string;
   resumeLink?: string;
 };
 
+const SUBMISSION_TIMEOUT_MS = 15000;
+const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
+const REQUIRED_FIELDS: FieldKey[] = ["fullName", "mobileNumber", "email", "profession", "areaOfExpertise"];
+
+const isDevelopment = import.meta.env.DEV;
+
+const debugLog = (message: string, details?: unknown) => {
+  if (!isDevelopment) return;
+
+  if (details === undefined) {
+    console.debug(`[JoinAsExpert] ${message}`);
+    return;
+  }
+
+  console.debug(`[JoinAsExpert] ${message}`, details);
+};
+
+const parseResponseJsonSafely = async (response: Response): Promise<ExpertOnboardingResponse | null> => {
+  const rawText = await response.text();
+  const trimmedBody = rawText.trim();
+  const contentType = response.headers.get("content-type") || "";
+
+  if (!trimmedBody) {
+    return null;
+  }
+
+  if (!contentType.toLowerCase().includes("application/json")) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(trimmedBody) as ExpertOnboardingResponse;
+  } catch {
+    return null;
+  }
+};
+
+const getSubmissionErrorMessage = (response: Response, payload: ExpertOnboardingResponse | null) => {
+  const message = trimValue(payload?.message);
+
+  if (message) {
+    return message;
+  }
+
+  debugLog("Using fallback submission error message.", {
+    status: response.status,
+    contentType: response.headers.get("content-type"),
+  });
+  return FALLBACK_SUBMISSION_ERROR;
+};
+
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
-  const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -119,6 +169,10 @@ export function JoinAsExpertPage() {
     setResumeFile(file);
     setShowErrorBanner(false);
     setErrorMessage("");
+    setErrors((prev) => ({
+      ...prev,
+      resume: "",
+    }));
   };
 
   const handleRemoveFile = () => {
@@ -129,8 +183,8 @@ export function JoinAsExpertPage() {
     }
   };
 
-  const validateForm = (values: ExpertFormData) => {
-    const newErrors: Partial<Record<FieldKey, string>> = {};
+  const validateForm = (values: ExpertFormData, file: File | null) => {
+    const newErrors: Partial<Record<ExpertFormFieldKey, string>> = {};
 
     if (!values.fullName || values.fullName.trim() === "") {
       newErrors.fullName = "Full name is required";
@@ -160,6 +214,10 @@ export function JoinAsExpertPage() {
       newErrors.linkedinOrWebsite = "Enter a valid URL";
     }
 
+    if (!file) {
+      newErrors.resume = "Please upload your resume.";
+    }
+
     return newErrors;
   };
 
@@ -171,17 +229,11 @@ export function JoinAsExpertPage() {
 
     if (loading) return;
 
-    const validationErrors = validateForm(values);
-
-    if (!resumeFile) {
-      setErrorMessage("Please upload your resume.");
-      setShowErrorBanner(true);
-      return;
-    }
+    const validationErrors = validateForm(values, resumeFile);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      setErrorMessage("Please fill all required fields.");
+      setErrorMessage(validationErrors.resume ? validationErrors.resume : "Please fill all required fields.");
       setShowErrorBanner(true);
       return;
     }
@@ -192,27 +244,60 @@ export function JoinAsExpertPage() {
 
     try {
       const formData = new FormData();
-      const fullName = values.fullName.trim();
-      const mobileNumber = values.mobileNumber.trim();
-      const email = values.email.trim();
-      const profession = values.profession.trim();
-      const areaOfExpertise = values.areaOfExpertise.trim();
+      const normalizedValues = Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, value.trim()])
+      ) as ExpertFormData;
 
-      formData.append("fullName", fullName);
-      formData.append("mobileNumber", mobileNumber);
-      formData.append("email", email);
-      formData.append("profession", profession);
-      formData.append("areaOfExpertise", areaOfExpertise);
-      formData.append("resume", resumeFile);
+      for (const key of REQUIRED_FIELDS) {
+        if (!normalizedValues[key]) {
+          setErrors((prev) => ({
+            ...prev,
+            [key]: "This field is required",
+          }));
+          setErrorMessage("Please fill all required fields.");
+          setShowErrorBanner(true);
+          setLoading(false);
+          return;
+        }
+      }
 
-      const response = await fetch(EXPERT_ONBOARDING_WEBHOOK_URL, {
-        method: "POST",
-        body: formData,
+      for (const [key, value] of Object.entries(normalizedValues)) {
+        if (!value) continue;
+        formData.append(key, value);
+      }
+
+      formData.append("resume", resumeFile as File);
+
+      debugLog("Submitting expert onboarding form.", {
+        url: EXPERT_ONBOARDING_WEBHOOK,
+        requiredFields: REQUIRED_FIELDS,
+        hasResume: true,
+        formKeys: Array.from(formData.keys()),
       });
 
-      const data = (await response.json()) as ExpertOnboardingResponse;
+      const abortController = new AbortController();
+      const timeoutId = window.setTimeout(() => abortController.abort(), SUBMISSION_TIMEOUT_MS);
 
-      if (response.ok && data.success) {
+      let response: Response;
+      try {
+        response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
+        method: "POST",
+        body: formData,
+        signal: abortController.signal,
+      });
+      } finally {
+        window.clearTimeout(timeoutId);
+      }
+
+      const data = await parseResponseJsonSafely(response);
+
+      debugLog("Expert onboarding response received.", {
+        status: response.status,
+        ok: response.ok,
+        body: data,
+      });
+
+      if (response.ok && data?.success) {
         setSuccessMessage(data.message || "Your application has been submitted successfully.");
         setValues(initialValues);
         setResumeFile(null);
@@ -223,12 +308,16 @@ export function JoinAsExpertPage() {
           resumeInputRef.current.value = "";
         }
       } else {
-        setErrorMessage(data.message || "Missing required fields or resume file.");
+        setErrorMessage(getSubmissionErrorMessage(response, data));
         setShowErrorBanner(true);
       }
     } catch (error) {
-      console.error("Submit error:", error);
-      setErrorMessage("A network or server error occurred. Please try again.");
+      debugLog("Expert onboarding submission failed.", error);
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setErrorMessage(FALLBACK_SUBMISSION_ERROR);
+      } else {
+        setErrorMessage("Unable to reach the server. Please try again.");
+      }
       setShowErrorBanner(true);
     } finally {
       setLoading(false);
@@ -452,7 +541,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="resumeUpload">Resume</Label>
+                  <Label htmlFor="resume">Resume</Label>
                   <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -470,13 +559,15 @@ export function JoinAsExpertPage() {
                       </Button>
                     </div>
                     <input
-                      id="resumeUpload"
+                      id="resume"
                       name="resume"
                       ref={resumeInputRef}
                       type="file"
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       className="hidden"
                       onChange={handleFileChange}
+                      aria-invalid={errors.resume ? true : undefined}
+                      disabled={loading}
                     />
                     {resumeFile ? (
                       <div className="mt-3 flex items-center justify-between rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm text-[#1D4ED8]">
@@ -484,6 +575,7 @@ export function JoinAsExpertPage() {
                         <button
                           type="button"
                           onClick={handleRemoveFile}
+                          disabled={loading}
                           className="inline-flex items-center gap-1 text-xs font-medium hover:underline"
                         >
                           <X className="size-3.5" />
@@ -491,6 +583,7 @@ export function JoinAsExpertPage() {
                         </button>
                       </div>
                     ) : null}
+                    {errors.resume ? <p className="mt-3 text-sm text-red-600">{errors.resume}</p> : null}
                   </div>
                 </div>
 
