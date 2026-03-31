@@ -7,6 +7,16 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkflow";
 
+declare global {
+  interface Window {
+    enableSubmit?: (token: string) => void;
+    disableSubmit?: () => void;
+    turnstile?: {
+      reset: (selector?: string | HTMLElement) => void;
+    };
+  }
+}
+
 type ExpertFormData = {
   fullName: string;
   mobileNumber: string;
@@ -19,7 +29,7 @@ type ExpertFormData = {
 };
 
 type FieldKey = keyof ExpertFormData;
-type ExpertFormFieldKey = FieldKey | "resume";
+type ExpertFormFieldKey = FieldKey | "resume" | "turnstile";
 
 const initialValues: ExpertFormData = {
   fullName: "",
@@ -40,6 +50,7 @@ type ExpertOnboardingResponse = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
+const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "YOUR_SITE_KEY").trim();
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "mobileNumber",
@@ -108,6 +119,7 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -123,6 +135,27 @@ export function JoinAsExpertPage() {
         email: prev.email || trimValue(parsedUser?.email),
       }));
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    window.enableSubmit = (token: string) => {
+      setTurnstileToken(token);
+      setErrors((prev) => ({
+        ...prev,
+        turnstile: "",
+      }));
+      setErrorMessage("");
+      setShowErrorBanner(false);
+    };
+
+    window.disableSubmit = () => {
+      setTurnstileToken("");
+    };
+
+    return () => {
+      delete window.enableSubmit;
+      delete window.disableSubmit;
+    };
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -209,6 +242,10 @@ export function JoinAsExpertPage() {
       newErrors.resume = "Please upload your resume.";
     }
 
+    if (!turnstileToken) {
+      newErrors.turnstile = "Please complete the CAPTCHA.";
+    }
+
     return newErrors;
   };
 
@@ -224,7 +261,9 @@ export function JoinAsExpertPage() {
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      setErrorMessage(validationErrors.resume ? validationErrors.resume : "Please fill all required fields.");
+      setErrorMessage(
+        validationErrors.resume || validationErrors.turnstile || "Please fill all required fields."
+      );
       setShowErrorBanner(true);
       return;
     }
@@ -261,10 +300,24 @@ export function JoinAsExpertPage() {
         formData.set("resume", resumeFile);
       }
 
+      const captchaToken = trimValue(String(formData.get("cf-turnstile-response") || turnstileToken));
+      if (!captchaToken) {
+        setErrors((prev) => ({
+          ...prev,
+          turnstile: "Please complete the CAPTCHA.",
+        }));
+        setErrorMessage("Please complete the CAPTCHA.");
+        setShowErrorBanner(true);
+        setLoading(false);
+        return;
+      }
+      formData.set("cf-turnstile-response", captchaToken);
+
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
         requiredFields: REQUIRED_FIELDS,
         hasResume: true,
+        hasTurnstileToken: Boolean(captchaToken),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -294,12 +347,14 @@ export function JoinAsExpertPage() {
         setSuccessMessage(data.message || "Your application has been submitted successfully.");
         setValues(initialValues);
         setResumeFile(null);
+        setTurnstileToken("");
         setErrors({});
         setShowErrorBanner(false);
         setErrorMessage("");
         if (resumeInputRef.current) {
           resumeInputRef.current.value = "";
         }
+        window.turnstile?.reset();
       } else {
         setErrorMessage(getSubmissionErrorMessage(response, data));
         setShowErrorBanner(true);
@@ -539,8 +594,18 @@ export function JoinAsExpertPage() {
               </div>
 
               <div className="border-t border-[#E2E8F0] pt-5">
+                <div className="mb-4">
+                  <div
+                    className="cf-turnstile"
+                    data-sitekey={TURNSTILE_SITE_KEY}
+                    data-callback="enableSubmit"
+                    data-expired-callback="disableSubmit"
+                    data-error-callback="disableSubmit"
+                  />
+                  {errors.turnstile ? <p className="mt-3 text-sm text-red-600">{errors.turnstile}</p> : null}
+                </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" className="h-11 px-6" disabled={loading}>
+                  <Button type="submit" className="h-11 px-6" disabled={loading || !turnstileToken}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
                   <p className="text-sm text-[#0F172A]">
