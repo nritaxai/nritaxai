@@ -58,10 +58,11 @@ export function Features() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="text-center mb-12"
+        className="mb-12 text-center"
       >
-        <h2 className="text-4xl sm:text-5xl font-extrabold tracking-tight text-[#0F172A] mb-4">Why Choose NRITAX.AI?</h2>
-        <p className="text-lg sm:text-xl font-medium text-[#0F172A] max-w-2xl mx-auto">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-600">Why NRITAX</p>
+        <h2 className="mb-4 text-3xl font-bold tracking-tight text-[#0F172A] sm:text-4xl">Why Choose NRITAX.AI?</h2>
+        <p className="mx-auto max-w-2xl text-base font-normal text-slate-500">
           Comprehensive tax solutions designed specifically for Non-Resident Indians
         </p>
       </motion.div>
@@ -98,10 +99,10 @@ export function Features() {
                   <div className={`inline-flex w-12 h-12 items-center justify-center rounded-lg shadow-md ${feature.color} mb-4 group-hover:scale-110 transition-transform`}>
                     <Icon className="size-6" />
                   </div>
-                  <CardTitle className="text-xl font-extrabold text-[#0F172A]">{renderTextWithShortForms(feature.title)}</CardTitle>
+                  <CardTitle className="text-lg font-semibold text-[#0F172A]">{renderTextWithShortForms(feature.title)}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1">
-                  <CardDescription className="text-base font-semibold text-[#0F172A] leading-relaxed">
+                  <CardDescription className="text-sm font-normal leading-7 text-slate-600">
                     {renderTextWithShortForms(feature.description)}
                   </CardDescription>
                 </CardContent>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import {
   Card,
@@ -12,8 +12,8 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { X, Eye, EyeOff, Loader2 } from "lucide-react";
-import { appleLoginUser, forgotPassword, loginUser, signupUser, googleLoginUser } from "../../utils/api";
-import { APPLE_AUTH_CONFIG, GOOGLE_AUTH_CONFIG, LINKEDIN_AUTH_CONFIG } from "../../config/appConfig";
+import { forgotPassword, loginUser, signupUser, googleLoginUser } from "../../utils/api";
+import { GOOGLE_AUTH_CONFIG, LINKEDIN_AUTH_CONFIG } from "../../config/appConfig";
 import { AuthPopup } from "./AuthPopup";
 
 interface LoginModalProps {
@@ -88,104 +88,6 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
       setTimeout(() => setPopup(null), 2200);
     }
   };
-
-  const completeAppleLogin = async (
-    mode: "login" | "signup",
-    payload: {
-      code?: string;
-      id_token?: string;
-      user?: { name?: { firstName?: string; lastName?: string } };
-    }
-  ) => {
-    const response = await appleLoginUser({
-      code: payload.code,
-      id_token: payload.id_token,
-      user: payload.user,
-      authorizationCode: payload.code,
-      identityToken: payload.id_token,
-      fullName: payload.user?.name,
-    });
-    const user = resolveAuthUser(response);
-    const successMessage =
-      mode === "signup"
-        ? `Account created successfully! WELCOME ${user?.name || "User"}`
-        : `WELCOME ${user?.name || "User"}!`;
-    handleAuthSuccess(response, successMessage);
-  };
-
-  const handleAppleSignIn = async (mode: "login" | "signup") => {
-    try {
-      const appleAuth = (window as any).AppleID?.auth;
-      if (!appleAuth) {
-        throw new Error("Apple Sign-In SDK not loaded");
-      }
-
-      if (!APPLE_AUTH_CONFIG.clientId || !APPLE_AUTH_CONFIG.redirectURI) {
-        throw new Error("Apple Sign-In configuration is missing");
-      }
-
-      appleAuth.init({
-        clientId: APPLE_AUTH_CONFIG.clientId,
-        scope: APPLE_AUTH_CONFIG.scope,
-        redirectURI: APPLE_AUTH_CONFIG.redirectURI,
-        state: mode,
-        usePopup: APPLE_AUTH_CONFIG.usePopup,
-      });
-
-      const result = await appleAuth.signIn();
-      const code = result?.authorization?.code;
-      const idToken = result?.authorization?.id_token;
-      const user = result?.user ? { name: result.user.name } : undefined;
-
-      if (!code && !idToken) {
-        throw new Error("Apple Sign-In returned no auth token");
-      }
-
-      await completeAppleLogin(mode, { code, id_token: idToken, user });
-    } catch (error: any) {
-      const popupFailed =
-        String(error?.error || "").toLowerCase().includes("popup") ||
-        String(error?.message || "").toLowerCase().includes("popup");
-
-      if (popupFailed) {
-        try {
-          const appleAuth = (window as any).AppleID?.auth;
-          appleAuth.init({
-            clientId: APPLE_AUTH_CONFIG.clientId,
-            scope: APPLE_AUTH_CONFIG.scope,
-            redirectURI: APPLE_AUTH_CONFIG.redirectURI,
-            state: mode,
-            usePopup: false,
-          });
-          await appleAuth.signIn();
-          return;
-        } catch {
-        }
-      }
-
-      const message =
-        error?.response?.data?.message || error?.message || "Apple Sign-In failed";
-      setPopup({
-        message,
-        type: "error",
-      });
-      setTimeout(() => setPopup(null), 2200);
-    }
-  };
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get("code") || undefined;
-    const idToken = params.get("id_token") || undefined;
-    const state = params.get("state") || "";
-    if (!code && !idToken) return;
-
-    const mode = state === "signup" ? "signup" : "login";
-    void completeAppleLogin(mode, { code, id_token: idToken }).finally(() => {
-      const cleanUrl = `${window.location.origin}${window.location.pathname}${window.location.hash || ""}`;
-      window.history.replaceState({}, document.title, cleanUrl);
-    });
-  }, []);
 
   const handleAuthSuccess = (response: any, message: string) => {
     const token = response?.token;
@@ -466,14 +368,6 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                   <Button
                     type="button"
                     variant="outline"
-                    className="w-full border-black text-black hover:bg-black hover:text-white"
-                    onClick={() => handleAppleSignIn("login")}
-                  >
-                    Continue with Apple
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
                     className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
                     onClick={() => handleLinkedInAuth("login")}
                   >
@@ -641,14 +535,6 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full border-black text-black hover:bg-black hover:text-white"
-                    onClick={() => handleAppleSignIn("signup")}
-                  >
-                    Continue with Apple
-                  </Button>
                   {canUseLinkedInAuth ? (
                     <Button
                       type="button"

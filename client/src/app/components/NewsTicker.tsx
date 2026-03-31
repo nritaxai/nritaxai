@@ -99,17 +99,17 @@ export default function NewsTicker() {
             <Fragment key={key}>
               {isLoopDivider ? <div className="h-px w-24 shrink-0 md:w-32" aria-hidden="true" /> : null}
               <div className="inline-flex shrink-0 items-center gap-3 rounded-full border border-slate-200 bg-white px-4 py-2 shadow-sm whitespace-nowrap">
-                <span className="shrink-0 rounded-md bg-slate-900 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-white">
+                <span className="shrink-0 rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
                   {renderTextWithShortForms(item.label || "INTERNATIONAL TAX ALERT")}
                 </span>
 
-                <span className="shrink-0 text-sm font-semibold text-slate-700">
+                <span className="shrink-0 text-sm font-medium text-slate-700">
                   {renderTextWithShortForms(item.country || "Cross-Border")}
                 </span>
 
                 <span className="mx-1 shrink-0 text-slate-300">|</span>
 
-                <span className="shrink-0 text-sm text-slate-600">
+                <span className="shrink-0 text-sm font-normal text-slate-600">
                   {renderTextWithShortForms(item.type || "Tax Update")}
                 </span>
 
@@ -129,7 +129,7 @@ export default function NewsTicker() {
                 {item.date ? (
                   <>
                     <span className="mx-1 shrink-0 text-slate-300">|</span>
-                    <span className="shrink-0 text-xs text-slate-500">
+                    <span className="shrink-0 text-xs font-normal text-slate-500">
                       {formatBannerDate(item.date)}
                     </span>
                   </>

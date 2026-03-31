@@ -127,20 +127,20 @@ export function Home({ onRequireLogin }: HomeProps) {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="mb-12 text-center">
             {userName ? (
-              <p className="mb-4 text-sm font-medium uppercase tracking-[0.2em] text-blue-700">
+              <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-blue-600">
                 WELCOME! {renderTextWithShortForms(userName)}
               </p>
             ) : null}
-            <span className="reveal-drop rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">{renderTextWithShortForms(heroContent.badge)}</span>
-            <h1 className="reveal-drop reveal-delay-1 mb-4 mt-6 text-4xl font-bold text-gray-900 md:text-5xl">{heroContent.headline}</h1>
-            <p className="reveal-drop reveal-delay-2 mb-6 text-2xl font-semibold text-blue-700">{renderTextWithShortForms(heroContent.subheadline)}</p>
-            <p className="reveal-drop reveal-delay-3 mx-auto mb-8 max-w-2xl text-lg text-gray-600">{renderTextWithShortForms(heroContent.description)}</p>
+            <span className="reveal-drop rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-600">{renderTextWithShortForms(heroContent.badge)}</span>
+            <h1 className="reveal-drop reveal-delay-1 mb-4 mt-6 text-5xl font-bold tracking-tight text-gray-900 md:text-6xl">{heroContent.headline}</h1>
+            <p className="reveal-drop reveal-delay-2 mb-4 text-lg font-normal text-slate-600">{renderTextWithShortForms(heroContent.subheadline)}</p>
+            <p className="reveal-drop reveal-delay-3 mx-auto mb-8 max-w-2xl text-lg font-normal text-slate-600">{renderTextWithShortForms(heroContent.description)}</p>
             <div className="reveal-drop reveal-delay-4 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <button
                 type="button"
                 aria-label="Ask AI instantly"
                 onClick={() => requireAuthFor("/chat")}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-lg font-semibold text-white shadow-lg transition-all hover:bg-blue-700"
+                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-blue-700"
               >
                 <MessageSquare className="mr-2 size-5" />
                 Ask AI Instantly
@@ -149,7 +149,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 type="button"
                 aria-label="Consult a CPA"
                 onClick={() => requireAuthFor("/consult")}
-                className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-8 py-4 text-lg font-semibold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
+                className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-8 py-4 text-base font-semibold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
               >
                 Consult a CPA
               </button>
@@ -157,7 +157,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 type="button"
                 aria-label="View pricing"
                 onClick={() => navigate("/pricing")}
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-8 py-4 text-lg font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100"
+                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100"
               >
                 View Pricing
               </button>
@@ -171,8 +171,8 @@ export function Home({ onRequireLogin }: HomeProps) {
                 className="reveal-tile rounded-xl border bg-white p-6 text-center shadow-sm"
                 style={{ ["--reveal-delay" as any]: `${160 + index * 90}ms` }}
               >
-                <div className="mb-2 text-3xl font-bold text-blue-700">{stat.value}</div>
-                <div className="text-sm text-gray-500">{stat.label}</div>
+                <div className="mb-2 text-3xl font-bold tracking-tight text-blue-700">{stat.value}</div>
+                <div className="text-sm font-normal text-slate-600">{stat.label}</div>
               </div>
             ))}
           </div>
@@ -186,10 +186,10 @@ export function Home({ onRequireLogin }: HomeProps) {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <section id="tax-updates">
             <div className="mb-4 text-center">
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
                 Regulatory Intelligence
               </p>
-              <h3 className="mt-3 text-2xl font-bold text-gray-900">Tax Updates</h3>
+              <h3 className="mt-3 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Tax Updates</h3>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               {taxUpdates.map((item, index) => (
@@ -209,11 +209,11 @@ export function Home({ onRequireLogin }: HomeProps) {
                       {item.type}
                     </span>
                   </div>
-                  <p className="text-base font-semibold leading-6 text-slate-900">
+                  <p className="text-lg font-semibold text-slate-900">
                     {renderTextWithShortForms(item.title)}
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 font-medium text-slate-500">
+                    <span className="inline-flex items-center gap-1 font-normal text-slate-500">
                       <Globe className="size-3.5" />
                       {item.date}
                     </span>
@@ -230,7 +230,8 @@ export function Home({ onRequireLogin }: HomeProps) {
           </section>
 
           <div className="mt-10">
-            <h3 className="mb-8 text-center text-2xl font-bold text-gray-900">Quick Access by Scenario</h3>
+            <p className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-blue-600">Smart Shortcuts</p>
+            <h3 className="mb-8 text-center text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Quick Access by Scenario</h3>
             <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
               {scenarioCards.map((scenario, index) => {
                 const Icon = scenario.icon;
@@ -245,7 +246,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                   >
                     <Icon className="mb-3 size-8" />
                     <h4 className="mb-1 text-lg font-semibold">{scenario.title}</h4>
-                    <p className="text-sm opacity-80">{renderTextWithShortForms(scenario.subtitle)}</p>
+                    <p className="text-sm font-normal leading-7 opacity-80">{renderTextWithShortForms(scenario.subtitle)}</p>
                   </button>
                 );
               })}

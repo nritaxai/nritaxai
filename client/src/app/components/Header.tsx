@@ -213,7 +213,7 @@ export function Header({ onLogin }: HeaderProps) {
               return (
                 <div
                   key={item.label}
-                  className="group inline-flex cursor-default items-center gap-2.5 whitespace-nowrap text-sm text-slate-200 transition-colors duration-200 hover:text-white"
+                  className="group inline-flex cursor-default items-center gap-2.5 whitespace-nowrap text-sm font-medium text-slate-200 transition-colors duration-200 hover:text-white"
                   title={item.title}
                 >
                   <Icon className="size-4 shrink-0" />
@@ -252,7 +252,7 @@ export function Header({ onLogin }: HeaderProps) {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`rounded px-4 py-2 text-base font-medium transition-colors ${
+                    className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
                       isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
                     }`}
                   >
@@ -267,7 +267,7 @@ export function Header({ onLogin }: HeaderProps) {
                 <>
                   <Link
                     to="/profile"
-                    className="flex items-center gap-3 text-base font-medium text-slate-700 transition-colors hover:text-blue-700"
+                    className="flex items-center gap-3 text-sm font-medium text-slate-700 transition-colors hover:text-blue-700"
                     aria-label="Open profile"
                     title="Open profile"
                   >
@@ -323,7 +323,7 @@ export function Header({ onLogin }: HeaderProps) {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`block rounded-md px-3 py-2.5 text-base font-medium transition-colors ${
+                      className={`block rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
                         isActive ? "bg-blue-50 text-blue-700" : "text-slate-800 hover:bg-gray-100 hover:text-blue-700"
                       }`}
                       onClick={() => setMobileMenuOpen(false)}
@@ -340,7 +340,7 @@ export function Header({ onLogin }: HeaderProps) {
                     <Link
                       to="/profile"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 rounded-md px-3 py-2.5 text-base font-medium text-slate-800 transition-colors hover:bg-gray-100 hover:text-blue-700"
+                      className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-slate-800 transition-colors hover:bg-gray-100 hover:text-blue-700"
                     >
                       {renderUserAvatar("h-10 w-10", "size-5")}
                       <span>{user.name}</span>

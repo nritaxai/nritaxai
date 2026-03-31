@@ -11,8 +11,9 @@ export function PrivacyTrustBanner() {
           <ShieldCheck className="size-8 text-emerald-600" />
         </div>
         <div className="flex-1">
-          <h3 className="mb-3 text-xl font-bold text-slate-900">Your Privacy, Our Priority</h3>
-          <p className="mb-4 text-slate-600">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600">Privacy First</p>
+          <h3 className="mb-3 text-3xl font-bold tracking-tight text-slate-900">Your Privacy, Our Priority</h3>
+          <p className="mb-4 text-sm font-normal leading-7 text-slate-600">
             <strong className="text-slate-900">Zero Personal Data Collection:</strong> We do not store or collect sensitive
             identifiers such as PAN, NPWP, Tax ID, or account details. Conversations are anonymized and used only for tax guidance.
           </p>
@@ -20,15 +21,15 @@ export function PrivacyTrustBanner() {
             <div className="flex items-start gap-3">
               <Eye className="mt-0.5 size-5 shrink-0 text-emerald-600" />
               <div>
-                <h4 className="mb-1 text-sm font-semibold text-slate-900">No Data Retention</h4>
-                <p className="text-xs text-slate-600">Conversations are not linked to your identity or stored permanently</p>
+                <h4 className="mb-1 text-lg font-semibold text-slate-900">No Data Retention</h4>
+                <p className="text-sm font-normal leading-7 text-slate-600">Conversations are not linked to your identity or stored permanently</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
               <UserCheck className="mt-0.5 size-5 shrink-0 text-emerald-600" />
               <div>
-                <h4 className="mb-1 text-sm font-semibold text-slate-900">Partner-Only Sharing</h4>
-                <p className="text-xs text-slate-600">Data is shared only with verified tax professionals on your explicit request</p>
+                <h4 className="mb-1 text-lg font-semibold text-slate-900">Partner-Only Sharing</h4>
+                <p className="text-sm font-normal leading-7 text-slate-600">Data is shared only with verified tax professionals on your explicit request</p>
               </div>
             </div>
           </div>
@@ -41,7 +42,7 @@ export function PrivacyTrustBanner() {
               Review Privacy Policy
               <ArrowRight className="ml-2 size-4" />
             </button>
-            <p className="text-sm text-slate-600">
+            <p className="text-sm font-normal text-slate-600">
               Read how NRITAX handles privacy, access, and data-sharing with tax professionals.
             </p>
           </div>

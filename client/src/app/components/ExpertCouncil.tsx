@@ -62,8 +62,9 @@ export function ExpertCouncil() {
     <section className="bg-gray-50 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <div className="mb-12 text-center">
-          <h2 className="mb-2 text-3xl font-bold text-slate-900">Meet Your Expert Council</h2>
-          <p className="text-lg text-slate-600">Certified professionals with decades of cross-border tax expertise</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600">Expert Council</p>
+          <h2 className="mb-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Meet Your Expert Council</h2>
+          <p className="text-base font-normal text-slate-500">Certified professionals with decades of cross-border tax expertise</p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -72,16 +73,16 @@ export function ExpertCouncil() {
               <img src={expert.imageUrl} alt={expert.name} className="mx-auto mb-4 h-24 w-24 rounded-full object-cover" />
               <h3 className="mb-1 text-lg font-semibold text-slate-900">{expert.name}</h3>
               <p className="mb-2 text-sm font-medium text-blue-600">{expert.role}</p>
-              <p className="mb-3 text-sm text-slate-600">{expert.specialization}</p>
+              <p className="mb-3 text-sm font-normal leading-7 text-slate-600">{expert.specialization}</p>
               <div className="mb-3 flex flex-wrap justify-center gap-1">
                 {expert.credentials.map((cred) => (
-                  <span key={cred} className="rounded-full bg-blue-100 px-2 py-1 text-xs text-blue-700">
+                  <span key={cred} className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
                     {cred}
                   </span>
                 ))}
               </div>
-              <p className="mb-4 text-xs text-slate-500">{expert.experience} experience</p>
-              <a href={expert.linkedinUrl} className="inline-flex items-center gap-2 text-sm text-blue-600 transition-colors hover:text-blue-800">
+              <p className="mb-4 text-xs font-normal text-slate-500">{expert.experience} experience</p>
+              <a href={expert.linkedinUrl} className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800">
                 <Linkedin className="size-4" />
                 Connect
               </a>
@@ -90,9 +91,9 @@ export function ExpertCouncil() {
         </div>
 
         <div className="mt-10 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-sm md:p-8">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-700">Join Our Team</p>
-          <h3 className="mt-3 text-2xl font-bold text-slate-900">Join Our Expert Team</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 md:text-base">
+          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Join Our Team</p>
+          <h3 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Join Our Expert Team</h3>
+          <p className="mx-auto mt-3 max-w-2xl text-base font-normal text-slate-500">
             Are you a Chartered Accountant or cross-border tax specialist? Apply to support NRI users with tax,
             compliance, and advisory services.
           </p>

@@ -39,7 +39,7 @@ export function HeroSection({
   buttonClassName = "",
   maxWidth = "max-w-6xl",
   veilOpacity = "bg-[#F7FAFC]/20 dark:bg-black/25",
-  fontFamily = "Roboto, sans-serif",
+  fontFamily = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   fontWeight = 500,
 }: HeroSectionProps) {
   const [dimensions, setDimensions] = useState({ width: 1920, height: 1080 });
