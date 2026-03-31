@@ -10,9 +10,8 @@ import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkf
 declare global {
   interface Window {
     handleCaptchaSuccess?: () => void;
-    handleCaptchaExpired?: () => void;
-    turnstile?: {
-      reset: (selector?: string | HTMLElement) => void;
+    grecaptcha?: {
+      reset: () => void;
     };
   }
 }
@@ -50,7 +49,7 @@ type ExpertOnboardingResponse = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const TURNSTILE_SITE_KEY = String(import.meta.env.VITE_TURNSTILE_SITE_KEY || "YOUR_SITE_KEY").trim();
+const RECAPTCHA_SITE_KEY = "6Lc1Z58sAAAAAACGlun3wJokzZbtDFc_XrOAYfNk";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "mobileNumber",
@@ -119,7 +118,6 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [captchaVerified, setCaptchaVerified] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -139,7 +137,6 @@ export function JoinAsExpertPage() {
 
   useEffect(() => {
     window.handleCaptchaSuccess = () => {
-      setCaptchaVerified(true);
       setErrors((prev) => ({
         ...prev,
         captcha: "",
@@ -148,13 +145,8 @@ export function JoinAsExpertPage() {
       setShowErrorBanner(false);
     };
 
-    window.handleCaptchaExpired = () => {
-      setCaptchaVerified(false);
-    };
-
     return () => {
       delete window.handleCaptchaSuccess;
-      delete window.handleCaptchaExpired;
     };
   }, []);
 
@@ -242,10 +234,6 @@ export function JoinAsExpertPage() {
       newErrors.resume = "Please upload your resume.";
     }
 
-    if (!captchaVerified) {
-      newErrors.captcha = "Please complete the CAPTCHA.";
-    }
-
     return newErrors;
   };
 
@@ -300,8 +288,8 @@ export function JoinAsExpertPage() {
         formData.set("resume", resumeFile);
       }
 
-      const captchaToken = trimValue(String(formData.get("cf-turnstile-response") || ""));
-      if (!captchaToken || !captchaVerified) {
+      const captchaToken = trimValue(String(formData.get("g-recaptcha-response") || ""));
+      if (!captchaToken) {
         setErrors((prev) => ({
           ...prev,
           captcha: "Please complete the CAPTCHA.",
@@ -316,7 +304,7 @@ export function JoinAsExpertPage() {
         url: EXPERT_ONBOARDING_WEBHOOK,
         requiredFields: REQUIRED_FIELDS,
         hasResume: true,
-        hasTurnstileToken: Boolean(captchaToken),
+        hasRecaptchaToken: Boolean(captchaToken),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -346,22 +334,23 @@ export function JoinAsExpertPage() {
         setSuccessMessage(data.message || "Your application has been submitted successfully.");
         setValues(initialValues);
         setResumeFile(null);
-        setCaptchaVerified(false);
         setErrors({});
         setShowErrorBanner(false);
         setErrorMessage("");
         if (resumeInputRef.current) {
           resumeInputRef.current.value = "";
         }
-        window.turnstile?.reset();
+        window.grecaptcha?.reset();
       } else {
         setErrorMessage(getSubmissionErrorMessage(response, data));
         setShowErrorBanner(true);
+        window.grecaptcha?.reset();
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
       setErrorMessage(FALLBACK_SUBMISSION_ERROR);
       setShowErrorBanner(true);
+      window.grecaptcha?.reset();
     } finally {
       setLoading(false);
     }
@@ -595,16 +584,14 @@ export function JoinAsExpertPage() {
               <div className="border-t border-[#E2E8F0] pt-5">
                 <div className="mb-4">
                   <div
-                    className="cf-turnstile"
-                    data-sitekey={TURNSTILE_SITE_KEY}
+                    className="g-recaptcha"
+                    data-sitekey={RECAPTCHA_SITE_KEY}
                     data-callback="handleCaptchaSuccess"
-                    data-expired-callback="handleCaptchaExpired"
-                    data-error-callback="handleCaptchaExpired"
                   />
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" className="h-11 px-6" disabled={loading || !captchaVerified}>
+                  <Button type="submit" className="h-11 px-6" disabled={loading}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
                   <p className="text-sm text-[#0F172A]">
