@@ -1,107 +1,178 @@
-﻿import { Link } from "react-router-dom";
-import { AlertTriangle, Lock, Shield } from "lucide-react";
+import { Github, Linkedin, Twitter } from "lucide-react";
+import { Link } from "react-router-dom";
 
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { renderTextWithShortForms } from "../utils/shortForms";
 
-const quickLinks = [
-  { label: "AI Tax Assistant", to: "/chat" },
-  { label: "Tax Calculators", to: "/calculators" },
-  { label: "DTAA Guide", to: "/home#tax-updates" },
+type FooterLink = {
+  label: string;
+  to: string;
+  state?: Record<string, unknown>;
+};
+
+type FooterColumn = {
+  heading: string;
+  links: FooterLink[];
+};
+
+const footerColumns: FooterColumn[] = [
+  {
+    heading: "Services",
+    links: [
+      { label: "NRI Tax Filing", to: "/consult" },
+      { label: "DTAA Advisory", to: "/home#tax-updates" },
+      { label: "Capital Gains", to: "/chat" },
+      { label: "Rental Income Tax", to: "/chat" },
+      { label: "TDS Refund", to: "/consult" },
+      { label: "Compliance", to: "/join-as-expert" },
+    ],
+  },
+  {
+    heading: "Platform",
+    links: [
+      { label: "AI Tax Assistant", to: "/chat" },
+      { label: "Upload Documents", to: "/profile" },
+      { label: "Dashboard", to: "/profile" },
+      { label: "Reports", to: "/profile" },
+      { label: "Pricing", to: "/pricing" },
+      { label: "Security", to: "/privacy-policy", state: { fromSite: true } },
+    ],
+  },
+  {
+    heading: "Resources",
+    links: [
+      { label: "Help Center", to: "/consult" },
+      { label: "Blog", to: "/home#tax-updates" },
+      { label: "Tax Guides", to: "/calculators" },
+      { label: "FAQs", to: "/disclaimer" },
+      { label: "FEMA & RBI", to: "/terms-and-conditions" },
+    ],
+  },
+  {
+    heading: "Company",
+    links: [
+      { label: "About Us", to: "/about-us" },
+      { label: "Careers", to: "/join-as-expert" },
+      { label: "Contact", to: "/consult" },
+      { label: "Privacy Policy", to: "/privacy-policy", state: { fromSite: true } },
+      { label: "Terms", to: "/terms-and-conditions" },
+    ],
+  },
+  {
+    heading: "Account",
+    links: [
+      { label: "Login", to: "/login" },
+      { label: "Signup", to: "/login" },
+      { label: "Partner With Us", to: "/join-as-expert" },
+    ],
+  },
 ] as const;
 
-const legalLinks = [
-  { label: "Privacy Policy", to: "/privacy-policy", state: { fromSite: true } },
-  { label: "Terms of Service", to: "/terms-and-conditions" },
-  { label: "Disclaimer", to: "/disclaimer" },
-  { label: "Refund Policy", to: "/refund-policy" },
+const socialLinks = [
+  { label: "LinkedIn", href: "https://www.linkedin.com", icon: Linkedin },
+  { label: "Twitter", href: "https://twitter.com", icon: Twitter },
+  { label: "GitHub", href: "https://github.com/nritaxai/Nritaxai", icon: Github },
 ] as const;
+
+const footerLinkClass =
+  "text-sm font-normal text-slate-500 transition-colors duration-200 hover:text-slate-900 hover:underline";
 
 export function Footer() {
   return (
-    <footer className="mt-auto bg-slate-900 text-slate-200">
-      <div className="mx-auto max-w-6xl px-4 py-16 md:px-6">
-        <div className="mb-12 grid grid-cols-1 gap-8 md:grid-cols-3">
-          <div>
-            <div className="mb-4 flex items-center">
-              <img
-                src="/logo-transparent.png"
-                alt="NRITAX logo"
-                className="h-20 w-auto scale-110 object-contain sm:h-24"
-              />
+    <footer className="mt-auto border-t border-slate-200 bg-[#f9f9f9]">
+      <div className="mx-auto max-w-7xl px-6 py-12">
+        <div className="hidden gap-10 border-b border-slate-200 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5">
+          {footerColumns.map((column) => (
+            <div key={column.heading}>
+              <h2 className="mb-4 text-sm font-medium text-slate-900">{column.heading}</h2>
+              <ul className="space-y-3">
+                {column.links.map((link) => (
+                  <li key={link.label}>
+                    <Link to={link.to} state={link.state} className={footerLinkClass}>
+                      {renderTextWithShortForms(link.label)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-            <p className="mb-3 text-sm font-normal text-slate-300">
-              {renderTextWithShortForms("World's First AI-Powered NRI Tax Platform")}
+          ))}
+        </div>
+
+        <div className="border-b border-slate-200 pb-8 md:hidden">
+          <Accordion type="single" collapsible className="w-full">
+            {footerColumns.map((column) => (
+              <AccordionItem key={column.heading} value={column.heading} className="border-slate-200">
+                <AccordionTrigger className="py-4 text-sm font-medium text-slate-900 hover:no-underline">
+                  {column.heading}
+                </AccordionTrigger>
+                <AccordionContent>
+                  <ul className="space-y-3">
+                    {column.links.map((link) => (
+                      <li key={link.label}>
+                        <Link to={link.to} state={link.state} className={footerLinkClass}>
+                          {renderTextWithShortForms(link.label)}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+        </div>
+
+        <div className="flex flex-col gap-6 pt-8 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col gap-4">
+            <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
+              <img src="/logo-transparent.png" alt="NRITAX logo" className="h-14 w-auto object-contain" />
+            </Link>
+            <p className="text-sm font-normal text-slate-500">
+              © 2026 NRITAX. {renderTextWithShortForms("AI-powered tax guidance for global NRIs.")}
             </p>
           </div>
 
-          <div>
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-white">Quick Links</h3>
-            <ul className="space-y-3">
-              {quickLinks.map((item) => (
-                <li key={item.label}>
-                  <Link className="text-sm font-normal text-slate-400 transition-colors hover:text-white" to={item.to} state={item.state}>
-                    {renderTextWithShortForms(item.label)}
-                  </Link>
-                </li>
-              ))}
-              <li>
-                <a
-                  href="https://calendly.com/logan786-jkt/30min"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm font-normal text-slate-400 transition-colors hover:text-white"
-                >
-                  Expert Consultation
-                </a>
-              </li>
-            </ul>
-          </div>
+          <div className="flex flex-col gap-4 md:items-end">
+            <div className="flex items-center gap-4">
+              {socialLinks.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={item.label}
+                    className="text-slate-500 transition-colors duration-200 hover:text-slate-900"
+                  >
+                    <Icon className="size-4" />
+                  </a>
+                );
+              })}
+            </div>
 
-          <div>
-            <h3 className="mb-4 text-xs font-semibold uppercase tracking-wide text-white">Legal</h3>
-            <ul className="space-y-3">
-              {legalLinks.map((item) => (
-                <li key={item.label}>
-                  <Link className="text-sm font-normal text-slate-400 transition-colors hover:text-white" to={item.to} state={item.state}>
-                    {renderTextWithShortForms(item.label)}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
+            <div className="grid grid-cols-2 gap-3 sm:w-auto">
+              <Select defaultValue="english">
+                <SelectTrigger className="h-10 min-w-32 border-slate-200 bg-white text-sm text-slate-600">
+                  <SelectValue placeholder="English" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="english">English</SelectItem>
+                </SelectContent>
+              </Select>
 
-        <div className="mb-8 rounded border-l-4 border-amber-500 bg-slate-800/50 p-4">
-          <div className="flex items-start gap-3">
-            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-500" />
-            <div>
-              <h4 className="mb-2 text-sm font-semibold text-white">Important Disclaimer</h4>
-              <p className="text-sm font-normal leading-7 text-slate-300">
-                NRITAX.AI provides AI-assisted tax information and connects users with qualified tax professionals.
-                AI responses are for general guidance only and do not constitute professional tax, legal, or financial advice.
-              </p>
+              <Select defaultValue="inr">
+                <SelectTrigger className="h-10 min-w-24 border-slate-200 bg-white text-sm text-slate-600">
+                  <SelectValue placeholder="INR" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="inr">INR</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </div>
-
-        <div className="border-t border-slate-800 pt-8">
-          <div className="mb-6 flex flex-col items-center justify-between gap-4 md:flex-row">
-            <div className="flex items-center gap-4 text-xs font-normal text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <Shield className="size-4" />
-                <span>{renderTextWithShortForms("SSL Secured")}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <Lock className="size-4" />
-                <span>Data Protected</span>
-              </div>
-            </div>
-          </div>
-          <p className="text-center text-xs font-normal text-slate-500">© 2026 NRITAX.AI. All rights reserved.</p>
         </div>
       </div>
     </footer>
   );
 }
-
-
