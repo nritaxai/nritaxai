@@ -5,25 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../co
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { Textarea } from "../components/ui/textarea";
-import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkflow";
 
 type ExpertFormData = {
   fullName: string;
   mobileNumber: string;
   email: string;
+  pincode: string;
+  membershipNumber: string;
+  cop: string;
   profession: string;
   areaOfExpertise: string;
-  yearsOfExperience: string;
-  qualification: string;
-  firmName: string;
-  country: string;
-  state: string;
-  city: string;
-  servicesOffered: string;
-  linkedinOrWebsite: string;
-  shortBio: string;
 };
 
 type FieldKey = keyof ExpertFormData;
@@ -33,17 +25,11 @@ const initialValues: ExpertFormData = {
   fullName: "",
   mobileNumber: "",
   email: "",
+  pincode: "",
+  membershipNumber: "",
+  cop: "",
   profession: "",
   areaOfExpertise: "",
-  yearsOfExperience: "",
-  qualification: "",
-  firmName: "",
-  country: "",
-  state: "",
-  city: "",
-  servicesOffered: "",
-  linkedinOrWebsite: "",
-  shortBio: "",
 };
 
 type ExpertOnboardingResponse = {
@@ -54,7 +40,16 @@ type ExpertOnboardingResponse = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const REQUIRED_FIELDS: FieldKey[] = ["fullName", "mobileNumber", "email", "profession", "areaOfExpertise"];
+const REQUIRED_FIELDS: FieldKey[] = [
+  "fullName",
+  "mobileNumber",
+  "email",
+  "pincode",
+  "membershipNumber",
+  "cop",
+  "profession",
+  "areaOfExpertise",
+];
 
 const isDevelopment = import.meta.env.DEV;
 
@@ -119,36 +114,28 @@ export function JoinAsExpertPage() {
 
     try {
       const rawUser = localStorage.getItem("user");
-      if (!rawUser) {
-        setValues((prev) => ({
-          ...prev,
-          country: prev.country || detectUserCountry(),
-        }));
-        return;
-      }
+      if (!rawUser) return;
 
       const parsedUser = JSON.parse(rawUser);
       setValues((prev) => ({
         ...prev,
         fullName: prev.fullName || trimValue(parsedUser?.name),
         email: prev.email || trimValue(parsedUser?.email),
-        country: prev.country || trimValue(parsedUser?.countryOfResidence) || detectUserCountry(),
       }));
-    } catch {
-      setValues((prev) => ({
-        ...prev,
-        country: prev.country || detectUserCountry(),
-      }));
-    }
+    } catch {}
   }, []);
 
-  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
 
     let nextValue = value;
 
     if (name === "mobileNumber") {
       nextValue = value.replace(/\D/g, "").slice(0, 10);
+    }
+
+    if (name === "pincode") {
+      nextValue = value.replace(/\D/g, "").slice(0, 6);
     }
 
     setValues((prev) => ({
@@ -198,20 +185,24 @@ export function JoinAsExpertPage() {
       newErrors.email = "Enter a valid email address";
     }
 
+    if (!values.pincode || !/^\d{6}$/.test(values.pincode.trim())) {
+      newErrors.pincode = "Enter a valid 6-digit pincode";
+    }
+
+    if (!values.membershipNumber || values.membershipNumber.trim() === "") {
+      newErrors.membershipNumber = "Membership number is required";
+    }
+
+    if (!["Yes", "No"].includes(values.cop.trim())) {
+      newErrors.cop = "Please select Yes or No";
+    }
+
     if (!values.profession || values.profession.trim() === "") {
       newErrors.profession = "Profession is required";
     }
 
     if (!values.areaOfExpertise || values.areaOfExpertise.trim() === "") {
       newErrors.areaOfExpertise = "Area of expertise is required";
-    }
-
-    if (
-      values.linkedinOrWebsite &&
-      values.linkedinOrWebsite.trim() !== "" &&
-      !/^https?:\/\/.+/.test(values.linkedinOrWebsite.trim())
-    ) {
-      newErrors.linkedinOrWebsite = "Enter a valid URL";
     }
 
     if (!file) {
@@ -221,7 +212,7 @@ export function JoinAsExpertPage() {
     return newErrors;
   };
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setShowErrorBanner(false);
     setSuccessMessage("");
@@ -243,7 +234,8 @@ export function JoinAsExpertPage() {
     setLoading(true);
 
     try {
-      const formData = new FormData();
+      const form = event.currentTarget;
+      const formData = new FormData(form);
       const normalizedValues = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value.trim()])
       ) as ExpertFormData;
@@ -262,11 +254,12 @@ export function JoinAsExpertPage() {
       }
 
       for (const [key, value] of Object.entries(normalizedValues)) {
-        if (!value) continue;
-        formData.append(key, value);
+        formData.set(key, value);
       }
 
-      formData.append("resume", resumeFile as File);
+      if (resumeFile) {
+        formData.set("resume", resumeFile);
+      }
 
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
@@ -281,10 +274,10 @@ export function JoinAsExpertPage() {
       let response: Response;
       try {
         response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
-        method: "POST",
-        body: formData,
-        signal: abortController.signal,
-      });
+          method: "POST",
+          body: formData,
+          signal: abortController.signal,
+        });
       } finally {
         window.clearTimeout(timeoutId);
       }
@@ -313,11 +306,7 @@ export function JoinAsExpertPage() {
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
-      if (error instanceof DOMException && error.name === "AbortError") {
-        setErrorMessage(FALLBACK_SUBMISSION_ERROR);
-      } else {
-        setErrorMessage("Unable to reach the server. Please try again.");
-      }
+      setErrorMessage(FALLBACK_SUBMISSION_ERROR);
       setShowErrorBanner(true);
     } finally {
       setLoading(false);
@@ -371,13 +360,14 @@ export function JoinAsExpertPage() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name *</Label>
                   <Input
                     id="fullName"
                     name="fullName"
+                    required
                     value={values.fullName}
                     onChange={handleChange}
                     aria-invalid={errors.fullName ? true : undefined}
@@ -391,6 +381,9 @@ export function JoinAsExpertPage() {
                   <Input
                     id="mobileNumber"
                     name="mobileNumber"
+                    type="tel"
+                    inputMode="numeric"
+                    required
                     value={values.mobileNumber}
                     onChange={handleChange}
                     aria-invalid={errors.mobileNumber ? true : undefined}
@@ -405,6 +398,7 @@ export function JoinAsExpertPage() {
                     id="email"
                     name="email"
                     type="email"
+                    required
                     value={values.email}
                     onChange={handleChange}
                     aria-invalid={errors.email ? true : undefined}
@@ -414,10 +408,62 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="pincode">Pincode *</Label>
+                  <Input
+                    id="pincode"
+                    name="pincode"
+                    type="text"
+                    inputMode="numeric"
+                    required
+                    value={values.pincode}
+                    onChange={handleChange}
+                    aria-invalid={errors.pincode ? true : undefined}
+                    placeholder="Enter your 6-digit pincode"
+                  />
+                  {errors.pincode ? <p className="text-sm text-red-600">{errors.pincode}</p> : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="membershipNumber">Membership Number *</Label>
+                  <Input
+                    id="membershipNumber"
+                    name="membershipNumber"
+                    required
+                    value={values.membershipNumber}
+                    onChange={handleChange}
+                    aria-invalid={errors.membershipNumber ? true : undefined}
+                    placeholder="Enter your membership number"
+                  />
+                  {errors.membershipNumber ? (
+                    <p className="text-sm text-red-600">{errors.membershipNumber}</p>
+                  ) : null}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cop">COP *</Label>
+                  <select
+                    id="cop"
+                    name="cop"
+                    required
+                    value={values.cop}
+                    onChange={handleChange}
+                    aria-invalid={errors.cop ? true : undefined}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={loading}
+                  >
+                    <option value="">Select COP status</option>
+                    <option value="Yes">Yes</option>
+                    <option value="No">No</option>
+                  </select>
+                  {errors.cop ? <p className="text-sm text-red-600">{errors.cop}</p> : null}
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="profession">Profession *</Label>
                   <Input
                     id="profession"
                     name="profession"
+                    required
                     value={values.profession}
                     onChange={handleChange}
                     aria-invalid={errors.profession ? true : undefined}
@@ -431,6 +477,7 @@ export function JoinAsExpertPage() {
                   <Input
                     id="areaOfExpertise"
                     name="areaOfExpertise"
+                    required
                     value={values.areaOfExpertise}
                     onChange={handleChange}
                     aria-invalid={errors.areaOfExpertise ? true : undefined}
@@ -442,106 +489,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="yearsOfExperience">Years of Experience</Label>
-                  <Input
-                    id="yearsOfExperience"
-                    name="yearsOfExperience"
-                    value={values.yearsOfExperience}
-                    onChange={handleChange}
-                    placeholder="e.g. 8 years"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="qualification">Qualification</Label>
-                  <Input
-                    id="qualification"
-                    name="qualification"
-                    value={values.qualification}
-                    onChange={handleChange}
-                    placeholder="CA, CPA, ACCA, LLM..."
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="firmName">Firm Name</Label>
-                  <Input
-                    id="firmName"
-                    name="firmName"
-                    value={values.firmName}
-                    onChange={handleChange}
-                    placeholder="Enter your firm name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="country">Country</Label>
-                  <Input
-                    id="country"
-                    name="country"
-                    list="expert-country-options"
-                    value={values.country}
-                    onChange={handleChange}
-                    placeholder="Select or type your country"
-                  />
-                  <datalist id="expert-country-options">
-                    {COUNTRY_OPTIONS.map((country) => (
-                      <option key={country.code} value={country.name} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
-                  <Input
-                    id="state"
-                    name="state"
-                    value={values.state}
-                    onChange={handleChange}
-                    placeholder="Enter your state"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    name="city"
-                    value={values.city}
-                    onChange={handleChange}
-                    placeholder="Enter your city"
-                  />
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="servicesOffered">Services Offered</Label>
-                  <Textarea
-                    id="servicesOffered"
-                    name="servicesOffered"
-                    value={values.servicesOffered}
-                    onChange={handleChange}
-                    className="min-h-32"
-                    placeholder="Describe the services you can provide to NRI users"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="linkedinOrWebsite">LinkedIn / Website</Label>
-                  <Input
-                    id="linkedinOrWebsite"
-                    name="linkedinOrWebsite"
-                    value={values.linkedinOrWebsite}
-                    onChange={handleChange}
-                    aria-invalid={errors.linkedinOrWebsite ? true : undefined}
-                    placeholder="LinkedIn or website URL"
-                  />
-                  {errors.linkedinOrWebsite ? (
-                    <p className="text-sm text-red-600">{errors.linkedinOrWebsite}</p>
-                  ) : null}
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="resume">Resume</Label>
+                  <Label htmlFor="resume">Resume *</Label>
                   <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
@@ -553,6 +501,7 @@ export function JoinAsExpertPage() {
                         variant="outline"
                         className="gap-2"
                         onClick={() => resumeInputRef.current?.click()}
+                        disabled={loading}
                       >
                         <Paperclip className="size-4" />
                         Choose File
@@ -563,6 +512,7 @@ export function JoinAsExpertPage() {
                       name="resume"
                       ref={resumeInputRef}
                       type="file"
+                      required
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       className="hidden"
                       onChange={handleFileChange}
@@ -585,18 +535,6 @@ export function JoinAsExpertPage() {
                     ) : null}
                     {errors.resume ? <p className="mt-3 text-sm text-red-600">{errors.resume}</p> : null}
                   </div>
-                </div>
-
-                <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="shortBio">Short Bio</Label>
-                  <Textarea
-                    id="shortBio"
-                    name="shortBio"
-                    value={values.shortBio}
-                    onChange={handleChange}
-                    className="min-h-28"
-                    placeholder="Briefly introduce your background and expertise"
-                  />
                 </div>
               </div>
 
