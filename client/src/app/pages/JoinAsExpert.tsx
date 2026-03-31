@@ -10,6 +10,13 @@ import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkf
 declare global {
   interface Window {
     grecaptcha?: {
+      ready: (callback: () => void) => void;
+      render: (
+        container: string | HTMLElement,
+        parameters: {
+          sitekey: string;
+        }
+      ) => number;
       reset: () => void;
     };
   }
@@ -110,6 +117,8 @@ const getSubmissionErrorMessage = (response: Response, payload: ExpertOnboarding
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
+  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const recaptchaWidgetIdRef = useRef<number | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -132,6 +141,44 @@ export function JoinAsExpertPage() {
         email: prev.email || trimValue(parsedUser?.email),
       }));
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const renderRecaptcha = () => {
+      if (!window.grecaptcha || !recaptchaContainerRef.current || recaptchaWidgetIdRef.current !== null) {
+        return;
+      }
+
+      window.grecaptcha.ready(() => {
+        if (!recaptchaContainerRef.current || recaptchaWidgetIdRef.current !== null) return;
+
+        recaptchaWidgetIdRef.current = window.grecaptcha?.render(recaptchaContainerRef.current, {
+          sitekey: RECAPTCHA_SITE_KEY,
+        }) ?? null;
+      });
+    };
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://www.google.com/recaptcha/api.js"]');
+    if (existingScript) {
+      if (window.grecaptcha) {
+        renderRecaptcha();
+      } else {
+        existingScript.addEventListener("load", renderRecaptcha, { once: true });
+      }
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://www.google.com/recaptcha/api.js";
+      script.async = true;
+      script.defer = true;
+      script.addEventListener("load", renderRecaptcha, { once: true });
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      existingScript?.removeEventListener("load", renderRecaptcha);
+    };
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -567,10 +614,9 @@ export function JoinAsExpertPage() {
 
               <div className="border-t border-[#E2E8F0] pt-5">
                 <div className="mb-4">
-                  <div
-                    className="g-recaptcha"
-                    data-sitekey={RECAPTCHA_SITE_KEY}
-                  />
+                  <div style={{ margin: "16px 0" }}>
+                    <div id="recaptcha-container" ref={recaptchaContainerRef} />
+                  </div>
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
