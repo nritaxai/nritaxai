@@ -9,8 +9,8 @@ import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkf
 
 declare global {
   interface Window {
-    enableSubmit?: (token: string) => void;
-    disableSubmit?: () => void;
+    handleCaptchaSuccess?: () => void;
+    handleCaptchaExpired?: () => void;
     turnstile?: {
       reset: (selector?: string | HTMLElement) => void;
     };
@@ -29,7 +29,7 @@ type ExpertFormData = {
 };
 
 type FieldKey = keyof ExpertFormData;
-type ExpertFormFieldKey = FieldKey | "resume" | "turnstile";
+type ExpertFormFieldKey = FieldKey | "resume" | "captcha";
 
 const initialValues: ExpertFormData = {
   fullName: "",
@@ -119,7 +119,7 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [turnstileToken, setTurnstileToken] = useState("");
+  const [captchaVerified, setCaptchaVerified] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -138,23 +138,23 @@ export function JoinAsExpertPage() {
   }, []);
 
   useEffect(() => {
-    window.enableSubmit = (token: string) => {
-      setTurnstileToken(token);
+    window.handleCaptchaSuccess = () => {
+      setCaptchaVerified(true);
       setErrors((prev) => ({
         ...prev,
-        turnstile: "",
+        captcha: "",
       }));
       setErrorMessage("");
       setShowErrorBanner(false);
     };
 
-    window.disableSubmit = () => {
-      setTurnstileToken("");
+    window.handleCaptchaExpired = () => {
+      setCaptchaVerified(false);
     };
 
     return () => {
-      delete window.enableSubmit;
-      delete window.disableSubmit;
+      delete window.handleCaptchaSuccess;
+      delete window.handleCaptchaExpired;
     };
   }, []);
 
@@ -242,8 +242,8 @@ export function JoinAsExpertPage() {
       newErrors.resume = "Please upload your resume.";
     }
 
-    if (!turnstileToken) {
-      newErrors.turnstile = "Please complete the CAPTCHA.";
+    if (!captchaVerified) {
+      newErrors.captcha = "Please complete the CAPTCHA.";
     }
 
     return newErrors;
@@ -262,7 +262,7 @@ export function JoinAsExpertPage() {
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       setErrorMessage(
-        validationErrors.resume || validationErrors.turnstile || "Please fill all required fields."
+        validationErrors.resume || validationErrors.captcha || "Please fill all required fields."
       );
       setShowErrorBanner(true);
       return;
@@ -300,18 +300,17 @@ export function JoinAsExpertPage() {
         formData.set("resume", resumeFile);
       }
 
-      const captchaToken = trimValue(String(formData.get("cf-turnstile-response") || turnstileToken));
-      if (!captchaToken) {
+      const captchaToken = trimValue(String(formData.get("cf-turnstile-response") || ""));
+      if (!captchaToken || !captchaVerified) {
         setErrors((prev) => ({
           ...prev,
-          turnstile: "Please complete the CAPTCHA.",
+          captcha: "Please complete the CAPTCHA.",
         }));
         setErrorMessage("Please complete the CAPTCHA.");
         setShowErrorBanner(true);
         setLoading(false);
         return;
       }
-      formData.set("cf-turnstile-response", captchaToken);
 
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
@@ -347,7 +346,7 @@ export function JoinAsExpertPage() {
         setSuccessMessage(data.message || "Your application has been submitted successfully.");
         setValues(initialValues);
         setResumeFile(null);
-        setTurnstileToken("");
+        setCaptchaVerified(false);
         setErrors({});
         setShowErrorBanner(false);
         setErrorMessage("");
@@ -598,14 +597,14 @@ export function JoinAsExpertPage() {
                   <div
                     className="cf-turnstile"
                     data-sitekey={TURNSTILE_SITE_KEY}
-                    data-callback="enableSubmit"
-                    data-expired-callback="disableSubmit"
-                    data-error-callback="disableSubmit"
+                    data-callback="handleCaptchaSuccess"
+                    data-expired-callback="handleCaptchaExpired"
+                    data-error-callback="handleCaptchaExpired"
                   />
-                  {errors.turnstile ? <p className="mt-3 text-sm text-red-600">{errors.turnstile}</p> : null}
+                  {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" className="h-11 px-6" disabled={loading || !turnstileToken}>
+                  <Button type="submit" className="h-11 px-6" disabled={loading || !captchaVerified}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
                   <p className="text-sm text-[#0F172A]">
