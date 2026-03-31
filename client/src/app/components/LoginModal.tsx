@@ -231,6 +231,14 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     }
   };
 
+  const googleButtonProps = {
+    theme: "outline" as const,
+    shape: "rectangular" as const,
+    size: "large" as const,
+    width: "100%",
+    logo_alignment: "left" as const,
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-start sm:items-center justify-center z-50 p-4 py-6 overflow-y-auto">
       <Card className="w-full max-w-md max-h-[92dvh] overflow-y-auto">
@@ -374,8 +382,10 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                     Sign in with LinkedIn
                   </Button>
                   {canUseGoogleAuth ? (
-                    <GoogleLogin
-                     text="signin_with"
+                    <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
+                      <GoogleLogin
+                      text="signin_with"
+                      {...googleButtonProps}
                       onSuccess={async (credentialResponse) => {
                         try {
                           if (!credentialResponse.credential) {
@@ -401,7 +411,8 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                       onError={() => {
                         showGoogleOriginMismatchHint("login");
                       }}
-                    />
+                      />
+                    </div>
                   ) : null}
                 </div>
 
@@ -546,8 +557,10 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                     </Button>
                   ) : null}
                   {canUseGoogleAuth ? (
-                    <GoogleLogin
+                    <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
+                      <GoogleLogin
                       text="signup_with"
+                      {...googleButtonProps}
                       onSuccess={async (credentialResponse) => {
                         try {
                           if (!credentialResponse.credential) {
@@ -574,7 +587,8 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                       onError={() => {
                         showGoogleOriginMismatchHint("signup");
                       }}
-                    />
+                      />
+                    </div>
                   ) : null}
                 </div>
                 <p className="text-xs text-[#E2E8F0] text-center">
