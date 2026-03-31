@@ -9,7 +9,6 @@ import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkf
 
 declare global {
   interface Window {
-    handleCaptchaSuccess?: () => void;
     grecaptcha?: {
       reset: () => void;
     };
@@ -133,21 +132,6 @@ export function JoinAsExpertPage() {
         email: prev.email || trimValue(parsedUser?.email),
       }));
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    window.handleCaptchaSuccess = () => {
-      setErrors((prev) => ({
-        ...prev,
-        captcha: "",
-      }));
-      setErrorMessage("");
-      setShowErrorBanner(false);
-    };
-
-    return () => {
-      delete window.handleCaptchaSuccess;
-    };
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -586,7 +570,6 @@ export function JoinAsExpertPage() {
                   <div
                     className="g-recaptcha"
                     data-sitekey={RECAPTCHA_SITE_KEY}
-                    data-callback="handleCaptchaSuccess"
                   />
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
