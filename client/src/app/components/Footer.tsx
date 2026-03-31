@@ -76,16 +76,16 @@ const socialLinks = [
 ] as const;
 
 const footerLinkClass =
-  "text-sm font-normal text-slate-500 transition-colors duration-200 hover:text-slate-900 hover:underline";
+  "text-sm font-normal text-slate-400 transition-colors duration-200 hover:text-white hover:underline";
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-slate-200 bg-[#f9f9f9]">
+    <footer className="mt-auto border-t border-slate-800 bg-black">
       <div className="mx-auto max-w-7xl px-6 py-12">
-        <div className="hidden gap-10 border-b border-slate-200 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5">
+        <div className="hidden gap-10 border-b border-slate-800 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5">
           {footerColumns.map((column) => (
             <div key={column.heading}>
-              <h2 className="mb-4 text-sm font-medium text-slate-900">{column.heading}</h2>
+              <h2 className="mb-4 text-sm font-medium text-white">{column.heading}</h2>
               <ul className="space-y-3">
                 {column.links.map((link) => (
                   <li key={link.label}>
@@ -99,11 +99,11 @@ export function Footer() {
           ))}
         </div>
 
-        <div className="border-b border-slate-200 pb-8 md:hidden">
+        <div className="border-b border-slate-800 pb-8 md:hidden">
           <Accordion type="single" collapsible className="w-full">
             {footerColumns.map((column) => (
-              <AccordionItem key={column.heading} value={column.heading} className="border-slate-200">
-                <AccordionTrigger className="py-4 text-sm font-medium text-slate-900 hover:no-underline">
+              <AccordionItem key={column.heading} value={column.heading} className="border-slate-800">
+                <AccordionTrigger className="py-4 text-sm font-medium text-white hover:text-white hover:no-underline">
                   {column.heading}
                 </AccordionTrigger>
                 <AccordionContent>
@@ -127,7 +127,7 @@ export function Footer() {
             <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
               <img src="/logo-transparent.png" alt="NRITAX logo" className="h-14 w-auto object-contain" />
             </Link>
-            <p className="text-sm font-normal text-slate-500">
+            <p className="text-sm font-normal text-slate-400">
               © 2026 NRITAX. {renderTextWithShortForms("AI-powered tax guidance for global NRIs.")}
             </p>
           </div>
@@ -143,7 +143,7 @@ export function Footer() {
                     target="_blank"
                     rel="noreferrer"
                     aria-label={item.label}
-                    className="text-slate-500 transition-colors duration-200 hover:text-slate-900"
+                    className="text-slate-400 transition-colors duration-200 hover:text-white"
                   >
                     <Icon className="size-4" />
                   </a>
@@ -153,7 +153,7 @@ export function Footer() {
 
             <div className="grid grid-cols-2 gap-3 sm:w-auto">
               <Select defaultValue="english">
-                <SelectTrigger className="h-10 min-w-32 border-slate-200 bg-white text-sm text-slate-600">
+                <SelectTrigger className="h-10 min-w-32 border-slate-700 bg-slate-950 text-sm text-slate-300">
                   <SelectValue placeholder="English" />
                 </SelectTrigger>
                 <SelectContent>
@@ -162,7 +162,7 @@ export function Footer() {
               </Select>
 
               <Select defaultValue="inr">
-                <SelectTrigger className="h-10 min-w-24 border-slate-200 bg-white text-sm text-slate-600">
+                <SelectTrigger className="h-10 min-w-24 border-slate-700 bg-slate-950 text-sm text-slate-300">
                   <SelectValue placeholder="INR" />
                 </SelectTrigger>
                 <SelectContent>
