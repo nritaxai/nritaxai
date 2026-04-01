@@ -9,9 +9,23 @@ import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkf
 
 declare global {
   interface Window {
+    __joinAsExpertRecaptchaLoader?: Promise<NonNullable<Window["grecaptcha"]>>;
+  }
+
+  interface Window {
     grecaptcha?: {
-      getResponse: () => string;
-      reset: () => void;
+      ready: (callback: () => void) => void;
+      render: (
+        container: HTMLElement,
+        parameters: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+        }
+      ) => number;
+      getResponse: (widgetId?: number) => string;
+      reset: (widgetId?: number) => void;
     };
   }
 }
@@ -50,6 +64,8 @@ type ExpertOnboardingResponse = {
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const RECAPTCHA_SITE_KEY = "6Lc1Z58sAAAAAACGlun3wJokzZbtDFc_XrOAYfNk";
+const RECAPTCHA_SCRIPT_ID = "join-as-expert-recaptcha-api";
+const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js?render=explicit";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "mobileNumber",
@@ -108,9 +124,65 @@ const getSubmissionErrorMessage = (response: Response, payload: ExpertOnboarding
   return FALLBACK_SUBMISSION_ERROR;
 };
 
+const loadRecaptchaScript = () => {
+  if (typeof window === "undefined") {
+    return Promise.reject(new Error("reCAPTCHA is only available in the browser."));
+  }
+
+  if (window.grecaptcha?.render) {
+    return Promise.resolve(window.grecaptcha);
+  }
+
+  if (window.__joinAsExpertRecaptchaLoader) {
+    return window.__joinAsExpertRecaptchaLoader;
+  }
+
+  window.__joinAsExpertRecaptchaLoader = new Promise((resolve, reject) => {
+    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID) as HTMLScriptElement | null;
+
+    const finalize = () => {
+      if (!window.grecaptcha?.ready) {
+        reject(new Error("reCAPTCHA script loaded, but the API is unavailable."));
+        return;
+      }
+
+      window.grecaptcha.ready(() => resolve(window.grecaptcha!));
+    };
+
+    if (existingScript) {
+      if (window.grecaptcha?.render) {
+        finalize();
+        return;
+      }
+
+      existingScript.addEventListener("load", finalize, { once: true });
+      existingScript.addEventListener("error", () => reject(new Error("Failed to load the reCAPTCHA script.")), {
+        once: true,
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.id = RECAPTCHA_SCRIPT_ID;
+    script.src = RECAPTCHA_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = finalize;
+    script.onerror = () => reject(new Error("Failed to load the reCAPTCHA script."));
+    document.head.appendChild(script);
+  }).catch((error) => {
+    window.__joinAsExpertRecaptchaLoader = undefined;
+    throw error;
+  });
+
+  return window.__joinAsExpertRecaptchaLoader;
+};
+
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
+  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const recaptchaWidgetIdRef = useRef<number | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -118,6 +190,9 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [recaptchaReady, setRecaptchaReady] = useState(false);
+  const [recaptchaError, setRecaptchaError] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -133,6 +208,68 @@ export function JoinAsExpertPage() {
         email: prev.email || trimValue(parsedUser?.email),
       }));
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const initializeRecaptcha = async () => {
+      try {
+        const grecaptcha = await loadRecaptchaScript();
+        if (!isMounted) return;
+
+        if (!recaptchaContainerRef.current) {
+          setRecaptchaReady(false);
+          setRecaptchaError("reCAPTCHA container is unavailable.");
+          return;
+        }
+
+        if (recaptchaWidgetIdRef.current === null) {
+          recaptchaWidgetIdRef.current = grecaptcha.render(recaptchaContainerRef.current, {
+            sitekey: RECAPTCHA_SITE_KEY,
+            callback: (token) => {
+              const nextToken = trimValue(token);
+              setCaptchaToken(nextToken);
+              setErrors((prev) => ({
+                ...prev,
+                captcha: "",
+              }));
+              setErrorMessage("");
+              setShowErrorBanner(false);
+            },
+            "expired-callback": () => {
+              setCaptchaToken("");
+              setErrors((prev) => ({
+                ...prev,
+                captcha: "Please complete the CAPTCHA again.",
+              }));
+            },
+            "error-callback": () => {
+              setCaptchaToken("");
+              setRecaptchaError("reCAPTCHA could not be verified. Please refresh and try again.");
+              setErrors((prev) => ({
+                ...prev,
+                captcha: "reCAPTCHA failed to load.",
+              }));
+            },
+          });
+        }
+
+        setRecaptchaReady(true);
+        setRecaptchaError("");
+      } catch (error) {
+        debugLog("Failed to initialize reCAPTCHA.", error);
+        if (!isMounted) return;
+        setRecaptchaReady(false);
+        setRecaptchaError("reCAPTCHA script failed to load. Please refresh and try again.");
+      }
+    };
+
+    initializeRecaptcha();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -246,6 +383,28 @@ export function JoinAsExpertPage() {
     setLoading(true);
 
     try {
+      if (!window.grecaptcha?.getResponse) {
+        setErrors((prev) => ({
+          ...prev,
+          captcha: "reCAPTCHA script is not loaded.",
+        }));
+        setErrorMessage("reCAPTCHA script is not loaded.");
+        setShowErrorBanner(true);
+        setLoading(false);
+        return;
+      }
+
+      if (recaptchaWidgetIdRef.current === null) {
+        setErrors((prev) => ({
+          ...prev,
+          captcha: "reCAPTCHA widget is not rendered.",
+        }));
+        setErrorMessage("reCAPTCHA widget is not rendered.");
+        setShowErrorBanner(true);
+        setLoading(false);
+        return;
+      }
+
       const form = event.currentTarget;
       const formData = new FormData(form);
       const normalizedValues = Object.fromEntries(
@@ -273,25 +432,27 @@ export function JoinAsExpertPage() {
         formData.set("resume", resumeFile);
       }
 
-      const captchaToken = trimValue(window.grecaptcha?.getResponse() || "");
-      if (!captchaToken) {
+      const resolvedCaptchaToken = trimValue(
+        captchaToken || window.grecaptcha.getResponse(recaptchaWidgetIdRef.current)
+      );
+      if (!resolvedCaptchaToken) {
         setErrors((prev) => ({
           ...prev,
-          captcha: "Please complete the CAPTCHA.",
+          captcha: "Please complete the CAPTCHA before submitting.",
         }));
-        setErrorMessage("Please complete the CAPTCHA.");
+        setErrorMessage("Please complete the CAPTCHA before submitting.");
         setShowErrorBanner(true);
         setLoading(false);
         return;
       }
 
-      formData.set("captchaToken", captchaToken);
+      formData.set("g-recaptcha-response", resolvedCaptchaToken);
 
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
         requiredFields: REQUIRED_FIELDS,
         hasResume: true,
-        hasRecaptchaToken: Boolean(captchaToken),
+        hasRecaptchaToken: Boolean(resolvedCaptchaToken),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -327,17 +488,22 @@ export function JoinAsExpertPage() {
         if (resumeInputRef.current) {
           resumeInputRef.current.value = "";
         }
-        window.grecaptcha?.reset();
+        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+        setCaptchaToken("");
       } else {
         setErrorMessage(getSubmissionErrorMessage(response, data));
         setShowErrorBanner(true);
-        window.grecaptcha?.reset();
+        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+        setCaptchaToken("");
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
       setErrorMessage(FALLBACK_SUBMISSION_ERROR);
       setShowErrorBanner(true);
-      window.grecaptcha?.reset();
+      if (window.grecaptcha?.reset && recaptchaWidgetIdRef.current !== null) {
+        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+      }
+      setCaptchaToken("");
     } finally {
       setLoading(false);
     }
@@ -570,11 +736,12 @@ export function JoinAsExpertPage() {
 
               <div className="border-t border-[#E2E8F0] pt-5">
                 <div className="mb-4">
-                  <div className="g-recaptcha mt-3" data-sitekey={RECAPTCHA_SITE_KEY} />
+                  <div ref={recaptchaContainerRef} className="mt-3 min-h-[78px]" />
+                  {recaptchaError ? <p className="mt-3 text-sm text-red-600">{recaptchaError}</p> : null}
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" className="h-11 px-6" disabled={loading}>
+                  <Button type="submit" className="h-11 px-6" disabled={loading || !recaptchaReady || !captchaToken}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
                   <p className="text-sm text-[#0F172A]">
