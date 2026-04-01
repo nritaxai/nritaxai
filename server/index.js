@@ -11,6 +11,7 @@ import pdfRoute from "./Routes/pdfRoutes.js";
 import consultationRoute from "./Routes/consultationRoutes.js";
 import yuktiRoute from "./Routes/yuktiRoutes.js";
 import bannerRoute from "./Routes/bannerRoutes.js";
+import expertOnboardingRoute from "./Routes/expertOnboardingRoutes.js";
 
 dotenv.config();
 
@@ -115,6 +116,7 @@ app.use("/api/subscription", subscriptionRoute);
 app.use("/api/calculator", calculatorRoute);
 app.use("/api/pdf", pdfRoute);
 app.use("/api/consultations", consultationRoute);
+app.use("/api/expert-onboarding", expertOnboardingRoute);
 app.use("/api", bannerRoute);
 
 app.use((req, res) => {

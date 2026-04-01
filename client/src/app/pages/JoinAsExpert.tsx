@@ -1,34 +1,12 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Paperclip, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Paperclip, RotateCw, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
-import { EXPERT_ONBOARDING_WEBHOOK, trimValue } from "../utils/consultationWorkflow";
-
-declare global {
-  interface Window {
-    __joinAsExpertRecaptchaLoader?: Promise<NonNullable<Window["grecaptcha"]>>;
-  }
-
-  interface Window {
-    grecaptcha?: {
-      ready: (callback: () => void) => void;
-      render: (
-        container: HTMLElement,
-        parameters: {
-          sitekey: string;
-          callback?: (token: string) => void;
-          "expired-callback"?: () => void;
-          "error-callback"?: () => void;
-        }
-      ) => number;
-      getResponse: (widgetId?: number) => string;
-      reset: (widgetId?: number) => void;
-    };
-  }
-}
+import { trimValue } from "../utils/consultationWorkflow";
+import { buildApiUrl } from "../../utils/api";
 
 type ExpertFormData = {
   fullName: string;
@@ -44,6 +22,21 @@ type ExpertFormData = {
 type FieldKey = keyof ExpertFormData;
 type ExpertFormFieldKey = FieldKey | "resume" | "captcha";
 
+type ExpertOnboardingResponse = {
+  success?: boolean;
+  message?: string;
+  resumeLink?: string;
+  challengeId?: string;
+  challengeValue?: string;
+  expiresAt?: string;
+};
+
+type NumericCaptchaChallenge = {
+  challengeId: string;
+  challengeValue: string;
+  expiresAt: string;
+};
+
 const initialValues: ExpertFormData = {
   fullName: "",
   mobileNumber: "",
@@ -55,17 +48,10 @@ const initialValues: ExpertFormData = {
   areaOfExpertise: "",
 };
 
-type ExpertOnboardingResponse = {
-  success?: boolean;
-  message?: string;
-  resumeLink?: string;
-};
-
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const RECAPTCHA_SITE_KEY = "6LfbPaEsAAAAAIRxHR8s1bZojFeuJoQ0Vgq2wSdo";
-const RECAPTCHA_SCRIPT_ID = "join-as-expert-recaptcha-api";
-const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js";
+const CAPTCHA_CHALLENGE_URL = buildApiUrl("/api/expert-onboarding/captcha-challenge");
+const EXPERT_ONBOARDING_SUBMIT_URL = buildApiUrl("/api/expert-onboarding/submit");
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "mobileNumber",
@@ -107,67 +93,9 @@ const parseResponseJsonSafely = async (response: Response): Promise<ExpertOnboar
   }
 };
 
-const loadRecaptchaScript = () => {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("reCAPTCHA is only available in the browser."));
-  }
-
-  if (window.grecaptcha?.render) {
-    return Promise.resolve(window.grecaptcha);
-  }
-
-  if (window.__joinAsExpertRecaptchaLoader) {
-    return window.__joinAsExpertRecaptchaLoader;
-  }
-
-  window.__joinAsExpertRecaptchaLoader = new Promise((resolve, reject) => {
-    const existingScript =
-      (document.getElementById(RECAPTCHA_SCRIPT_ID) as HTMLScriptElement | null) ||
-      (document.querySelector(`script[src="${RECAPTCHA_SCRIPT_SRC}"]`) as HTMLScriptElement | null);
-
-    const finalize = () => {
-      if (!window.grecaptcha?.ready) {
-        reject(new Error("reCAPTCHA script loaded, but the API is unavailable."));
-        return;
-      }
-
-      window.grecaptcha.ready(() => resolve(window.grecaptcha!));
-    };
-
-    if (existingScript) {
-      if (window.grecaptcha?.render) {
-        finalize();
-        return;
-      }
-
-      existingScript.addEventListener("load", finalize, { once: true });
-      existingScript.addEventListener("error", () => reject(new Error("Failed to load the reCAPTCHA script.")), {
-        once: true,
-      });
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = RECAPTCHA_SCRIPT_ID;
-    script.src = RECAPTCHA_SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = finalize;
-    script.onerror = () => reject(new Error("Failed to load the reCAPTCHA script."));
-    document.head.appendChild(script);
-  }).catch((error) => {
-    window.__joinAsExpertRecaptchaLoader = undefined;
-    throw error;
-  });
-
-  return window.__joinAsExpertRecaptchaLoader;
-};
-
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
-  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
-  const recaptchaWidgetIdRef = useRef<number | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -175,9 +103,9 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [recaptchaReady, setRecaptchaReady] = useState(false);
-  const [recaptchaError, setRecaptchaError] = useState("");
+  const [captchaChallenge, setCaptchaChallenge] = useState<NumericCaptchaChallenge | null>(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+  const [captchaLoading, setCaptchaLoading] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -195,72 +123,50 @@ export function JoinAsExpertPage() {
     } catch {}
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadCaptchaChallenge = async (showRefreshError = true) => {
+    setCaptchaLoading(true);
 
-    const initializeRecaptcha = async () => {
-      try {
-        const grecaptcha = await loadRecaptchaScript();
-        if (!isMounted) return;
+    try {
+      const response = await fetch(CAPTCHA_CHALLENGE_URL, {
+        method: "GET",
+      });
+      const payload = await parseResponseJsonSafely(response);
 
-        if (!RECAPTCHA_SITE_KEY) {
-          setRecaptchaReady(false);
-          setRecaptchaError("reCAPTCHA site key is missing. Configure VITE_RECAPTCHA_SITE_KEY.");
-          return;
-        }
-
-        if (!recaptchaContainerRef.current) {
-          setRecaptchaReady(false);
-          setRecaptchaError("reCAPTCHA container is unavailable.");
-          return;
-        }
-
-        if (recaptchaWidgetIdRef.current === null) {
-          recaptchaWidgetIdRef.current = grecaptcha.render(recaptchaContainerRef.current, {
-            sitekey: RECAPTCHA_SITE_KEY,
-            callback: (token) => {
-              const nextToken = trimValue(token);
-              setCaptchaToken(nextToken);
-              setErrors((prev) => ({
-                ...prev,
-                captcha: "",
-              }));
-              setErrorMessage("");
-              setShowErrorBanner(false);
-            },
-            "expired-callback": () => {
-              setCaptchaToken("");
-              setErrors((prev) => ({
-                ...prev,
-                captcha: "Please complete the CAPTCHA again.",
-              }));
-            },
-            "error-callback": () => {
-              setCaptchaToken("");
-              setRecaptchaError("reCAPTCHA could not be verified. Please refresh and try again.");
-              setErrors((prev) => ({
-                ...prev,
-                captcha: "reCAPTCHA failed to load.",
-              }));
-            },
-          });
-        }
-
-        setRecaptchaReady(true);
-        setRecaptchaError("");
-      } catch (error) {
-        debugLog("Failed to initialize reCAPTCHA.", error);
-        if (!isMounted) return;
-        setRecaptchaReady(false);
-        setRecaptchaError("reCAPTCHA script failed to load. Please refresh and try again.");
+      if (!response.ok || !payload?.challengeId || !payload?.challengeValue || !payload?.expiresAt) {
+        throw new Error(payload?.message || "Unable to load CAPTCHA. Please try again.");
       }
-    };
 
-    initializeRecaptcha();
+      setCaptchaChallenge({
+        challengeId: payload.challengeId,
+        challengeValue: payload.challengeValue,
+        expiresAt: payload.expiresAt,
+      });
+      setCaptchaAnswer("");
+      setErrors((prev) => ({
+        ...prev,
+        captcha: "",
+      }));
+      setShowErrorBanner(false);
+    } catch (error) {
+      debugLog("Failed to load numeric CAPTCHA challenge.", error);
+      setCaptchaChallenge(null);
 
-    return () => {
-      isMounted = false;
-    };
+      if (showRefreshError) {
+        const message = error instanceof Error ? error.message : "Unable to load CAPTCHA. Please try again.";
+        setErrors((prev) => ({
+          ...prev,
+          captcha: message,
+        }));
+        setErrorMessage(message);
+        setShowErrorBanner(true);
+      }
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCaptchaChallenge(false);
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -289,6 +195,16 @@ export function JoinAsExpertPage() {
     setShowErrorBanner(false);
   };
 
+  const handleCaptchaAnswerChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const nextValue = e.target.value.replace(/\D/g, "").slice(0, 6);
+    setCaptchaAnswer(nextValue);
+    setErrors((prev) => ({
+      ...prev,
+      captcha: "",
+    }));
+    setShowErrorBanner(false);
+  };
+
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
     setResumeFile(file);
@@ -308,43 +224,49 @@ export function JoinAsExpertPage() {
     }
   };
 
-  const validateForm = (values: ExpertFormData, file: File | null) => {
+  const validateForm = (formValues: ExpertFormData, file: File | null) => {
     const newErrors: Partial<Record<ExpertFormFieldKey, string>> = {};
 
-    if (!values.fullName || values.fullName.trim() === "") {
+    if (!formValues.fullName || formValues.fullName.trim() === "") {
       newErrors.fullName = "Full name is required";
     }
 
-    if (!values.mobileNumber || !/^\d{10}$/.test(values.mobileNumber.trim())) {
+    if (!formValues.mobileNumber || !/^\d{10}$/.test(formValues.mobileNumber.trim())) {
       newErrors.mobileNumber = "Enter a valid 10-digit mobile number";
     }
 
-    if (!values.email || !/^\S+@\S+\.\S+$/.test(values.email.trim())) {
+    if (!formValues.email || !/^\S+@\S+\.\S+$/.test(formValues.email.trim())) {
       newErrors.email = "Enter a valid email address";
     }
 
-    if (!values.pincode || !/^\d{6}$/.test(values.pincode.trim())) {
+    if (!formValues.pincode || !/^\d{6}$/.test(formValues.pincode.trim())) {
       newErrors.pincode = "Enter a valid 6-digit pincode";
     }
 
-    if (!values.membershipNumber || values.membershipNumber.trim() === "") {
+    if (!formValues.membershipNumber || formValues.membershipNumber.trim() === "") {
       newErrors.membershipNumber = "Membership number is required";
     }
 
-    if (!["Yes", "No"].includes(values.cop.trim())) {
+    if (!["Yes", "No"].includes(formValues.cop.trim())) {
       newErrors.cop = "Please select Yes or No";
     }
 
-    if (!values.profession || values.profession.trim() === "") {
+    if (!formValues.profession || formValues.profession.trim() === "") {
       newErrors.profession = "Profession is required";
     }
 
-    if (!values.areaOfExpertise || values.areaOfExpertise.trim() === "") {
+    if (!formValues.areaOfExpertise || formValues.areaOfExpertise.trim() === "") {
       newErrors.areaOfExpertise = "Area of expertise is required";
     }
 
     if (!file) {
       newErrors.resume = "Please upload your resume.";
+    }
+
+    if (!captchaChallenge?.challengeId) {
+      newErrors.captcha = "Unable to load CAPTCHA. Please refresh and try again.";
+    } else if (!trimValue(captchaAnswer)) {
+      newErrors.captcha = "Please enter the number shown above.";
     }
 
     return newErrors;
@@ -374,34 +296,12 @@ export function JoinAsExpertPage() {
     setLoading(true);
 
     try {
-      if (!window.grecaptcha?.getResponse) {
+      if (!captchaChallenge?.challengeId) {
         setErrors((prev) => ({
           ...prev,
-          captcha: "reCAPTCHA failed to load. Please refresh and try again.",
+          captcha: "Unable to load CAPTCHA. Please refresh and try again.",
         }));
-        setErrorMessage("reCAPTCHA failed to load. Please refresh and try again.");
-        setShowErrorBanner(true);
-        return;
-      }
-
-      if (recaptchaWidgetIdRef.current === null) {
-        setErrors((prev) => ({
-          ...prev,
-          captcha: "reCAPTCHA widget is not rendered.",
-        }));
-        setErrorMessage("reCAPTCHA widget is not rendered.");
-        setShowErrorBanner(true);
-        return;
-      }
-
-      const token = trimValue(window.grecaptcha.getResponse());
-
-      if (!token) {
-        setErrors((prev) => ({
-          ...prev,
-          captcha: "Please complete the CAPTCHA.",
-        }));
-        setErrorMessage("Please complete the CAPTCHA.");
+        setErrorMessage("Unable to load CAPTCHA. Please refresh and try again.");
         setShowErrorBanner(true);
         return;
       }
@@ -439,16 +339,14 @@ export function JoinAsExpertPage() {
       }
 
       formData.append("resume", resumeFile);
-      formData.append("g-recaptcha-response", token);
-
-      console.log("captcha token length:", token?.length);
-      console.log("resumeFile:", resumeFile);
+      formData.append("captchaChallengeId", captchaChallenge.challengeId);
+      formData.append("captchaAnswer", trimValue(captchaAnswer));
 
       debugLog("Submitting expert onboarding form.", {
-        url: EXPERT_ONBOARDING_WEBHOOK,
+        url: EXPERT_ONBOARDING_SUBMIT_URL,
         requiredFields: REQUIRED_FIELDS,
         hasResume: true,
-        hasRecaptchaToken: Boolean(token),
+        hasCaptchaChallengeId: Boolean(captchaChallenge.challengeId),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -457,7 +355,7 @@ export function JoinAsExpertPage() {
 
       let response: Response;
       try {
-        response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
+        response = await fetch(EXPERT_ONBOARDING_SUBMIT_URL, {
           method: "POST",
           body: formData,
           signal: abortController.signal,
@@ -478,28 +376,22 @@ export function JoinAsExpertPage() {
         throw new Error(data?.message || FALLBACK_SUBMISSION_ERROR);
       }
 
-      if (response.ok && data?.success) {
-        setSuccessMessage(data.message || "Your application has been submitted successfully.");
-        setValues(initialValues);
-        setResumeFile(null);
-        setErrors({});
-        setShowErrorBanner(false);
-        setErrorMessage("");
-        if (resumeInputRef.current) {
-          resumeInputRef.current.value = "";
-        }
+      setSuccessMessage(data.message || "Your application has been submitted successfully.");
+      setValues(initialValues);
+      setResumeFile(null);
+      setErrors({});
+      setShowErrorBanner(false);
+      setErrorMessage("");
+      if (resumeInputRef.current) {
+        resumeInputRef.current.value = "";
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
-      setErrorMessage(
-        error instanceof Error ? error.message : FALLBACK_SUBMISSION_ERROR
-      );
+      setErrorMessage(error instanceof Error ? error.message : FALLBACK_SUBMISSION_ERROR);
       setShowErrorBanner(true);
     } finally {
-      if (window.grecaptcha?.reset) {
-        window.grecaptcha.reset();
-      }
-      setCaptchaToken("");
+      await loadCaptchaChallenge(false);
+      setCaptchaAnswer("");
       setLoading(false);
     }
   };
@@ -535,7 +427,7 @@ export function JoinAsExpertPage() {
             {successMessage ? (
               <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-800">
                 <div className="flex items-start gap-3">
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                  <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
                   <div>
                     <p className="text-sm font-semibold">{successMessage}</p>
                     <p className="mt-1 text-sm">
@@ -731,16 +623,50 @@ export function JoinAsExpertPage() {
 
               <div className="border-t border-[#E2E8F0] pt-5">
                 <div className="mb-4">
-                  <div
-                    ref={recaptchaContainerRef}
-                    className="g-recaptcha mt-3 min-h-[78px]"
-                    data-sitekey={RECAPTCHA_SITE_KEY}
-                  />
-                  {recaptchaError ? <p className="mt-3 text-sm text-red-600">{recaptchaError}</p> : null}
+                  <div className="mt-3 rounded-xl border border-[#CBD5E1] bg-white px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-[#0F172A]">Numeric CAPTCHA</p>
+                        <p className="mt-1 text-xs text-[#0F172A]/70">Enter the number shown below to continue.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void loadCaptchaChallenge()}
+                        disabled={loading || captchaLoading}
+                        className="gap-2"
+                      >
+                        <RotateCw className={`size-4 ${captchaLoading ? "animate-spin" : ""}`} />
+                        Refresh
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 inline-flex min-h-14 items-center rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-2xl font-semibold tracking-[0.35em] text-[#1D4ED8]">
+                      {captchaChallenge?.challengeValue || "-----"}
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      <Label htmlFor="captchaAnswer" className="text-sm font-medium text-[#0F172A]">
+                        Enter the number shown above
+                      </Label>
+                      <Input
+                        id="captchaAnswer"
+                        name="captchaAnswer"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={captchaAnswer}
+                        onChange={handleCaptchaAnswerChange}
+                        aria-invalid={errors.captcha ? true : undefined}
+                        placeholder="Enter CAPTCHA"
+                        disabled={loading || captchaLoading}
+                      />
+                    </div>
+                  </div>
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" className="h-11 px-6" disabled={loading || !recaptchaReady || !captchaToken}>
+                  <Button type="submit" className="h-11 px-6" disabled={loading || captchaLoading || !captchaChallenge}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
                   <p className="text-sm text-[#0F172A]">
