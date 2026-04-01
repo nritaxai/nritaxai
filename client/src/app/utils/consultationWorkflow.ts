@@ -4,12 +4,7 @@ export const CONSULTATION_WEBHOOKS = {
   cancel: "https://n8n.caloganathan.com/webhook/consultation-cancel",
 } as const;
 
-export const EXPERT_ONBOARDING_WEBHOOK =
-  String(
-    import.meta.env.VITE_EXPERT_ONBOARDING_WEBHOOK_URL ||
-      import.meta.env.VITE_EXPERT_ONBOARDING_WEBHOOK ||
-      "https://n8n.caloganathan.com/webhook/expert-onboarding"
-  ).trim();
+export const EXPERT_ONBOARDING_WEBHOOK = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 
 export const AVAILABLE_CONSULTATION_TIME_SLOTS = [
   "09:00",

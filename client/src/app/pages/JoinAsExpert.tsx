@@ -63,7 +63,7 @@ type ExpertOnboardingResponse = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const RECAPTCHA_SITE_KEY = String(import.meta.env.VITE_RECAPTCHA_SITE_KEY || "").trim();
+const RECAPTCHA_SITE_KEY = "6LfbPaEsAAAAAIRxHR8s1bZojFeuJoQ0Vgq2wSdo";
 const RECAPTCHA_SCRIPT_ID = "join-as-expert-recaptcha-api";
 const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js";
 const REQUIRED_FIELDS: FieldKey[] = [
