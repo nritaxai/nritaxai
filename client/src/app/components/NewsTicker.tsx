@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { renderTextWithShortForms } from "../utils/shortForms";
+import { BANNER_API_BASE_URL } from "../../config/appConfig";
 
 type Banner = {
   label?: string;
@@ -15,7 +16,30 @@ type Banner = {
   priority?: number;
 };
 
-const BANNER_API_URL = "https://www.nritax.ai/api/banner-updates";
+type BannerPayload = {
+  updates: Banner[];
+};
+
+const BANNER_CACHE_KEY = "homepage-banner-cache";
+const BANNER_API_URL = `${BANNER_API_BASE_URL}/api/banner-updates`;
+
+const fallbackBanner: BannerPayload = {
+  updates: [
+    {
+      label: "INTERNATIONAL TAX ALERT",
+      title: "Expert-reviewed NRI tax updates available",
+      summary: "Stay updated with cross-border tax and DTAA developments.",
+      country: "India",
+      type: "Tax Update",
+      date: new Date().toISOString().split("T")[0],
+      source: "NRITAX Research",
+      confidence: "Advisory",
+      url: "/home#tax-updates",
+      active: true,
+      priority: 1,
+    },
+  ],
+};
 
 const normalizeBanner = (item: Banner): Banner => ({
   ...item,
@@ -28,9 +52,44 @@ const normalizeBanner = (item: Banner): Banner => ({
   url: item.url?.trim() || "#",
   source: item.source?.trim() || "NRITAX Research",
   confidence: item.confidence?.trim() || "Advisory",
-  active: item.active === true,
+  active: item.active !== false,
   priority: item.priority ?? 9999,
 });
+
+const isValidBannerPayload = (data: unknown): data is BannerPayload => {
+  if (!data || typeof data !== "object") return false;
+  return Array.isArray((data as BannerPayload).updates) && (data as BannerPayload).updates.length > 0;
+};
+
+const normalizeBannerPayload = (data: BannerPayload): BannerPayload => ({
+  ...data,
+  updates: data.updates
+    .filter(Boolean)
+    .map(normalizeBanner)
+    .filter((item) => item.active !== false)
+    .sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999)),
+});
+
+const getCachedBanner = (): BannerPayload | null => {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const raw = window.localStorage.getItem(BANNER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BannerPayload;
+    return isValidBannerPayload(parsed) ? normalizeBannerPayload(parsed) : null;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedBanner = (data: BannerPayload) => {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(BANNER_CACHE_KEY, JSON.stringify(data));
+  } catch {}
+};
 
 const formatBannerDate = (value?: string) => {
   if (!value) return "";
@@ -42,7 +101,11 @@ const formatBannerDate = (value?: string) => {
 };
 
 export default function NewsTicker() {
-  const [items, setItems] = useState<Banner[]>([]);
+  const [items, setItems] = useState<Banner[]>(() => {
+    const cachedBanner = getCachedBanner();
+    if (cachedBanner) return cachedBanner.updates;
+    return normalizeBannerPayload(fallbackBanner).updates;
+  });
 
   useEffect(() => {
     async function fetchBannerUpdates() {
@@ -59,25 +122,32 @@ export default function NewsTicker() {
         }
 
         const data = await response.json();
-        const updates = Array.isArray(data)
-          ? data
-          : Array.isArray((data as { updates?: unknown })?.updates)
-            ? ((data as { updates: Banner[] }).updates)
-            : [];
+        const payload = Array.isArray(data) ? { updates: data as Banner[] } : (data as BannerPayload);
 
-        if (!updates.length && !Array.isArray(data) && !Array.isArray((data as { updates?: unknown })?.updates)) {
-          console.error("Banner API payload did not contain a valid updates array:", data);
+        if (!isValidBannerPayload(payload)) {
+          const cachedBanner = getCachedBanner();
+          if (cachedBanner) {
+            setItems(cachedBanner.updates);
+            return;
+          }
+
+          setItems(normalizeBannerPayload(fallbackBanner).updates);
+          return;
         }
 
-        const nextItems = updates
-          .filter((item) => item && item.active === true)
-          .map(normalizeBanner)
-          .sort((a, b) => (a.priority ?? 9999) - (b.priority ?? 9999));
+        const normalizedPayload = normalizeBannerPayload(payload);
+        if (!normalizedPayload.updates.length) {
+          const cachedBanner = getCachedBanner();
+          setItems(cachedBanner?.updates || normalizeBannerPayload(fallbackBanner).updates);
+          return;
+        }
 
-        setItems(nextItems);
+        setCachedBanner(normalizedPayload);
+        setItems(normalizedPayload.updates);
       } catch (error) {
         console.error("Failed to load banner:", error);
-        setItems([]);
+        const cachedBanner = getCachedBanner();
+        setItems(cachedBanner?.updates || normalizeBannerPayload(fallbackBanner).updates);
       }
     }
 

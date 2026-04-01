@@ -63,7 +63,7 @@ type ExpertOnboardingResponse = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const RECAPTCHA_SITE_KEY = "6Lc1Z58sAAAAAACGlun3wJokzZbtDFc_XrOAYfNk";
+const RECAPTCHA_SITE_KEY = String(import.meta.env.VITE_RECAPTCHA_SITE_KEY || "").trim();
 const RECAPTCHA_SCRIPT_ID = "join-as-expert-recaptcha-api";
 const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js";
 const REQUIRED_FIELDS: FieldKey[] = [
@@ -219,6 +219,12 @@ export function JoinAsExpertPage() {
       try {
         const grecaptcha = await loadRecaptchaScript();
         if (!isMounted) return;
+
+        if (!RECAPTCHA_SITE_KEY) {
+          setRecaptchaReady(false);
+          setRecaptchaError("reCAPTCHA site key is missing. Configure VITE_RECAPTCHA_SITE_KEY.");
+          return;
+        }
 
         if (!recaptchaContainerRef.current) {
           setRecaptchaReady(false);
@@ -385,6 +391,17 @@ export function JoinAsExpertPage() {
     setLoading(true);
 
     try {
+      if (!RECAPTCHA_SITE_KEY) {
+        setErrors((prev) => ({
+          ...prev,
+          captcha: "reCAPTCHA is not configured for this environment.",
+        }));
+        setErrorMessage("reCAPTCHA is not configured for this environment.");
+        setShowErrorBanner(true);
+        setLoading(false);
+        return;
+      }
+
       if (!window.grecaptcha?.getResponse) {
         setErrors((prev) => ({
           ...prev,
@@ -512,7 +529,7 @@ export function JoinAsExpertPage() {
   };
 
   return (
-    <div className="py-10">
+    <div className="py-10 font-sans text-[#0F172A]">
       <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
         <button
           type="button"
@@ -531,7 +548,7 @@ export function JoinAsExpertPage() {
           </p>
         </div>
 
-        <Card className="border border-[#E2E8F0] bg-[#F7FAFC] shadow-xl">
+        <Card className="border border-[#E2E8F0] bg-[#F7FAFC] font-sans shadow-xl">
           <CardHeader>
             <CardTitle className="text-2xl text-[#0F172A]">Expert Registration Form</CardTitle>
             <CardDescription className="text-[#0F172A]">
@@ -561,7 +578,7 @@ export function JoinAsExpertPage() {
             <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name *</Label>
+                  <Label htmlFor="fullName" className="text-sm font-medium text-[#0F172A]">Full Name *</Label>
                   <Input
                     id="fullName"
                     name="fullName"
@@ -575,7 +592,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="mobileNumber">Mobile Number *</Label>
+                  <Label htmlFor="mobileNumber" className="text-sm font-medium text-[#0F172A]">Mobile Number *</Label>
                   <Input
                     id="mobileNumber"
                     name="mobileNumber"
@@ -591,7 +608,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email" className="text-sm font-medium text-[#0F172A]">Email *</Label>
                   <Input
                     id="email"
                     name="email"
@@ -606,7 +623,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pincode">Pincode *</Label>
+                  <Label htmlFor="pincode" className="text-sm font-medium text-[#0F172A]">Pincode *</Label>
                   <Input
                     id="pincode"
                     name="pincode"
@@ -622,7 +639,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="membershipNumber">Membership Number *</Label>
+                  <Label htmlFor="membershipNumber" className="text-sm font-medium text-[#0F172A]">Membership Number *</Label>
                   <Input
                     id="membershipNumber"
                     name="membershipNumber"
@@ -638,7 +655,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cop">COP *</Label>
+                  <Label htmlFor="cop" className="text-sm font-medium text-[#0F172A]">COP *</Label>
                   <select
                     id="cop"
                     name="cop"
@@ -646,7 +663,7 @@ export function JoinAsExpertPage() {
                     value={values.cop}
                     onChange={handleChange}
                     aria-invalid={errors.cop ? true : undefined}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     disabled={loading}
                   >
                     <option value="">Select COP status</option>
@@ -657,7 +674,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="profession">Profession *</Label>
+                  <Label htmlFor="profession" className="text-sm font-medium text-[#0F172A]">Profession *</Label>
                   <Input
                     id="profession"
                     name="profession"
@@ -671,7 +688,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="areaOfExpertise">Area of Expertise *</Label>
+                  <Label htmlFor="areaOfExpertise" className="text-sm font-medium text-[#0F172A]">Area of Expertise *</Label>
                   <Input
                     id="areaOfExpertise"
                     name="areaOfExpertise"
@@ -687,7 +704,7 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="resume">Resume *</Label>
+                  <Label htmlFor="resume" className="text-sm font-medium text-[#0F172A]">Resume *</Label>
                   <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
