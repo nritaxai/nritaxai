@@ -12,9 +12,10 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils/api";
+import { PREMIUM_EASE } from "../utils/motion";
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -53,6 +54,8 @@ export function Header({ onLogin }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const shouldReduceMotion = useReducedMotion();
 
   const navItems = [
     { to: "/home#features", label: "Features" },
@@ -137,6 +140,16 @@ export function Header({ onLogin }: HeaderProps) {
   useEffect(() => {
     setAvatarFailed(false);
   }, [user?.profileImage]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setHasScrolled(window.scrollY > 12);
+    };
+
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -224,7 +237,14 @@ export function Header({ onLogin }: HeaderProps) {
           </div>
         </div>
       </div>
-      <div className="sticky top-0 border-b border-gray-200 bg-white/90 backdrop-blur-md">
+      <motion.div
+        animate={{
+          backgroundColor: hasScrolled ? "rgba(255,255,255,0.94)" : "rgba(255,255,255,0.90)",
+          boxShadow: hasScrolled ? "0 10px 30px rgba(15, 23, 42, 0.08)" : "0 0 0 rgba(15, 23, 42, 0)",
+        }}
+        transition={{ duration: 0.3, ease: PREMIUM_EASE }}
+        className="sticky top-0 border-b border-gray-200 backdrop-blur-md"
+      >
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between">
             <div className="ml-1 flex items-center gap-5">
@@ -249,15 +269,28 @@ export function Header({ onLogin }: HeaderProps) {
               {navItems.map((item) => {
                 const isActive = isNavItemActive(item.to);
                 return (
-                  <Link
+                  <motion.div
                     key={item.to}
-                    to={item.to}
-                    className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
-                      isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
-                    }`}
+                    whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+                    transition={{ duration: 0.2, ease: PREMIUM_EASE }}
                   >
-                    {renderTextWithShortForms(item.label)}
-                  </Link>
+                    <Link
+                      to={item.to}
+                      className={`relative rounded px-4 py-2 text-sm font-medium transition-colors ${
+                        isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
+                      }`}
+                    >
+                      {renderTextWithShortForms(item.label)}
+                      <motion.span
+                        className="absolute inset-x-4 bottom-1 h-0.5 rounded-full bg-blue-600"
+                        initial={false}
+                        animate={{ scaleX: isActive ? 1 : 0.45, opacity: isActive ? 1 : 0 }}
+                        whileHover={shouldReduceMotion ? undefined : { scaleX: 1, opacity: 1 }}
+                        transition={{ duration: 0.22, ease: PREMIUM_EASE }}
+                        style={{ originX: 0.5 }}
+                      />
+                    </Link>
+                  </motion.div>
                 );
               })}
             </nav>
@@ -304,7 +337,7 @@ export function Header({ onLogin }: HeaderProps) {
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       <AnimatePresence initial={false}>
         {mobileMenuOpen && (

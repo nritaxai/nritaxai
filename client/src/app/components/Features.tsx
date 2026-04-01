@@ -7,10 +7,12 @@ import {
   Globe2,
   Clock
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
+import { fadeUp, fadeUpSoft, PREMIUM_EASE, staggerContainer } from "../utils/motion";
 
 export function Features() {
+  const shouldReduceMotion = useReducedMotion();
   const features = [
     {
       icon: MessageSquare,
@@ -54,10 +56,10 @@ export function Features() {
     <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-[#2563eb]/12 to-transparent rounded-3xl" />
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
+        initial="hidden"
+        whileInView="visible"
         viewport={{ once: true, amount: 0.3 }}
-        transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        variants={fadeUp}
         className="mb-12 text-center"
       >
         <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-600">Why NRITAX</p>
@@ -71,15 +73,7 @@ export function Features() {
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.2 }}
-        variants={{
-          hidden: {},
-          visible: {
-            transition: {
-              staggerChildren: 0.08,
-              delayChildren: 0.08,
-            },
-          },
-        }}
+        variants={staggerContainer(0.08, 0.08)}
         className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
       >
         {features.map((feature, index) => {
@@ -87,18 +81,27 @@ export function Features() {
           return (
             <motion.div
               key={index}
-              variants={{
-                hidden: { opacity: 0, y: 24, scale: 0.98 },
-                visible: { opacity: 1, y: 0, scale: 1 },
-              }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              variants={fadeUpSoft}
               className="h-full"
             >
-              <Card className="group flex h-full flex-col border-border transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl">
+              <motion.div
+                whileHover={
+                  shouldReduceMotion
+                    ? undefined
+                    : { y: -6, boxShadow: "0 24px 42px rgba(15, 23, 42, 0.10)" }
+                }
+                transition={{ duration: 0.28, ease: PREMIUM_EASE }}
+                className="h-full"
+              >
+              <Card className="group flex h-full flex-col border-border transition-all duration-300">
                 <CardHeader>
-                  <div className={`inline-flex w-12 h-12 items-center justify-center rounded-lg shadow-md ${feature.color} mb-4 group-hover:scale-110 transition-transform`}>
+                  <motion.div
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.08 }}
+                    transition={{ duration: 0.2, ease: PREMIUM_EASE }}
+                    className={`inline-flex w-12 h-12 items-center justify-center rounded-lg shadow-md ${feature.color} mb-4`}
+                  >
                     <Icon className="size-6" />
-                  </div>
+                  </motion.div>
                   <CardTitle className="text-lg font-semibold text-[#0F172A]">{renderTextWithShortForms(feature.title)}</CardTitle>
                 </CardHeader>
                 <CardContent className="flex-1">
@@ -107,6 +110,7 @@ export function Features() {
                   </CardDescription>
                 </CardContent>
               </Card>
+              </motion.div>
             </motion.div>
           );
         })}

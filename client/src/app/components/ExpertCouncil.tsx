@@ -1,5 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Linkedin } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
+import { fadeUp, fadeUpSoft, PREMIUM_EASE, staggerContainer } from "../utils/motion";
 
 interface Expert {
   id: string;
@@ -57,19 +59,42 @@ const expertTeam: Expert[] = [
 
 export function ExpertCouncil() {
   const navigate = useNavigate();
+  const shouldReduceMotion = useReducedMotion();
 
   return (
     <section className="bg-gray-50 py-16 md:py-24">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
-        <div className="mb-12 text-center">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.3 }}
+          variants={fadeUp}
+          className="mb-12 text-center"
+        >
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600">Expert Council</p>
           <h2 className="mb-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Meet Your Expert Council</h2>
           <p className="text-base font-normal text-slate-500">Certified professionals with decades of cross-border tax expertise</p>
-        </div>
+        </motion.div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={staggerContainer(0.08, 0.08)}
+          className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"
+        >
           {expertTeam.map((expert) => (
-            <div key={expert.id} className="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm transition-shadow hover:shadow-lg">
+            <motion.div
+              key={expert.id}
+              variants={fadeUpSoft}
+              whileHover={
+                shouldReduceMotion
+                  ? undefined
+                  : { y: -5, boxShadow: "0 20px 36px rgba(15, 23, 42, 0.10)" }
+              }
+              transition={{ duration: 0.28, ease: PREMIUM_EASE }}
+              className="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm"
+            >
               <img src={expert.imageUrl} alt={expert.name} className="mx-auto mb-4 h-24 w-24 rounded-full object-cover" />
               <h3 className="mb-1 text-lg font-semibold text-slate-900">{expert.name}</h3>
               <p className="mb-2 text-sm font-medium text-blue-600">{expert.role}</p>
@@ -86,26 +111,39 @@ export function ExpertCouncil() {
                 <Linkedin className="size-4" />
                 Connect
               </a>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
-        <div className="mt-10 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-sm md:p-8">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.35 }}
+          variants={fadeUp}
+          className="mt-10 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-sm md:p-8"
+        >
           <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Join Our Team</p>
           <h3 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Join Our Expert Team</h3>
           <p className="mx-auto mt-3 max-w-2xl text-base font-normal text-slate-500">
             Are you a Chartered Accountant or cross-border tax specialist? Apply to support NRI users with tax,
             compliance, and advisory services.
           </p>
-          <button
+          <motion.button
             type="button"
             onClick={() => navigate("/join-as-expert")}
             className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
+            whileHover={
+              shouldReduceMotion
+                ? undefined
+                : { y: -2, boxShadow: "0 18px 34px rgba(37, 99, 235, 0.22)" }
+            }
+            whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
+            transition={{ duration: 0.25, ease: PREMIUM_EASE }}
           >
             Join Our Expert Team
             <ArrowRight className="size-4" />
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       </div>
     </section>
   );

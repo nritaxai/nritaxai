@@ -1,9 +1,11 @@
 import { Github, Linkedin, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
+import { motion } from "motion/react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { renderTextWithShortForms } from "../utils/shortForms";
+import { fadeUp, staggerContainer } from "../utils/motion";
 
 type FooterLink = {
   label: string;
@@ -80,11 +82,20 @@ const footerLinkClass =
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-slate-800 bg-black">
+    <motion.footer
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.2 }}
+      variants={fadeUp}
+      className="mt-auto border-t border-slate-800 bg-black"
+    >
       <div className="mx-auto max-w-7xl px-6 py-12">
-        <div className="hidden gap-10 border-b border-slate-800 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5">
+        <motion.div
+          variants={staggerContainer(0.06, 0.06)}
+          className="hidden gap-10 border-b border-slate-800 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5"
+        >
           {footerColumns.map((column) => (
-            <div key={column.heading}>
+            <motion.div key={column.heading} variants={fadeUp}>
               <h2 className="mb-4 text-sm font-medium text-white">{column.heading}</h2>
               <ul className="space-y-3">
                 {column.links.map((link) => (
@@ -95,9 +106,9 @@ export function Footer() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
 
         <div className="border-b border-slate-800 pb-8 md:hidden">
           <Accordion type="single" collapsible className="w-full">
@@ -173,6 +184,6 @@ export function Footer() {
           </div>
         </div>
       </div>
-    </footer>
+    </motion.footer>
   );
 }
