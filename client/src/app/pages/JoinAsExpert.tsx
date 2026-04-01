@@ -65,7 +65,7 @@ const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const RECAPTCHA_SITE_KEY = "6Lc1Z58sAAAAAACGlun3wJokzZbtDFc_XrOAYfNk";
 const RECAPTCHA_SCRIPT_ID = "join-as-expert-recaptcha-api";
-const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js?render=explicit";
+const RECAPTCHA_SCRIPT_SRC = "https://www.google.com/recaptcha/api.js";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "mobileNumber",
@@ -138,7 +138,9 @@ const loadRecaptchaScript = () => {
   }
 
   window.__joinAsExpertRecaptchaLoader = new Promise((resolve, reject) => {
-    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID) as HTMLScriptElement | null;
+    const existingScript =
+      (document.getElementById(RECAPTCHA_SCRIPT_ID) as HTMLScriptElement | null) ||
+      (document.querySelector(`script[src="${RECAPTCHA_SCRIPT_SRC}"]`) as HTMLScriptElement | null);
 
     const finalize = () => {
       if (!window.grecaptcha?.ready) {
@@ -736,7 +738,11 @@ export function JoinAsExpertPage() {
 
               <div className="border-t border-[#E2E8F0] pt-5">
                 <div className="mb-4">
-                  <div ref={recaptchaContainerRef} className="mt-3 min-h-[78px]" />
+                  <div
+                    ref={recaptchaContainerRef}
+                    className="g-recaptcha mt-3 min-h-[78px]"
+                    data-sitekey={RECAPTCHA_SITE_KEY}
+                  />
                   {recaptchaError ? <p className="mt-3 text-sm text-red-600">{recaptchaError}</p> : null}
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
