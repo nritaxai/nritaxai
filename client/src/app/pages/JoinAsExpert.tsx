@@ -93,35 +93,18 @@ const debugLog = (message: string, details?: unknown) => {
 const parseResponseJsonSafely = async (response: Response): Promise<ExpertOnboardingResponse | null> => {
   const rawText = await response.text();
   const trimmedBody = rawText.trim();
-  const contentType = response.headers.get("content-type") || "";
 
   if (!trimmedBody) {
-    return null;
-  }
-
-  if (!contentType.toLowerCase().includes("application/json")) {
     return null;
   }
 
   try {
     return JSON.parse(trimmedBody) as ExpertOnboardingResponse;
   } catch {
-    return null;
+    return {
+      message: trimmedBody,
+    };
   }
-};
-
-const getSubmissionErrorMessage = (response: Response, payload: ExpertOnboardingResponse | null) => {
-  const message = trimValue(payload?.message);
-
-  if (message) {
-    return message;
-  }
-
-  debugLog("Using fallback submission error message.", {
-    status: response.status,
-    contentType: response.headers.get("content-type"),
-  });
-  return FALLBACK_SUBMISSION_ERROR;
 };
 
 const loadRecaptchaScript = () => {
@@ -391,25 +374,13 @@ export function JoinAsExpertPage() {
     setLoading(true);
 
     try {
-      if (!RECAPTCHA_SITE_KEY) {
-        setErrors((prev) => ({
-          ...prev,
-          captcha: "reCAPTCHA is not configured for this environment.",
-        }));
-        setErrorMessage("reCAPTCHA is not configured for this environment.");
-        setShowErrorBanner(true);
-        setLoading(false);
-        return;
-      }
-
       if (!window.grecaptcha?.getResponse) {
         setErrors((prev) => ({
           ...prev,
-          captcha: "reCAPTCHA script is not loaded.",
+          captcha: "reCAPTCHA failed to load. Please refresh and try again.",
         }));
-        setErrorMessage("reCAPTCHA script is not loaded.");
+        setErrorMessage("reCAPTCHA failed to load. Please refresh and try again.");
         setShowErrorBanner(true);
-        setLoading(false);
         return;
       }
 
@@ -420,12 +391,31 @@ export function JoinAsExpertPage() {
         }));
         setErrorMessage("reCAPTCHA widget is not rendered.");
         setShowErrorBanner(true);
-        setLoading(false);
         return;
       }
 
-      const form = event.currentTarget;
-      const formData = new FormData(form);
+      const token = trimValue(window.grecaptcha.getResponse());
+
+      if (!token) {
+        setErrors((prev) => ({
+          ...prev,
+          captcha: "Please complete the CAPTCHA.",
+        }));
+        setErrorMessage("Please complete the CAPTCHA.");
+        setShowErrorBanner(true);
+        return;
+      }
+
+      if (!resumeFile) {
+        setErrors((prev) => ({
+          ...prev,
+          resume: "Please upload your resume.",
+        }));
+        setErrorMessage("Please upload your resume.");
+        setShowErrorBanner(true);
+        return;
+      }
+
       const normalizedValues = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value.trim()])
       ) as ExpertFormData;
@@ -438,40 +428,27 @@ export function JoinAsExpertPage() {
           }));
           setErrorMessage("Please fill all required fields.");
           setShowErrorBanner(true);
-          setLoading(false);
           return;
         }
       }
 
+      const formData = new FormData();
+
       for (const [key, value] of Object.entries(normalizedValues)) {
-        formData.set(key, value);
+        formData.append(key, value);
       }
 
-      if (resumeFile) {
-        formData.set("resume", resumeFile);
-      }
+      formData.append("resume", resumeFile);
+      formData.append("g-recaptcha-response", token);
 
-      const resolvedCaptchaToken = trimValue(
-        captchaToken || window.grecaptcha.getResponse(recaptchaWidgetIdRef.current)
-      );
-      if (!resolvedCaptchaToken) {
-        setErrors((prev) => ({
-          ...prev,
-          captcha: "Please complete the CAPTCHA before submitting.",
-        }));
-        setErrorMessage("Please complete the CAPTCHA before submitting.");
-        setShowErrorBanner(true);
-        setLoading(false);
-        return;
-      }
-
-      formData.set("g-recaptcha-response", resolvedCaptchaToken);
+      console.log("captcha token length:", token?.length);
+      console.log("resumeFile:", resumeFile);
 
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
         requiredFields: REQUIRED_FIELDS,
         hasResume: true,
-        hasRecaptchaToken: Boolean(resolvedCaptchaToken),
+        hasRecaptchaToken: Boolean(token),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -497,6 +474,10 @@ export function JoinAsExpertPage() {
         body: data,
       });
 
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || FALLBACK_SUBMISSION_ERROR);
+      }
+
       if (response.ok && data?.success) {
         setSuccessMessage(data.message || "Your application has been submitted successfully.");
         setValues(initialValues);
@@ -507,23 +488,18 @@ export function JoinAsExpertPage() {
         if (resumeInputRef.current) {
           resumeInputRef.current.value = "";
         }
-        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
-        setCaptchaToken("");
-      } else {
-        setErrorMessage(getSubmissionErrorMessage(response, data));
-        setShowErrorBanner(true);
-        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
-        setCaptchaToken("");
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
-      setErrorMessage(FALLBACK_SUBMISSION_ERROR);
+      setErrorMessage(
+        error instanceof Error ? error.message : FALLBACK_SUBMISSION_ERROR
+      );
       setShowErrorBanner(true);
-      if (window.grecaptcha?.reset && recaptchaWidgetIdRef.current !== null) {
-        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+    } finally {
+      if (window.grecaptcha?.reset) {
+        window.grecaptcha.reset();
       }
       setCaptchaToken("");
-    } finally {
       setLoading(false);
     }
   };
