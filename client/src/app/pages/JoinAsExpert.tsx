@@ -6,7 +6,6 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { trimValue } from "../utils/consultationWorkflow";
-import { buildApiUrl } from "../../utils/api";
 
 type ExpertFormData = {
   fullName: string;
@@ -50,8 +49,8 @@ const initialValues: ExpertFormData = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const CAPTCHA_CHALLENGE_URL = buildApiUrl("/api/expert-onboarding/captcha-challenge");
-const EXPERT_ONBOARDING_SUBMIT_URL = buildApiUrl("/api/expert-onboarding/submit");
+const CAPTCHA_CHALLENGE_URL = "https://n8n.caloganathan.com/webhook/captcha-challenge";
+const EXPERT_ONBOARDING_SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "mobileNumber",
