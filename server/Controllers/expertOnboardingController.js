@@ -21,6 +21,7 @@ const REQUIRED_FIELDS = [
 const challengeStore = new Map();
 
 const clean = (value) => (typeof value === "string" ? value.trim() : "");
+const DEFAULT_MOBILE_PLACEHOLDER = "Not Provided";
 
 const cleanupExpiredChallenges = () => {
   const now = Date.now();
@@ -122,6 +123,27 @@ const buildWebhookFormData = (body, file) => {
   return formData;
 };
 
+const normalizeRequestBody = (body) => {
+  const normalizedQualification = clean(body?.qualification) || clean(body?.profession);
+  const normalizedProfession = clean(body?.profession) || normalizedQualification;
+
+  return {
+    ...body,
+    fullName: clean(body?.fullName),
+    mobileNumber: clean(body?.mobileNumber) || DEFAULT_MOBILE_PLACEHOLDER,
+    email: clean(body?.email),
+    pincode: clean(body?.pincode),
+    membershipNumber: clean(body?.membershipNumber),
+    cop: clean(body?.cop),
+    qualification: normalizedQualification,
+    profession: normalizedProfession,
+    areaOfExpertise: clean(body?.areaOfExpertise),
+    captchaChallengeId: clean(body?.captchaChallengeId),
+    captchaAnswer: clean(body?.captchaAnswer),
+    "g-recaptcha-response": clean(body?.["g-recaptcha-response"]),
+  };
+};
+
 const validateCaptchaChallenge = ({ challengeId, answer }) => {
   cleanupExpiredChallenges();
 
@@ -185,7 +207,7 @@ export const submitExpertOnboarding = async (req, res) => {
   cleanupExpiredChallenges();
 
   try {
-    const body = req.body || {};
+    const body = normalizeRequestBody(req.body || {});
     const uploadedFile = req.file || req.files?.resume?.[0] || req.files?.profile?.[0] || null;
 
     if (!uploadedFile) {
@@ -204,7 +226,7 @@ export const submitExpertOnboarding = async (req, res) => {
       }
     }
 
-    const recaptchaToken = clean(body["g-recaptcha-response"]);
+    const recaptchaToken = body["g-recaptcha-response"];
 
     if (recaptchaToken) {
       const recaptchaValidation = await verifyRecaptchaToken(recaptchaToken);
@@ -216,8 +238,8 @@ export const submitExpertOnboarding = async (req, res) => {
         });
       }
     } else {
-      const challengeId = clean(body.captchaChallengeId);
-      const captchaAnswer = clean(body.captchaAnswer);
+      const challengeId = body.captchaChallengeId;
+      const captchaAnswer = body.captchaAnswer;
       const captchaValidation = validateCaptchaChallenge({
         challengeId,
         answer: captchaAnswer,
@@ -272,7 +294,7 @@ export const submitExpertOnboarding = async (req, res) => {
     } finally {
       clearTimeout(timeoutId);
       if (!recaptchaToken) {
-        challengeStore.delete(clean(body.captchaChallengeId));
+        challengeStore.delete(body.captchaChallengeId);
       }
     }
   } catch (error) {

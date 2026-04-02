@@ -141,6 +141,20 @@ app.use((err, req, res, _next) => {
     });
   }
 
+  if (err?.name === "MulterError") {
+    const message =
+      err.code === "LIMIT_FILE_SIZE"
+        ? "Uploaded file is too large."
+        : err.code === "LIMIT_UNEXPECTED_FILE"
+          ? "Unexpected upload field. Please reselect your profile file and try again."
+          : err.message || "File upload failed.";
+
+    return res.status(400).json({
+      success: false,
+      message,
+    });
+  }
+
   console.error("Unhandled server error:", err);
   return res.status(500).json({
     success: false,
