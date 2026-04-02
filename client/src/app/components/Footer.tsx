@@ -160,10 +160,6 @@ export function Footer() {
                 );
               })}
             </div>
-
-            <div className="flex items-center rounded-md border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-300">
-              English
-            </div>
           </div>
         </div>
       </div>
