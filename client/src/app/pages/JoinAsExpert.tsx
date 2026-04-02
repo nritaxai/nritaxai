@@ -7,7 +7,6 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { trimValue } from "../utils/consultationWorkflow";
-import { API_BASE_URL } from "../../config/api";
 
 type ExpertFormData = {
   fullName: string;
@@ -39,9 +38,8 @@ const initialValues: ExpertFormData = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const EXPERT_ONBOARDING_SUBMIT_URL = `${API_BASE_URL}/api/expert-onboarding/submit`;
+const SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
-const LEGACY_MOBILE_PLACEHOLDER = "Not Provided";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "email",
@@ -63,23 +61,6 @@ const debugLog = (message: string, details?: unknown) => {
   }
 
   console.debug(`[JoinAsExpert] ${message}`, details);
-};
-
-const parseResponseJsonSafely = async (response: Response): Promise<ExpertOnboardingResponse | null> => {
-  const rawText = await response.text();
-  const trimmedBody = rawText.trim();
-
-  if (!trimmedBody) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(trimmedBody) as ExpertOnboardingResponse;
-  } catch {
-    return {
-      message: trimmedBody,
-    };
-  }
 };
 
 export function JoinAsExpertPage() {
@@ -239,20 +220,17 @@ export function JoinAsExpertPage() {
       formData.append("membershipNumber", normalizedValues.membershipNumber || "");
       formData.append("cop", normalizedValues.cop || "");
       formData.append("qualification", normalizedValues.qualification || "");
-      formData.append("profession", normalizedValues.qualification || "");
       formData.append("areaOfExpertise", normalizedValues.areaOfExpertise || "");
-      formData.append("mobileNumber", LEGACY_MOBILE_PLACEHOLDER);
       formData.append("profile", profileFile);
-      formData.append("resume", profileFile);
       formData.append("g-recaptcha-response", captchaToken);
 
-      console.log("Submitting form...");
+      console.log("Submitting to:", SUBMIT_URL);
       for (const pair of formData.entries()) {
         console.log(pair[0], pair[1]);
       }
 
       debugLog("Submitting expert onboarding form.", {
-        url: EXPERT_ONBOARDING_SUBMIT_URL,
+        url: SUBMIT_URL,
         requiredFields: REQUIRED_FIELDS,
         hasProfile: true,
         hasRecaptchaToken: Boolean(captchaToken),
@@ -264,7 +242,7 @@ export function JoinAsExpertPage() {
 
       let response: Response;
       try {
-        response = await fetch(EXPERT_ONBOARDING_SUBMIT_URL, {
+        response = await fetch(SUBMIT_URL, {
           method: "POST",
           body: formData,
           signal: abortController.signal,
@@ -273,15 +251,23 @@ export function JoinAsExpertPage() {
         window.clearTimeout(timeoutId);
       }
 
-      const data = await parseResponseJsonSafely(response);
+      const text = await response.text();
+      console.log("Raw submit response:", text);
+
+      let data: ExpertOnboardingResponse;
+      try {
+        data = JSON.parse(text) as ExpertOnboardingResponse;
+      } catch {
+        throw new Error("Invalid server response");
+      }
+
+      console.log("Parsed submit response:", data);
 
       debugLog("Expert onboarding response received.", {
         status: response.status,
         ok: response.ok,
         body: data,
       });
-
-      console.log("submit response:", data);
 
       if (!response.ok || !data?.success) {
         throw new Error(data?.message || FALLBACK_SUBMISSION_ERROR);
