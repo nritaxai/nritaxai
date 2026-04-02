@@ -5,6 +5,7 @@ const EXPERT_ONBOARDING_WEBHOOK_URL =
 const CAPTCHA_TTL_MS = Number(process.env.EXPERT_ONBOARDING_CAPTCHA_TTL_MS || 5 * 60 * 1000);
 const CAPTCHA_LENGTH = Math.min(Math.max(Number(process.env.EXPERT_ONBOARDING_CAPTCHA_LENGTH || 5), 4), 6);
 const EXPERT_ONBOARDING_TIMEOUT_MS = Number(process.env.EXPERT_ONBOARDING_TIMEOUT_MS || 15000);
+const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim();
 
 const REQUIRED_FIELDS = [
   "fullName",
@@ -54,6 +55,46 @@ const parseWebhookResponse = async (response) => {
   }
 };
 
+const verifyRecaptchaToken = async (token) => {
+  if (!token) {
+    return { ok: false, message: "Please complete the CAPTCHA." };
+  }
+
+  if (!RECAPTCHA_SECRET_KEY) {
+    console.error("[expert-onboarding] RECAPTCHA_SECRET_KEY is not configured");
+    return { ok: false, message: "CAPTCHA verification is unavailable. Please try again later." };
+  }
+
+  try {
+    const payload = new URLSearchParams();
+    payload.append("secret", RECAPTCHA_SECRET_KEY);
+    payload.append("response", token);
+
+    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: payload,
+    });
+
+    const result = await response.json();
+
+    if (!response.ok || !result?.success) {
+      console.warn("[expert-onboarding] reCAPTCHA verification failed", {
+        status: response.status,
+        errors: Array.isArray(result?.["error-codes"]) ? result["error-codes"] : [],
+      });
+      return { ok: false, message: "Please complete the CAPTCHA." };
+    }
+
+    return { ok: true };
+  } catch (error) {
+    console.error("[expert-onboarding] reCAPTCHA verification error:", error);
+    return { ok: false, message: "Unable to verify CAPTCHA. Please try again." };
+  }
+};
+
 const buildWebhookFormData = (body, file) => {
   const formData = new FormData();
 
@@ -61,10 +102,21 @@ const buildWebhookFormData = (body, file) => {
     formData.append(field, clean(body?.[field]));
   }
 
+  formData.append("qualification", clean(body?.qualification) || clean(body?.profession));
+  formData.append("profession", clean(body?.profession) || clean(body?.qualification));
+  formData.append("pincode", clean(body?.pincode));
+  formData.append("membershipNumber", clean(body?.membershipNumber));
+  formData.append("cop", clean(body?.cop));
+
   formData.append(
     "resume",
     new Blob([file.buffer], { type: file.mimetype || "application/octet-stream" }),
     file.originalname || "resume"
+  );
+  formData.append(
+    "profile",
+    new Blob([file.buffer], { type: file.mimetype || "application/octet-stream" }),
+    file.originalname || "profile"
   );
 
   return formData;
@@ -134,11 +186,12 @@ export const submitExpertOnboarding = async (req, res) => {
 
   try {
     const body = req.body || {};
+    const uploadedFile = req.file || req.files?.resume?.[0] || req.files?.profile?.[0] || null;
 
-    if (!req.file) {
+    if (!uploadedFile) {
       return res.status(400).json({
         success: false,
-        message: "Please upload your resume.",
+        message: "Please upload your profile.",
       });
     }
 
@@ -151,18 +204,31 @@ export const submitExpertOnboarding = async (req, res) => {
       }
     }
 
-    const challengeId = clean(body.captchaChallengeId);
-    const captchaAnswer = clean(body.captchaAnswer);
-    const captchaValidation = validateCaptchaChallenge({
-      challengeId,
-      answer: captchaAnswer,
-    });
+    const recaptchaToken = clean(body["g-recaptcha-response"]);
 
-    if (!captchaValidation.ok) {
-      return res.status(400).json({
-        success: false,
-        message: captchaValidation.message,
+    if (recaptchaToken) {
+      const recaptchaValidation = await verifyRecaptchaToken(recaptchaToken);
+
+      if (!recaptchaValidation.ok) {
+        return res.status(400).json({
+          success: false,
+          message: recaptchaValidation.message,
+        });
+      }
+    } else {
+      const challengeId = clean(body.captchaChallengeId);
+      const captchaAnswer = clean(body.captchaAnswer);
+      const captchaValidation = validateCaptchaChallenge({
+        challengeId,
+        answer: captchaAnswer,
       });
+
+      if (!captchaValidation.ok) {
+        return res.status(400).json({
+          success: false,
+          message: captchaValidation.message,
+        });
+      }
     }
 
     const abortController = new AbortController();
@@ -171,7 +237,7 @@ export const submitExpertOnboarding = async (req, res) => {
     try {
       const webhookResponse = await fetch(EXPERT_ONBOARDING_WEBHOOK_URL, {
         method: "POST",
-        body: buildWebhookFormData(body, req.file),
+        body: buildWebhookFormData(body, uploadedFile),
         signal: abortController.signal,
       });
 
@@ -205,7 +271,9 @@ export const submitExpertOnboarding = async (req, res) => {
       });
     } finally {
       clearTimeout(timeoutId);
-      challengeStore.delete(challengeId);
+      if (!recaptchaToken) {
+        challengeStore.delete(clean(body.captchaChallengeId));
+      }
     }
   } catch (error) {
     console.error("[expert-onboarding] unexpected error:", error);

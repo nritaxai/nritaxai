@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { trimValue } from "../utils/consultationWorkflow";
+import { API_BASE_URL } from "../../config/api";
 
 type ExpertFormData = {
   fullName: string;
@@ -38,7 +39,7 @@ const initialValues: ExpertFormData = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const EXPERT_ONBOARDING_SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
+const EXPERT_ONBOARDING_SUBMIT_URL = `${API_BASE_URL}/api/expert-onboarding/submit`;
 const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
 const LEGACY_MOBILE_PLACEHOLDER = "Not Provided";
 const REQUIRED_FIELDS: FieldKey[] = [

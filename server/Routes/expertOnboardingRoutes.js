@@ -32,7 +32,10 @@ router.post(
     maxRequests: Number(process.env.EXPERT_ONBOARDING_SUBMIT_PER_MIN || 8),
     message: "Too many onboarding attempts. Please try again in a minute.",
   }),
-  upload.single("resume"),
+  upload.fields([
+    { name: "resume", maxCount: 1 },
+    { name: "profile", maxCount: 1 },
+  ]),
   submitExpertOnboarding
 );
 
