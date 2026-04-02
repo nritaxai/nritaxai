@@ -332,14 +332,22 @@ export function JoinAsExpertPage() {
       }
 
       const formData = new FormData();
-
-      for (const [key, value] of Object.entries(normalizedValues)) {
-        formData.append(key, value);
-      }
-
+      formData.append("fullName", normalizedValues.fullName || "");
+      formData.append("mobileNumber", normalizedValues.mobileNumber || "");
+      formData.append("email", normalizedValues.email || "");
+      formData.append("pincode", normalizedValues.pincode || "");
+      formData.append("membershipNumber", normalizedValues.membershipNumber || "");
+      formData.append("cop", normalizedValues.cop || "");
+      formData.append("profession", normalizedValues.profession || "");
+      formData.append("areaOfExpertise", normalizedValues.areaOfExpertise || "");
       formData.append("resume", resumeFile);
       formData.append("captchaChallengeId", captchaChallenge.challengeId);
       formData.append("captchaAnswer", trimValue(captchaAnswer));
+
+      console.log("Submitting form...");
+      for (const pair of formData.entries()) {
+        console.log(pair[0], pair[1]);
+      }
 
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_SUBMIT_URL,
@@ -371,11 +379,15 @@ export function JoinAsExpertPage() {
         body: data,
       });
 
-      if (!response.ok || !data?.success) {
+      if (!response.ok) {
         throw new Error(data?.message || FALLBACK_SUBMISSION_ERROR);
       }
 
-      setSuccessMessage(data.message || "Your application has been submitted successfully.");
+      if (typeof data?.success === "boolean" && !data.success) {
+        throw new Error(data.message || FALLBACK_SUBMISSION_ERROR);
+      }
+
+      setSuccessMessage(data?.message || "Your application has been submitted successfully.");
       setValues(initialValues);
       setResumeFile(null);
       setErrors({});
