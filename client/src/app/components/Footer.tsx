@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { fadeUp, staggerContainer } from "../utils/motion";
 
@@ -162,24 +161,8 @@ export function Footer() {
               })}
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:w-auto">
-              <Select defaultValue="english">
-                <SelectTrigger className="h-10 min-w-32 border-slate-700 bg-slate-950 text-sm text-slate-300">
-                  <SelectValue placeholder="English" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="english">English</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select defaultValue="inr">
-                <SelectTrigger className="h-10 min-w-24 border-slate-700 bg-slate-950 text-sm text-slate-300">
-                  <SelectValue placeholder="INR" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="inr">INR</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="flex items-center rounded-md border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-slate-300">
+              English
             </div>
           </div>
         </div>
