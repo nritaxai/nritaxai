@@ -40,6 +40,7 @@ const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const EXPERT_ONBOARDING_SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
+const LEGACY_MOBILE_PLACEHOLDER = "Not Provided";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "email",
@@ -237,8 +238,11 @@ export function JoinAsExpertPage() {
       formData.append("membershipNumber", normalizedValues.membershipNumber || "");
       formData.append("cop", normalizedValues.cop || "");
       formData.append("qualification", normalizedValues.qualification || "");
+      formData.append("profession", normalizedValues.qualification || "");
       formData.append("areaOfExpertise", normalizedValues.areaOfExpertise || "");
+      formData.append("mobileNumber", LEGACY_MOBILE_PLACEHOLDER);
       formData.append("profile", profileFile);
+      formData.append("resume", profileFile);
       formData.append("g-recaptcha-response", captchaToken);
 
       console.log("Submitting form...");
