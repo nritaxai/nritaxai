@@ -9,17 +9,16 @@ import { trimValue } from "../utils/consultationWorkflow";
 
 type ExpertFormData = {
   fullName: string;
-  mobileNumber: string;
   email: string;
   pincode: string;
   membershipNumber: string;
   cop: string;
-  profession: string;
+  qualification: string;
   areaOfExpertise: string;
 };
 
 type FieldKey = keyof ExpertFormData;
-type ExpertFormFieldKey = FieldKey | "resume" | "captcha";
+type ExpertFormFieldKey = FieldKey | "profile" | "captcha";
 
 type ExpertOnboardingResponse = {
   success?: boolean;
@@ -32,12 +31,11 @@ type ExpertOnboardingResponse = {
 
 const initialValues: ExpertFormData = {
   fullName: "",
-  mobileNumber: "",
   email: "",
   pincode: "",
   membershipNumber: "",
   cop: "",
-  profession: "",
+  qualification: "",
   areaOfExpertise: "",
 };
 
@@ -47,12 +45,11 @@ const CAPTCHA_CHALLENGE_URL = "https://n8n.caloganathan.com/webhook/captcha-chal
 const EXPERT_ONBOARDING_SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
-  "mobileNumber",
   "email",
   "pincode",
   "membershipNumber",
   "cop",
-  "profession",
+  "qualification",
   "areaOfExpertise",
 ];
 
@@ -95,7 +92,7 @@ export function JoinAsExpertPage() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
-  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
   const [captchaChallengeId, setCaptchaChallengeId] = useState("");
   const [captchaValue, setCaptchaValue] = useState("");
   const [captchaExpiresAt, setCaptchaExpiresAt] = useState("");
@@ -168,10 +165,6 @@ export function JoinAsExpertPage() {
 
     let nextValue = value;
 
-    if (name === "mobileNumber") {
-      nextValue = value.replace(/\D/g, "").slice(0, 10);
-    }
-
     if (name === "pincode") {
       nextValue = value.replace(/\D/g, "").slice(0, 6);
     }
@@ -201,17 +194,17 @@ export function JoinAsExpertPage() {
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    setResumeFile(file);
+    setProfileFile(file);
     setShowErrorBanner(false);
     setErrorMessage("");
     setErrors((prev) => ({
       ...prev,
-      resume: "",
+      profile: "",
     }));
   };
 
   const handleRemoveFile = () => {
-    setResumeFile(null);
+    setProfileFile(null);
     setErrorMessage("");
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
@@ -223,10 +216,6 @@ export function JoinAsExpertPage() {
 
     if (!formValues.fullName || formValues.fullName.trim() === "") {
       newErrors.fullName = "Full name is required";
-    }
-
-    if (!formValues.mobileNumber || !/^\d{10}$/.test(formValues.mobileNumber.trim())) {
-      newErrors.mobileNumber = "Enter a valid 10-digit mobile number";
     }
 
     if (!formValues.email || !/^\S+@\S+\.\S+$/.test(formValues.email.trim())) {
@@ -241,20 +230,20 @@ export function JoinAsExpertPage() {
       newErrors.membershipNumber = "Membership number is required";
     }
 
-    if (!["Yes", "No"].includes(formValues.cop.trim())) {
-      newErrors.cop = "Please select Yes or No";
+    if (!["Active", "Inactive", "Not Applicable"].includes(formValues.cop.trim())) {
+      newErrors.cop = "Please select COP.";
     }
 
-    if (!formValues.profession || formValues.profession.trim() === "") {
-      newErrors.profession = "Profession is required";
+    if (!formValues.qualification || formValues.qualification.trim() === "") {
+      newErrors.qualification = "Please select qualification.";
     }
 
     if (!formValues.areaOfExpertise || formValues.areaOfExpertise.trim() === "") {
-      newErrors.areaOfExpertise = "Area of expertise is required";
+      newErrors.areaOfExpertise = "Please select area of expertise.";
     }
 
     if (!file) {
-      newErrors.resume = "Please upload your resume.";
+      newErrors.profile = "Please upload your profile.";
     }
 
     if (!captchaChallengeId) {
@@ -274,12 +263,12 @@ export function JoinAsExpertPage() {
 
     if (loading) return;
 
-    const validationErrors = validateForm(values, resumeFile);
+    const validationErrors = validateForm(values, profileFile);
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       setErrorMessage(
-        validationErrors.resume || validationErrors.captcha || "Please fill all required fields."
+        validationErrors.profile || validationErrors.captcha || "Please fill all required fields."
       );
       setShowErrorBanner(true);
       return;
@@ -295,27 +284,25 @@ export function JoinAsExpertPage() {
       ) as ExpertFormData;
 
       if (!normalizedValues.fullName) throw new Error("Please enter full name.");
-      if (!normalizedValues.mobileNumber) throw new Error("Please enter mobile number.");
       if (!normalizedValues.email) throw new Error("Please enter email.");
       if (!normalizedValues.pincode) throw new Error("Please enter pincode.");
       if (!normalizedValues.membershipNumber) throw new Error("Please enter membership number.");
       if (!normalizedValues.cop) throw new Error("Please select COP.");
-      if (!normalizedValues.profession) throw new Error("Please enter profession.");
-      if (!normalizedValues.areaOfExpertise) throw new Error("Please enter area of expertise.");
+      if (!normalizedValues.qualification) throw new Error("Please select qualification.");
+      if (!normalizedValues.areaOfExpertise) throw new Error("Please select area of expertise.");
       if (!captchaChallengeId) throw new Error("CAPTCHA failed to load. Please refresh and try again.");
       if (!trimValue(captchaAnswer)) throw new Error("Please enter the CAPTCHA.");
-      if (!resumeFile) throw new Error("Please upload your resume.");
+      if (!profileFile) throw new Error("Please upload your profile.");
 
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
-      formData.append("mobileNumber", normalizedValues.mobileNumber || "");
       formData.append("email", normalizedValues.email || "");
       formData.append("pincode", normalizedValues.pincode || "");
       formData.append("membershipNumber", normalizedValues.membershipNumber || "");
       formData.append("cop", normalizedValues.cop || "");
-      formData.append("profession", normalizedValues.profession || "");
+      formData.append("qualification", normalizedValues.qualification || "");
       formData.append("areaOfExpertise", normalizedValues.areaOfExpertise || "");
-      formData.append("resume", resumeFile);
+      formData.append("profile", profileFile);
       formData.append("captchaChallengeId", captchaChallengeId || "");
       formData.append("captchaAnswer", trimValue(captchaAnswer) || "");
 
@@ -327,7 +314,7 @@ export function JoinAsExpertPage() {
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_SUBMIT_URL,
         requiredFields: REQUIRED_FIELDS,
-        hasResume: true,
+        hasProfile: true,
         hasCaptchaChallengeId: Boolean(captchaChallengeId),
         formKeys: Array.from(formData.keys()),
       });
@@ -362,7 +349,7 @@ export function JoinAsExpertPage() {
 
       setSuccessMessage(data.message || "Application submitted successfully.");
       setValues(initialValues);
-      setResumeFile(null);
+      setProfileFile(null);
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
@@ -445,22 +432,6 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="mobileNumber" className="text-sm font-medium text-[#0F172A]">Mobile Number *</Label>
-                  <Input
-                    id="mobileNumber"
-                    name="mobileNumber"
-                    type="tel"
-                    inputMode="numeric"
-                    required
-                    value={values.mobileNumber}
-                    onChange={handleChange}
-                    aria-invalid={errors.mobileNumber ? true : undefined}
-                    placeholder="Enter your mobile number"
-                  />
-                  {errors.mobileNumber ? <p className="text-sm text-red-600">{errors.mobileNumber}</p> : null}
-                </div>
-
-                <div className="space-y-2">
                   <Label htmlFor="email" className="text-sm font-medium text-[#0F172A]">Email *</Label>
                   <Input
                     id="email"
@@ -520,48 +491,68 @@ export function JoinAsExpertPage() {
                     disabled={loading}
                   >
                     <option value="">Select COP status</option>
-                    <option value="Yes">Yes</option>
-                    <option value="No">No</option>
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                    <option value="Not Applicable">Not Applicable</option>
                   </select>
                   {errors.cop ? <p className="text-sm text-red-600">{errors.cop}</p> : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="profession" className="text-sm font-medium text-[#0F172A]">Profession *</Label>
-                  <Input
-                    id="profession"
-                    name="profession"
+                  <Label htmlFor="qualification" className="text-sm font-medium text-[#0F172A]">Qualification *</Label>
+                  <select
+                    id="qualification"
+                    name="qualification"
                     required
-                    value={values.profession}
+                    value={values.qualification}
                     onChange={handleChange}
-                    aria-invalid={errors.profession ? true : undefined}
-                    placeholder="CA, CPA, Tax Advisor, Lawyer..."
-                  />
-                  {errors.profession ? <p className="text-sm text-red-600">{errors.profession}</p> : null}
+                    aria-invalid={errors.qualification ? true : undefined}
+                    className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={loading}
+                  >
+                    <option value="">Select qualification</option>
+                    <option value="Chartered Accountant (CA)">Chartered Accountant (CA)</option>
+                    <option value="CPA">CPA</option>
+                    <option value="Tax Advisor">Tax Advisor</option>
+                    <option value="Lawyer">Lawyer</option>
+                    <option value="Other">Other</option>
+                  </select>
+                  {errors.qualification ? <p className="text-sm text-red-600">{errors.qualification}</p> : null}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="areaOfExpertise" className="text-sm font-medium text-[#0F172A]">Area of Expertise *</Label>
-                  <Input
+                  <select
                     id="areaOfExpertise"
                     name="areaOfExpertise"
                     required
                     value={values.areaOfExpertise}
                     onChange={handleChange}
                     aria-invalid={errors.areaOfExpertise ? true : undefined}
-                    placeholder="DTAA, FEMA, NRI filing, property tax, capital gains..."
-                  />
+                    className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    disabled={loading}
+                  >
+                    <option value="">Select area of expertise</option>
+                    <option value="DTAA">DTAA</option>
+                    <option value="FEMA">FEMA</option>
+                    <option value="NRI Tax Filing">NRI Tax Filing</option>
+                    <option value="Capital Gains">Capital Gains</option>
+                    <option value="Property Tax">Property Tax</option>
+                    <option value="TDS Refund">TDS Refund</option>
+                    <option value="Compliance">Compliance</option>
+                    <option value="Other">Other</option>
+                  </select>
                   {errors.areaOfExpertise ? (
                     <p className="text-sm text-red-600">{errors.areaOfExpertise}</p>
                   ) : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="resume" className="text-sm font-medium text-[#0F172A]">Resume *</Label>
+                  <Label htmlFor="profile" className="text-sm font-medium text-[#0F172A]">Profile *</Label>
                   <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
-                        <p className="text-sm font-medium text-[#0F172A]">Upload resume from desktop</p>
+                        <p className="text-sm font-medium text-[#0F172A]">Upload profile from desktop</p>
                         <p className="text-xs text-[#0F172A]/70">Accepted formats: PDF, DOC, DOCX</p>
                       </div>
                       <Button
@@ -576,20 +567,20 @@ export function JoinAsExpertPage() {
                       </Button>
                     </div>
                     <input
-                      id="resume"
-                      name="resume"
+                      id="profile"
+                      name="profile"
                       ref={resumeInputRef}
                       type="file"
                       required
                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                       className="hidden"
                       onChange={handleFileChange}
-                      aria-invalid={errors.resume ? true : undefined}
+                      aria-invalid={errors.profile ? true : undefined}
                       disabled={loading}
                     />
-                    {resumeFile ? (
+                    {profileFile ? (
                       <div className="mt-3 flex items-center justify-between rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-3 py-2 text-sm text-[#1D4ED8]">
-                        <span className="truncate pr-3">{resumeFile.name}</span>
+                        <span className="truncate pr-3">{profileFile.name}</span>
                         <button
                           type="button"
                           onClick={handleRemoveFile}
@@ -601,7 +592,7 @@ export function JoinAsExpertPage() {
                         </button>
                       </div>
                     ) : null}
-                    {errors.resume ? <p className="mt-3 text-sm text-red-600">{errors.resume}</p> : null}
+                    {errors.profile ? <p className="mt-3 text-sm text-red-600">{errors.profile}</p> : null}
                   </div>
                 </div>
               </div>
