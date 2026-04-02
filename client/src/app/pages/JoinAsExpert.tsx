@@ -15,7 +15,9 @@ type ExpertFormData = {
   membershipNumber: string;
   cop: string;
   qualification: string;
+  customQualification: string;
   areaOfExpertise: string;
+  customAreaOfExpertise: string;
 };
 
 type FieldKey = keyof ExpertFormData;
@@ -33,7 +35,9 @@ const initialValues: ExpertFormData = {
   membershipNumber: "",
   cop: "",
   qualification: "",
+  customQualification: "",
   areaOfExpertise: "",
+  customAreaOfExpertise: "",
 };
 
 const SUBMISSION_TIMEOUT_MS = 15000;
@@ -62,6 +66,9 @@ const debugLog = (message: string, details?: unknown) => {
 
   console.debug(`[JoinAsExpert] ${message}`, details);
 };
+
+const resolveSelectedValue = (value: string, customValue: string) =>
+  value === "Other" ? customValue.trim() : value.trim();
 
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
@@ -104,6 +111,8 @@ export function JoinAsExpertPage() {
     setValues((prev) => ({
       ...prev,
       [name]: nextValue,
+      ...(name === "qualification" && nextValue !== "Other" ? { customQualification: "" } : {}),
+      ...(name === "areaOfExpertise" && nextValue !== "Other" ? { customAreaOfExpertise: "" } : {}),
     }));
 
     setErrors((prev) => ({
@@ -156,11 +165,11 @@ export function JoinAsExpertPage() {
       newErrors.cop = "Please select COP.";
     }
 
-    if (!formValues.qualification || formValues.qualification.trim() === "") {
+    if (!resolveSelectedValue(formValues.qualification, formValues.customQualification)) {
       newErrors.qualification = "Please select qualification.";
     }
 
-    if (!formValues.areaOfExpertise || formValues.areaOfExpertise.trim() === "") {
+    if (!resolveSelectedValue(formValues.areaOfExpertise, formValues.customAreaOfExpertise)) {
       newErrors.areaOfExpertise = "Please select area of expertise.";
     }
 
@@ -202,16 +211,24 @@ export function JoinAsExpertPage() {
       const normalizedValues = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value.trim()])
       ) as ExpertFormData;
+      const resolvedQualification = resolveSelectedValue(
+        normalizedValues.qualification,
+        normalizedValues.customQualification
+      );
+      const resolvedAreaOfExpertise = resolveSelectedValue(
+        normalizedValues.areaOfExpertise,
+        normalizedValues.customAreaOfExpertise
+      );
 
       if (!normalizedValues.fullName) throw new Error("Please enter full name.");
       if (!normalizedValues.email) throw new Error("Please enter email.");
       if (!normalizedValues.pincode) throw new Error("Please enter pincode.");
       if (!normalizedValues.membershipNumber) throw new Error("Please enter membership number.");
       if (!profileFile) throw new Error("Please upload your profile.");
-      if (!normalizedValues.qualification) throw new Error("Please select qualification.");
+      if (!resolvedQualification) throw new Error("Please select qualification.");
       if (!captchaToken) throw new Error("Please complete the CAPTCHA.");
       if (!normalizedValues.cop) throw new Error("Please select COP.");
-      if (!normalizedValues.areaOfExpertise) throw new Error("Please select area of expertise.");
+      if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
 
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
@@ -219,8 +236,8 @@ export function JoinAsExpertPage() {
       formData.append("pincode", normalizedValues.pincode || "");
       formData.append("membershipNumber", normalizedValues.membershipNumber || "");
       formData.append("cop", normalizedValues.cop || "");
-      formData.append("qualification", normalizedValues.qualification || "");
-      formData.append("areaOfExpertise", normalizedValues.areaOfExpertise || "");
+      formData.append("qualification", resolvedQualification || "");
+      formData.append("areaOfExpertise", resolvedAreaOfExpertise || "");
       formData.append("profile", profileFile);
       formData.append("g-recaptcha-response", captchaToken);
 
@@ -445,6 +462,17 @@ export function JoinAsExpertPage() {
                     <option value="Lawyer">Lawyer</option>
                     <option value="Other">Other</option>
                   </select>
+                  {values.qualification === "Other" ? (
+                    <Input
+                      id="customQualification"
+                      name="customQualification"
+                      value={values.customQualification}
+                      onChange={handleChange}
+                      aria-invalid={errors.qualification ? true : undefined}
+                      placeholder="Enter your qualification"
+                      disabled={loading}
+                    />
+                  ) : null}
                   {errors.qualification ? <p className="text-sm text-red-600">{errors.qualification}</p> : null}
                 </div>
 
@@ -470,6 +498,17 @@ export function JoinAsExpertPage() {
                     <option value="Compliance">Compliance</option>
                     <option value="Other">Other</option>
                   </select>
+                  {values.areaOfExpertise === "Other" ? (
+                    <Input
+                      id="customAreaOfExpertise"
+                      name="customAreaOfExpertise"
+                      value={values.customAreaOfExpertise}
+                      onChange={handleChange}
+                      aria-invalid={errors.areaOfExpertise ? true : undefined}
+                      placeholder="Enter your area of expertise"
+                      disabled={loading}
+                    />
+                  ) : null}
                   {errors.areaOfExpertise ? (
                     <p className="text-sm text-red-600">{errors.areaOfExpertise}</p>
                   ) : null}
