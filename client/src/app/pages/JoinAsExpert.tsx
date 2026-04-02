@@ -1,6 +1,7 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Paperclip, X } from "lucide-react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -25,24 +26,6 @@ type ExpertOnboardingResponse = {
   message?: string;
 };
 
-declare global {
-  interface Window {
-    grecaptcha?: {
-      render: (
-        container: HTMLElement,
-        parameters: {
-          sitekey: string;
-          callback: (token: string) => void;
-          "expired-callback"?: () => void;
-          "error-callback"?: () => void;
-        }
-      ) => number;
-      reset: (widgetId?: number) => void;
-      ready: (callback: () => void) => void;
-    };
-  }
-}
-
 const initialValues: ExpertFormData = {
   fullName: "",
   email: "",
@@ -56,8 +39,7 @@ const initialValues: ExpertFormData = {
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const EXPERT_ONBOARDING_SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
-const RECAPTCHA_SITE_KEY = "PASTE_MY_RECAPTCHA_V2_SITE_KEY_HERE";
-const RECAPTCHA_SCRIPT_ID = "google-recaptcha-v2-script";
+const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "email",
@@ -101,6 +83,7 @@ const parseResponseJsonSafely = async (response: Response): Promise<ExpertOnboar
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -109,8 +92,6 @@ export function JoinAsExpertPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
-  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
-  const recaptchaWidgetIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -126,57 +107,6 @@ export function JoinAsExpertPage() {
         email: prev.email || trimValue(parsedUser?.email),
       }));
     } catch {}
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    const renderRecaptcha = () => {
-      if (!window.grecaptcha || !recaptchaContainerRef.current || recaptchaWidgetIdRef.current !== null) {
-        return;
-      }
-
-      recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaContainerRef.current, {
-        sitekey: RECAPTCHA_SITE_KEY,
-        callback: (token: string) => {
-          setCaptchaToken(token || "");
-          setErrors((prev) => ({
-            ...prev,
-            captcha: "",
-          }));
-          setShowErrorBanner(false);
-        },
-        "expired-callback": () => {
-          setCaptchaToken("");
-        },
-        "error-callback": () => {
-          setCaptchaToken("");
-        },
-      });
-    };
-
-    const existingScript = document.getElementById(RECAPTCHA_SCRIPT_ID) as HTMLScriptElement | null;
-
-    if (existingScript) {
-      if (window.grecaptcha) {
-        window.grecaptcha.ready(renderRecaptcha);
-      } else {
-        existingScript.addEventListener("load", renderRecaptcha, { once: true });
-      }
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.id = RECAPTCHA_SCRIPT_ID;
-    script.src = "https://www.google.com/recaptcha/api.js?render=explicit";
-    script.async = true;
-    script.defer = true;
-    script.addEventListener("load", renderRecaptcha, { once: true });
-    document.head.appendChild(script);
-
-    return () => {
-      script.removeEventListener("load", renderRecaptcha);
-    };
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -294,11 +224,11 @@ export function JoinAsExpertPage() {
       if (!normalizedValues.email) throw new Error("Please enter email.");
       if (!normalizedValues.pincode) throw new Error("Please enter pincode.");
       if (!normalizedValues.membershipNumber) throw new Error("Please enter membership number.");
-      if (!normalizedValues.cop) throw new Error("Please select COP.");
-      if (!normalizedValues.qualification) throw new Error("Please select qualification.");
-      if (!normalizedValues.areaOfExpertise) throw new Error("Please select area of expertise.");
-      if (!captchaToken) throw new Error("Please complete the CAPTCHA.");
       if (!profileFile) throw new Error("Please upload your profile.");
+      if (!normalizedValues.qualification) throw new Error("Please select qualification.");
+      if (!captchaToken) throw new Error("Please complete the CAPTCHA.");
+      if (!normalizedValues.cop) throw new Error("Please select COP.");
+      if (!normalizedValues.areaOfExpertise) throw new Error("Please select area of expertise.");
 
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
@@ -362,18 +292,14 @@ export function JoinAsExpertPage() {
       if (resumeInputRef.current) {
         resumeInputRef.current.value = "";
       }
-      if (window.grecaptcha && recaptchaWidgetIdRef.current !== null) {
-        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
-      }
+      recaptchaRef.current?.reset();
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
       const message = error instanceof Error ? error.message : "Something went wrong.";
       setErrorMessage(message);
       setShowErrorBanner(true);
       setCaptchaToken("");
-      if (window.grecaptcha && recaptchaWidgetIdRef.current !== null) {
-        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
-      }
+      recaptchaRef.current?.reset();
     } finally {
       setLoading(false);
     }
@@ -617,13 +543,26 @@ export function JoinAsExpertPage() {
                         <p className="mt-1 text-xs text-[#0F172A]/70">Please complete the checkbox below to continue.</p>
                       </div>
                     </div>
-                    <div className="mt-4">
+                    <div className="mt-4 overflow-x-auto">
                       <div
-                        id="recaptcha-container"
-                        ref={recaptchaContainerRef}
-                        className="g-recaptcha min-h-[78px]"
+                        className="min-h-[78px]"
                         aria-invalid={errors.captcha ? true : undefined}
-                      />
+                      >
+                        <ReCAPTCHA
+                          ref={recaptchaRef}
+                          sitekey={RECAPTCHA_SITE_KEY}
+                          onChange={(token) => {
+                            setCaptchaToken(token || "");
+                            setErrors((prev) => ({
+                              ...prev,
+                              captcha: "",
+                            }));
+                            setShowErrorBanner(false);
+                          }}
+                          onExpired={() => setCaptchaToken("")}
+                          onErrored={() => setCaptchaToken("")}
+                        />
+                      </div>
                     </div>
                   </div>
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
