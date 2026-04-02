@@ -30,12 +30,6 @@ type ExpertOnboardingResponse = {
   expiresAt?: string;
 };
 
-type NumericCaptchaChallenge = {
-  challengeId: string;
-  challengeValue: string;
-  expiresAt: string;
-};
-
 const initialValues: ExpertFormData = {
   fullName: "",
   mobileNumber: "",
@@ -102,7 +96,9 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [resumeFile, setResumeFile] = useState<File | null>(null);
-  const [captchaChallenge, setCaptchaChallenge] = useState<NumericCaptchaChallenge | null>(null);
+  const [captchaChallengeId, setCaptchaChallengeId] = useState("");
+  const [captchaValue, setCaptchaValue] = useState("");
+  const [captchaExpiresAt, setCaptchaExpiresAt] = useState("");
   const [captchaAnswer, setCaptchaAnswer] = useState("");
   const [captchaLoading, setCaptchaLoading] = useState(false);
 
@@ -122,36 +118,35 @@ export function JoinAsExpertPage() {
     } catch {}
   }, []);
 
-  const loadCaptchaChallenge = async (showRefreshError = true) => {
-    setCaptchaLoading(true);
-
+  const loadCaptcha = async (showRefreshError = true) => {
     try {
-      const response = await fetch(CAPTCHA_CHALLENGE_URL, {
-        method: "GET",
-      });
-      const payload = await parseResponseJsonSafely(response);
+      setCaptchaLoading(true);
+      setErrorMessage("");
+      setShowErrorBanner(false);
 
-      if (!response.ok || !payload?.challengeId || !payload?.challengeValue || !payload?.expiresAt) {
-        throw new Error(payload?.message || "Unable to load CAPTCHA. Please try again.");
+      const response = await fetch(CAPTCHA_CHALLENGE_URL);
+      const data = await parseResponseJsonSafely(response);
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Failed to load CAPTCHA.");
       }
 
-      setCaptchaChallenge({
-        challengeId: payload.challengeId,
-        challengeValue: payload.challengeValue,
-        expiresAt: payload.expiresAt,
-      });
+      setCaptchaChallengeId(data.challengeId || "");
+      setCaptchaValue(data.challengeValue || "");
+      setCaptchaExpiresAt(data.expiresAt || "");
       setCaptchaAnswer("");
       setErrors((prev) => ({
         ...prev,
         captcha: "",
       }));
-      setShowErrorBanner(false);
     } catch (error) {
       debugLog("Failed to load numeric CAPTCHA challenge.", error);
-      setCaptchaChallenge(null);
+      setCaptchaChallengeId("");
+      setCaptchaValue("");
+      setCaptchaExpiresAt("");
 
       if (showRefreshError) {
-        const message = error instanceof Error ? error.message : "Unable to load CAPTCHA. Please try again.";
+        const message = error instanceof Error ? error.message : "Failed to load CAPTCHA.";
         setErrors((prev) => ({
           ...prev,
           captcha: message,
@@ -165,7 +160,7 @@ export function JoinAsExpertPage() {
   };
 
   useEffect(() => {
-    void loadCaptchaChallenge(false);
+    void loadCaptcha(false);
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -262,10 +257,10 @@ export function JoinAsExpertPage() {
       newErrors.resume = "Please upload your resume.";
     }
 
-    if (!captchaChallenge?.challengeId) {
-      newErrors.captcha = "Unable to load CAPTCHA. Please refresh and try again.";
+    if (!captchaChallengeId) {
+      newErrors.captcha = "CAPTCHA failed to load. Please refresh and try again.";
     } else if (!trimValue(captchaAnswer)) {
-      newErrors.captcha = "Please enter the number shown above.";
+      newErrors.captcha = "Please enter the CAPTCHA.";
     }
 
     return newErrors;
@@ -295,41 +290,21 @@ export function JoinAsExpertPage() {
     setLoading(true);
 
     try {
-      if (!captchaChallenge?.challengeId) {
-        setErrors((prev) => ({
-          ...prev,
-          captcha: "Unable to load CAPTCHA. Please refresh and try again.",
-        }));
-        setErrorMessage("Unable to load CAPTCHA. Please refresh and try again.");
-        setShowErrorBanner(true);
-        return;
-      }
-
-      if (!resumeFile) {
-        setErrors((prev) => ({
-          ...prev,
-          resume: "Please upload your resume.",
-        }));
-        setErrorMessage("Please upload your resume.");
-        setShowErrorBanner(true);
-        return;
-      }
-
       const normalizedValues = Object.fromEntries(
         Object.entries(values).map(([key, value]) => [key, value.trim()])
       ) as ExpertFormData;
 
-      for (const key of REQUIRED_FIELDS) {
-        if (!normalizedValues[key]) {
-          setErrors((prev) => ({
-            ...prev,
-            [key]: "This field is required",
-          }));
-          setErrorMessage("Please fill all required fields.");
-          setShowErrorBanner(true);
-          return;
-        }
-      }
+      if (!normalizedValues.fullName) throw new Error("Please enter full name.");
+      if (!normalizedValues.mobileNumber) throw new Error("Please enter mobile number.");
+      if (!normalizedValues.email) throw new Error("Please enter email.");
+      if (!normalizedValues.pincode) throw new Error("Please enter pincode.");
+      if (!normalizedValues.membershipNumber) throw new Error("Please enter membership number.");
+      if (!normalizedValues.cop) throw new Error("Please select COP.");
+      if (!normalizedValues.profession) throw new Error("Please enter profession.");
+      if (!normalizedValues.areaOfExpertise) throw new Error("Please enter area of expertise.");
+      if (!captchaChallengeId) throw new Error("CAPTCHA failed to load. Please refresh and try again.");
+      if (!trimValue(captchaAnswer)) throw new Error("Please enter the CAPTCHA.");
+      if (!resumeFile) throw new Error("Please upload your resume.");
 
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
@@ -341,10 +316,10 @@ export function JoinAsExpertPage() {
       formData.append("profession", normalizedValues.profession || "");
       formData.append("areaOfExpertise", normalizedValues.areaOfExpertise || "");
       formData.append("resume", resumeFile);
-      formData.append("captchaChallengeId", captchaChallenge.challengeId);
-      formData.append("captchaAnswer", trimValue(captchaAnswer));
+      formData.append("captchaChallengeId", captchaChallengeId || "");
+      formData.append("captchaAnswer", trimValue(captchaAnswer) || "");
 
-      console.log("Submitting form...");
+      console.log("Submitting to:", EXPERT_ONBOARDING_SUBMIT_URL);
       for (const pair of formData.entries()) {
         console.log(pair[0], pair[1]);
       }
@@ -353,7 +328,7 @@ export function JoinAsExpertPage() {
         url: EXPERT_ONBOARDING_SUBMIT_URL,
         requiredFields: REQUIRED_FIELDS,
         hasResume: true,
-        hasCaptchaChallengeId: Boolean(captchaChallenge.challengeId),
+        hasCaptchaChallengeId: Boolean(captchaChallengeId),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -379,15 +354,13 @@ export function JoinAsExpertPage() {
         body: data,
       });
 
-      if (!response.ok) {
+      console.log("submit response:", data);
+
+      if (!response.ok || !data?.success) {
         throw new Error(data?.message || FALLBACK_SUBMISSION_ERROR);
       }
 
-      if (typeof data?.success === "boolean" && !data.success) {
-        throw new Error(data.message || FALLBACK_SUBMISSION_ERROR);
-      }
-
-      setSuccessMessage(data?.message || "Your application has been submitted successfully.");
+      setSuccessMessage(data.message || "Application submitted successfully.");
       setValues(initialValues);
       setResumeFile(null);
       setErrors({});
@@ -398,10 +371,11 @@ export function JoinAsExpertPage() {
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
-      setErrorMessage(error instanceof Error ? error.message : FALLBACK_SUBMISSION_ERROR);
+      const message = error instanceof Error ? error.message : "Something went wrong.";
+      setErrorMessage(message);
       setShowErrorBanner(true);
     } finally {
-      await loadCaptchaChallenge(false);
+      await loadCaptcha(false);
       setCaptchaAnswer("");
       setLoading(false);
     }
@@ -644,7 +618,7 @@ export function JoinAsExpertPage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => void loadCaptchaChallenge()}
+                        onClick={() => void loadCaptcha()}
                         disabled={loading || captchaLoading}
                         className="gap-2"
                       >
@@ -654,7 +628,7 @@ export function JoinAsExpertPage() {
                     </div>
 
                     <div className="mt-4 inline-flex min-h-14 items-center rounded-lg border border-[#BFDBFE] bg-[#EFF6FF] px-4 py-3 text-2xl font-semibold tracking-[0.35em] text-[#1D4ED8]">
-                      {captchaChallenge?.challengeValue || "-----"}
+                      {captchaValue || "-----"}
                     </div>
 
                     <div className="mt-4 space-y-2">
@@ -677,13 +651,18 @@ export function JoinAsExpertPage() {
                   {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <Button type="submit" className="h-11 px-6" disabled={loading || captchaLoading || !captchaChallenge}>
+                  <Button type="submit" className="h-11 px-6" disabled={loading || captchaLoading || !captchaChallengeId}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
                   <p className="text-sm text-[#0F172A]">
                     Your details will be reviewed by our team before onboarding.
                   </p>
                 </div>
+                {captchaExpiresAt ? (
+                  <p className="mt-2 text-xs text-[#0F172A]/60">
+                    CAPTCHA expires at {new Date(captchaExpiresAt).toLocaleString()}.
+                  </p>
+                ) : null}
                 <p className="mt-3 text-sm text-[#0F172A]/80">
                   Your information is secure and used only for onboarding purposes.
                 </p>
