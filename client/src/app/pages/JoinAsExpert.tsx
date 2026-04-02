@@ -353,14 +353,15 @@ export function JoinAsExpertPage() {
                   </div>
                 </div>
               </div>
-            ) : null}
-            {showErrorBanner && (
-              <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {errorMessage || "Please fill all required fields."}
-              </div>
-            )}
+            ) : (
+              <>
+                {showErrorBanner && (
+                  <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {errorMessage || "Please fill all required fields."}
+                  </div>
+                )}
 
-            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="text-sm font-medium text-[#0F172A]">Full Name *</Label>
@@ -608,8 +609,10 @@ export function JoinAsExpertPage() {
                 <p className="mt-3 text-sm text-[#0F172A]/80">
                   Your information is secure and used only for onboarding purposes.
                 </p>
-              </div>
-            </form>
+                </div>
+              </form>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
