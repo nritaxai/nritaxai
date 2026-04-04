@@ -22,15 +22,15 @@ const buildPeriodLabel = (period) => {
 
   if (period.label) return period.label;
   if (startLabel && endLabel) return `${startLabel} to ${endLabel}`;
-  if (startLabel) return `From ${startLabel}`;
-  if (endLabel) return `Until ${endLabel}`;
+  if (startLabel) return `On/after ${startLabel}`;
+  if (endLabel) return `Before ${endLabel}`;
   return "Current rule";
 };
 
 const taxRuleCatalog = [
   {
     id: "india-listed-equity-ltcg",
-    ruleName: "India LTCG on listed equity",
+    ruleName: "Section 112A LTCG for listed equity, equity mutual funds, and business trusts",
     helperText: "The applicable rule depends on the transaction date.",
     keywords: [
       /\bltcg\b/i,
@@ -39,23 +39,27 @@ const taxRuleCatalog = [
       /\blisted equity\b/i,
       /\bequity shares?\b/i,
       /\bequity mutual funds?\b/i,
+      /\bbusiness trusts?\b/i,
+      /\bsection\s*112a\b/i,
     ],
     periods: [
       {
+        label: "Before 23 Jul 2024",
         value: "10% tax",
         rate: 0.1,
         exemption: 100000,
         threshold: 100000,
         effectiveStartDate: null,
-        effectiveEndDate: "2026-03-31",
+        effectiveEndDate: "2024-07-22",
         active: false,
       },
       {
+        label: "On/after 23 Jul 2024",
         value: "12.5% tax",
         rate: 0.125,
         exemption: 125000,
         threshold: 125000,
-        effectiveStartDate: "2026-04-01",
+        effectiveStartDate: "2024-07-23",
         effectiveEndDate: null,
         active: true,
       },
