@@ -28,8 +28,9 @@ test("getTaxRuleTimelinesForQuery returns dated periods for LTCG questions", () 
   const timelines = getTaxRuleTimelinesForQuery("Explain LTCG on listed equity after the new law change.");
   assert.equal(timelines.length, 1);
   assert.equal(timelines[0].ruleName, "India LTCG on listed equity");
-  assert.equal(timelines[0].periods[0].label, "Before 31 Mar 2026");
+  assert.equal(timelines[0].periods[0].label, "Until 31 Mar 2026");
   assert.equal(timelines[0].periods[1].label, "From 1 Apr 2026");
+  assert.equal(timelines[0].helperText, "The applicable rule depends on the transaction date.");
 });
 
 test("resolveApplicablePeriod selects the pre-change LTCG rule for earlier dates", () => {
@@ -47,7 +48,8 @@ test("appendTimelineToAnswer injects date-wise tax rule sections into markdown",
   );
 
   assert.match(reply, /#### India LTCG on listed equity/);
-  assert.match(reply, /Before 31 Mar 2026: 10% tax, ₹1,00,000 exemption/);
+  assert.match(reply, /The applicable rule depends on the transaction date\./);
+  assert.match(reply, /Until 31 Mar 2026: 10% tax, ₹1,00,000 exemption/);
   assert.match(reply, /From 1 Apr 2026: 12.5% tax, ₹1,25,000 exemption/);
 });
 
@@ -67,6 +69,6 @@ test("calculateCapitalGainsTax uses dated LTCG rule when sale date is before 1 A
   assert.equal(res.statusCode, 200);
   assert.equal(res.body.result.rate, 0.1);
   assert.equal(res.body.result.baseTax, 50000);
-  assert.equal(res.body.result.applicableRule.label, "Before 31 Mar 2026");
+  assert.equal(res.body.result.applicableRule.label, "Until 31 Mar 2026");
   assert.equal(res.body.result.taxRuleTimelines[0].periods.length, 2);
 });

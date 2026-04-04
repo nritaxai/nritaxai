@@ -23,7 +23,7 @@ const buildPeriodLabel = (period) => {
   if (period.label) return period.label;
   if (startLabel && endLabel) return `${startLabel} to ${endLabel}`;
   if (startLabel) return `From ${startLabel}`;
-  if (endLabel) return `Before ${endLabel}`;
+  if (endLabel) return `Until ${endLabel}`;
   return "Current rule";
 };
 
@@ -31,7 +31,7 @@ const taxRuleCatalog = [
   {
     id: "india-listed-equity-ltcg",
     ruleName: "India LTCG on listed equity",
-    helperText: "Applicable rule depends on the transaction or sale date.",
+    helperText: "The applicable rule depends on the transaction date.",
     keywords: [
       /\bltcg\b/i,
       /\blong[\s-]?term capital gains?\b/i,

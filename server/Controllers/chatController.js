@@ -972,7 +972,7 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "If the user asks a practical question, include the actual process, common documentation, filing flow, and the reason each step matters instead of generic advice. " +
           "If the user asks for documents, eligibility, forms, rates, exemptions, or DTAA relief, explicitly list them in a clean structured way. " +
           "If a tax rule changed across effective dates, do not merge the periods into one blended statement. " +
-          "Show the old and new rule separately with labels such as 'Before 1 Apr 2026' and 'From 1 Apr 2026 onward', and say that the applicable rule depends on the transaction or sale date. " +
+          "Show the old and new rule separately with labels such as 'Until 31 Mar 2026' and 'From 1 Apr 2026', and include this exact note: 'The applicable rule depends on the transaction date.' " +
           "Use your general model knowledge for the main explanation and practical guidance. " +
           "If hidden reference context is provided, use it only as supporting reference material for directly relevant treaty, statutory, or document details. " +
           "Do not overfit the whole answer to the hidden reference context unless it is clearly on point. " +
