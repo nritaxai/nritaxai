@@ -14,8 +14,9 @@ import {
   normalizeUserSubscriptionState,
 } from "../Utils/subscriptionAccess.js";
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
+import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
 
-const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 20000);
+const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 15000);
 const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
 
 const client = new OpenAI({
@@ -29,7 +30,7 @@ const client = new OpenAI({
   },
 });
 
-const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 12), 8);
+const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 8), 6);
 const MAX_STORED_MESSAGES = 100;
 const chatSessionMemory = new Map();
 const chatSessionStore = new Map();
@@ -40,7 +41,7 @@ const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
 const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 const RAG_MAX_PER_PAGE = Number(process.env.RAG_MAX_PER_PAGE || 2);
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
-const CHAT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || 1400), 900);
+const CHAT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || 1000), 700);
 let dtaaChunksCache = null;
 let dtaaTokenIndexCache = null;
 let dtaaIndexMtimeCache = null;
@@ -797,6 +798,7 @@ const appendSourcesIfMissing = (reply = "", matches = []) => {
   return `${safeReply}${buildRagSourcesSection(matches)}`;
 };
 
+
 const getInstantRepeatReply = (messages = [], question = "") => {
   const normalizedQuestion = String(question || "").trim().toLowerCase();
   if (!normalizedQuestion || !Array.isArray(messages) || !messages.length) return "";
@@ -980,14 +982,14 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "Do not invent treaty rules, forms, rates, eligibility conditions, or document requirements that are not supported by the hidden reference context or clearly established Indian tax practice. " +
           "If the hidden reference context is partial or unclear, say so carefully and give conservative guidance rather than a confident unsupported answer. " +
           "When useful, include mini-subheadings inside the Answer section such as 'Documents Required', 'How It Works', 'Example', or 'Important Note'. " +
-          "Aim for a complete reply, usually 320 to 520 words. " +
+          "Aim for a concise but useful reply, usually 180 to 320 words. " +
           "Use this exact response format for every answer.\n" +
           "Return markdown with only these headings:\n" +
           "### Answer\n" +
           "### Key Tax Points\n" +
           "### Next Steps\n" +
           "### Follow-up Questions\n" +
-          "Write 6 to 12 sentences in Answer. " +
+          "Write 4 to 8 sentences in Answer. " +
           "Inside the Answer section, you may use short markdown subheadings like '#### Documents Required' or '#### Example' if they improve clarity. " +
           "Write exactly 2 substantial bullets in Key Tax Points. " +
           "Write exactly 2 numbered items in Next Steps. " +
@@ -1079,12 +1081,6 @@ export const chatWithAI = async (req, res) => {
     let model = DEFAULT_CHAT_MODEL;
     const userId = getSessionActorId(req);
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
-    const sessionMessages = await loadSessionMessages({
-      userId,
-      language: rawLanguage,
-      knowledgeSource,
-      sessionKey,
-    });
 
     const languageMap = {
       english: {
@@ -1106,7 +1102,21 @@ export const chatWithAI = async (req, res) => {
     };
     const selectedLanguage = languageMap[rawLanguage] || languageMap.english;
 
+    if (!message) {
+      return res.status(400).json({
+        error: "Message is required",
+      });
+    }
+
+    const isGuestUser = userId.startsWith("guest:");
+
     if (isGreetingMessage(message)) {
+      const sessionMessages = await loadSessionMessages({
+        userId,
+        language: rawLanguage,
+        knowledgeSource,
+        sessionKey,
+      });
       const greetingReplyMap = {
         english: "Hello! How can I assist you today?",
         tamil: "Vanakkam! Indru naan ungalukku eppadi uthavalam?",
@@ -1133,24 +1143,23 @@ export const chatWithAI = async (req, res) => {
       });
     }
 
-    if (!message) {
-      return res.status(400).json({
-        error: "Message is required",
-      });
-    }
-
-    const isGuestUser = userId.startsWith("guest:");
     if (isGuestUser) {
       return res.status(401).json({
         error: "Authentication required.",
       });
     }
 
-    const userDoc = isGuestUser
-      ? null
-      : await User.findById(req.user?._id).select(
-          "subscription usage plan subscriptionStatus subscriptionStartDate subscriptionEndDate chatUsageCount chatUsageMonth cpaUsageCount cpaUsageMonth"
-        );
+    const [sessionMessages, userDoc] = await Promise.all([
+      loadSessionMessages({
+        userId,
+        language: rawLanguage,
+        knowledgeSource,
+        sessionKey,
+      }),
+      User.findById(req.user?._id).select(
+        "subscription usage plan subscriptionStatus subscriptionStartDate subscriptionEndDate chatUsageCount chatUsageMonth cpaUsageCount cpaUsageMonth"
+      ),
+    ]);
     if (!isGuestUser && !userDoc) {
       return res.status(404).json({
         error: "User not found",
@@ -1235,9 +1244,7 @@ export const chatWithAI = async (req, res) => {
     if (knowledgeSource === "dtaa") {
       const dtaaChunks = await loadDtaaChunks();
       const matches = await getRagMatches(message, dtaaChunks);
-      const hiddenContext = matches.length
-        ? matches.map((match) => `${match.text}`).join("\n\n")
-        : "";
+      const hiddenContext = buildHiddenContextFromMatches(matches);
 
       const contextualMessages = buildContextualMessages(sessionMessages, message);
       const taxRuleTimelines = getTaxRuleTimelinesForQuery(message);
