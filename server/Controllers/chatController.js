@@ -13,6 +13,7 @@ import {
   getSubscriptionSummary,
   normalizeUserSubscriptionState,
 } from "../Utils/subscriptionAccess.js";
+import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 
 const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 20000);
 const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
@@ -834,6 +835,7 @@ const normalizeStoredMessages = (messages = []) =>
     .map((msg) => ({
       role: toClientRole(msg.role),
       content: sanitizeAiReply(msg.content.trim()),
+      taxRuleTimelines: Array.isArray(msg.taxRuleTimelines) ? msg.taxRuleTimelines : [],
     }));
 
 const loadPersistedMessages = async (userId, language, knowledgeSource) => {
@@ -969,6 +971,8 @@ const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMess
           "Avoid placeholders, template artifacts, or repeating section headings inside section content. " +
           "If the user asks a practical question, include the actual process, common documentation, filing flow, and the reason each step matters instead of generic advice. " +
           "If the user asks for documents, eligibility, forms, rates, exemptions, or DTAA relief, explicitly list them in a clean structured way. " +
+          "If a tax rule changed across effective dates, do not merge the periods into one blended statement. " +
+          "Show the old and new rule separately with labels such as 'Before 1 Apr 2026' and 'From 1 Apr 2026 onward', and say that the applicable rule depends on the transaction or sale date. " +
           "Use your general model knowledge for the main explanation and practical guidance. " +
           "If hidden reference context is provided, use it only as supporting reference material for directly relevant treaty, statutory, or document details. " +
           "Do not overfit the whole answer to the hidden reference context unless it is clearly on point. " +
@@ -1189,15 +1193,24 @@ export const chatWithAI = async (req, res) => {
     }
     const cachedReply = getCachedResponse(cacheKey);
     if (cachedReply) {
+      const cachedTaxRuleTimelines = getTaxRuleTimelinesForQuery(message);
       return res.status(200).json({
-        reply: ensureStructuredSections(sanitizeAiReply(cachedReply), rawLanguage),
+        reply: appendTimelineToAnswer(
+          ensureStructuredSections(sanitizeAiReply(cachedReply), rawLanguage),
+          cachedTaxRuleTimelines
+        ),
         cached: true,
+        taxRuleTimelines: cachedTaxRuleTimelines,
         usage: subscriptionSummary,
       });
     }
 
     const finalizeReply = async (reply, extra = {}) => {
-      const cleanedReply = ensureStructuredSections(sanitizeAiReply(reply), rawLanguage);
+      const taxRuleTimelines = Array.isArray(extra.taxRuleTimelines) ? extra.taxRuleTimelines : [];
+      const cleanedReply = appendTimelineToAnswer(
+        ensureStructuredSections(sanitizeAiReply(reply), rawLanguage),
+        taxRuleTimelines
+      );
       let latestUsage = subscriptionSummary;
       if (userDoc) {
         const usageResult = await checkAndConsumeChatUsage(userDoc);
@@ -1213,6 +1226,7 @@ export const chatWithAI = async (req, res) => {
       return res.status(200).json({
         reply: cleanedReply,
         ...extra,
+        taxRuleTimelines,
         usage: latestUsage,
       });
     };
@@ -1225,6 +1239,7 @@ export const chatWithAI = async (req, res) => {
         : "";
 
       const contextualMessages = buildContextualMessages(sessionMessages, message);
+      const taxRuleTimelines = getTaxRuleTimelinesForQuery(message);
       const dtaaReplyRaw = await generateGeneralTaxReply({
         model,
         selectedLanguage,
@@ -1235,7 +1250,7 @@ export const chatWithAI = async (req, res) => {
       const updatedContext = [
         ...sessionMessages,
         { role: "user", content: message },
-        { role: "ai", content: dtaaReply },
+        { role: "ai", content: dtaaReply, taxRuleTimelines },
       ].slice(-MAX_STORED_MESSAGES);
       syncSessionStoresAsync({
         userId,
@@ -1248,10 +1263,12 @@ export const chatWithAI = async (req, res) => {
       setCachedResponse(cacheKey, dtaaReply, rawLanguage);
       return await finalizeReply(dtaaReply, {
         ragUsed: Boolean(matches.length),
+        taxRuleTimelines,
       });
     }
 
     const contextualMessages = buildContextualMessages(sessionMessages, message);
+    const taxRuleTimelines = getTaxRuleTimelinesForQuery(message);
 
     const reply = await generateGeneralTaxReply({
       model,
@@ -1261,7 +1278,7 @@ export const chatWithAI = async (req, res) => {
     const persistedUpdatedContext = [
       ...sessionMessages,
       { role: "user", content: message },
-      { role: "ai", content: reply },
+      { role: "ai", content: reply, taxRuleTimelines },
     ].slice(-MAX_STORED_MESSAGES);
     syncSessionStoresAsync({
       userId,
@@ -1272,7 +1289,7 @@ export const chatWithAI = async (req, res) => {
     });
 
     setCachedResponse(cacheKey, reply, rawLanguage);
-    return await finalizeReply(reply);
+    return await finalizeReply(reply, { taxRuleTimelines });
   } catch (error) {
     console.error("OpenRouter Error:", error);
 

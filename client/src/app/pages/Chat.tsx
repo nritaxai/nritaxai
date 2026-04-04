@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "motion/react";
+import ReactMarkdown from "react-markdown";
 import { AIChat } from "../components/AIChat";
 import { AuthGateCard } from "../components/AuthGateCard";
+import { TaxRuleTimeline, type TaxRuleTimelineItem } from "../components/TaxRuleTimeline";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
@@ -141,11 +143,20 @@ const fallbackReplyByLanguage: Record<string, string> = {
     "### Answer\nLayanan AI langsung sedang tidak tersedia sementara.\n\n### Key Tax Points\n- Pertanyaan Anda sudah diterima.\n- Anda tetap bisa lanjut dengan langkah perencanaan pajak NRI umum.\n- Untuk kasus mendesak, konsultasikan ke CPA.\n\n### Next Steps\n- Coba kirim ulang pertanyaan dalam 1-2 menit.\n- Jika tetap terjadi, gunakan CPA Consultation.\n\n### Follow-up Questions\n- Topik pajak NRI mana yang ingin diprioritaskan?\n- Apakah Anda ingin checklist dokumen DTAA?",
 };
 
-const normalizeMessage = (message: unknown): { role: "user" | "ai"; content: string } | null => {
+type ChatMessage = {
+  role: "user" | "ai";
+  content: string;
+  taxRuleTimelines?: TaxRuleTimelineItem[];
+};
+
+const normalizeMessage = (message: unknown): ChatMessage | null => {
   if (!message || typeof message !== "object") return null;
   const role = (message as { role?: string }).role === "user" ? "user" : "ai";
   const content = ensureVisibleReply((message as { content?: unknown }).content as string);
-  return { role, content };
+  const taxRuleTimelines = Array.isArray((message as { taxRuleTimelines?: unknown }).taxRuleTimelines)
+    ? ((message as { taxRuleTimelines?: TaxRuleTimelineItem[] }).taxRuleTimelines as TaxRuleTimelineItem[])
+    : [];
+  return { role, content, taxRuleTimelines };
 };
 
 export function Chat({ onRequireLogin }: ChatProps) {
@@ -162,7 +173,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
     hindi: `Namaste${userName ? ` ${userName}` : ""}! Main aapka AI chat assistant hoon. DTAA niyamon, NRI tax prashnon, aur tax planning mein main aapki madad kar sakta hoon. Main aaj aapki kaise sahayata kar sakta hoon?`,
     indonesian: `Halo${userName ? ` ${userName}` : ""}! Saya asisten chat AI Anda. Saya siap membantu Anda terkait regulasi DTAA, pertanyaan pajak NRI, dan perencanaan pajak. Bagaimana saya bisa membantu Anda hari ini?`,
   };
-  const [messages, setMessages] = useState<Array<{ role: "user" | "ai"; content: string }>>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "ai",
       content: welcomeByLanguage.english
@@ -238,47 +249,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
     setMessages([{ role: "ai", content: welcomeMessage }]);
   };
-  const renderAiMessage = (content: string) => {
-    const lines = stripBoldMarkers(content).split("\n");
-    return (
-      <div className="space-y-1">
-        {lines.map((line, index) => {
-          const trimmed = line.trim();
-          const markdownHeadingMatch = trimmed.match(/^#{1,6}\s+(.*)$/);
-          const numberedHeadingMatch = trimmed.match(/^\d+[).]\s+(.*)$/);
-          const boldHeadingMatch = trimmed.match(/^\*\*(.+)\*\*$/);
-          const labelHeadingMatch = trimmed.match(
-            /^(short answer|key points|important highlights|important points|next steps)\b[:\-]?\s*(.*)$/i
-          );
-
-          const headingText =
-            markdownHeadingMatch?.[1] ??
-            numberedHeadingMatch?.[1] ??
-            boldHeadingMatch?.[1] ??
-            labelHeadingMatch?.[0];
-
-          const isHeading = Boolean(headingText);
-
-          if (!trimmed) return <div key={index} className="h-2" />;
-
-          if (isHeading) {
-            return (
-              <p key={index} className="font-bold">
-                <strong style={{ fontWeight: 700 }}>{headingText}</strong>
-              </p>
-            );
-          }
-
-          return (
-            <p key={index}>
-              {line}
-            </p>
-          );
-        })}
-      </div>
-    );
-  };
-
   const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
   const hasActivePaidSubscription =
     Boolean(subscription?.plan && subscription.plan !== PLAN_KEYS.STARTER && subscription?.subscriptionStatus === "active");
@@ -419,7 +389,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
           const normalizedHistory = history
             .map((item: unknown) => normalizeMessage(item))
             .filter(Boolean) as Array<{ role: "user" | "ai"; content: string }>;
-          setMessages(normalizedHistory.length ? normalizedHistory : [{ role: "ai", content: welcomeMessage }]);
+          setMessages(normalizedHistory.length ? normalizedHistory : [{ role: "ai", content: welcomeMessage, taxRuleTimelines: [] }]);
           return;
         }
       } catch {
@@ -474,7 +444,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
       setMessages((prev) => [
         ...prev,
-        { role: "ai", content: ensureVisibleReply(response.data.reply) },
+        {
+          role: "ai",
+          content: ensureVisibleReply(response.data.reply),
+          taxRuleTimelines: Array.isArray(response.data?.taxRuleTimelines) ? response.data.taxRuleTimelines : [],
+        },
       ]);
     } catch (error: any) {
       if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
@@ -498,6 +472,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             fallbackReplyByLanguage[language] ||
               fallbackReplyByLanguage.english
           ),
+          taxRuleTimelines: [],
         },
       ]);
     } finally {
@@ -862,7 +837,27 @@ export function Chat({ onRequireLogin }: ChatProps) {
                           : "border border-[#E2E8F0] bg-[#F7FAFC]/90 text-[#0F172A]"
                       }`}
                     >
-                      {message.role === "ai" ? renderAiMessage(message.content) : message.content}
+                      {message.role === "ai" ? (
+                        <div>
+                          <ReactMarkdown
+                            components={{
+                              h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
+                              h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
+                              h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
+                              h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
+                              h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
+                              h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
+                              strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                              p: ({ children }) => <p className="mb-2">{children}</p>,
+                              ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
+                              ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
+                            }}
+                          >
+                            {ensureVisibleReply(message.content)}
+                          </ReactMarkdown>
+                          <TaxRuleTimeline timelines={message.taxRuleTimelines} compact />
+                        </div>
+                      ) : message.content}
                     </div>
                   </div>
                 ))}

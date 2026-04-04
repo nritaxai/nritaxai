@@ -10,6 +10,7 @@ import axios from "axios";
 import ReactMarkdown from "react-markdown";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { TaxReportPDF } from "./TaxReportPDF";
+import { TaxRuleTimeline, type TaxRuleTimelineItem } from "./TaxRuleTimeline";
 import { buildApiUrl, clearStoredAuth, getMySubscription } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
 
@@ -59,6 +60,21 @@ interface AIChatProps {
   minimal?: boolean;
 }
 
+type ChatMessage = {
+  role: "user" | "ai";
+  content: string;
+  taxRuleTimelines?: TaxRuleTimelineItem[];
+};
+
+const normalizeMessage = (message: any): ChatMessage | null => {
+  if (!message || typeof message !== "object") return null;
+  return {
+    role: message.role === "user" ? "user" : "ai",
+    content: ensureVisibleReply(message.content),
+    taxRuleTimelines: Array.isArray(message.taxRuleTimelines) ? message.taxRuleTimelines : [],
+  };
+};
+
 export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   const navigate = useNavigate();
   const [question, setQuestion] = useState("");
@@ -69,7 +85,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
     Boolean(localStorage.getItem("token"))
   );
   const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
-  const [messages, setMessages] = useState<Array<{ role: "user" | "ai"; content: string }>>([
+  const [messages, setMessages] = useState<ChatMessage[]>([
     {
       role: "ai",
       content: getWelcomeMessage("english", getStoredUserName()),
@@ -283,12 +299,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
 
         const history = Array.isArray(response.data?.messages) ? response.data.messages : [];
         if (history.length) {
-          setMessages(
-            history.map((item: any) => ({
-              role: item.role,
-              content: stripBoldMarkers(item.content),
-            }))
-          );
+          setMessages(history.map((item: any) => normalizeMessage(item)).filter(Boolean) as ChatMessage[]);
           return;
         }
       } catch {
@@ -359,7 +370,14 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         setSubscription(response.data.usage);
       }
       const aiReply = ensureVisibleReply(response.data.reply);
-      setMessages((prev) => [...prev, { role: "ai", content: aiReply }]);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: aiReply,
+          taxRuleTimelines: Array.isArray(response.data?.taxRuleTimelines) ? response.data.taxRuleTimelines : [],
+        },
+      ]);
     } catch (error: any) {
       if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
         return;
@@ -380,7 +398,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
           ? "Please sign in again to continue."
           : error.response?.data?.error || "Something went wrong. Please try again.";
 
-      setMessages((prev) => [...prev, { role: "ai", content: ensureVisibleReply(errorMessage) }]);
+      setMessages((prev) => [...prev, { role: "ai", content: ensureVisibleReply(errorMessage), taxRuleTimelines: [] }]);
     } finally {
       if (activeRequestIdRef.current === requestId) {
         activeRequestControllerRef.current = null;
@@ -577,22 +595,25 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                 }`}
               >
                 {message.role === "ai" ? (
-                  <ReactMarkdown
-                    components={{
-                      h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
-                      h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
-                      h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
-                      h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
-                      h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
-                      h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
-                      strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                      p: ({ children }) => <p className="mb-2">{children}</p>,
-                      ul: ({ children }) => <ul className="list-disc pl-5 mb-2">{children}</ul>,
-                      ol: ({ children }) => <ol className="list-decimal pl-5 mb-2">{children}</ol>,
-                    }}
-                  >
-                    {ensureVisibleReply(message.content)}
-                  </ReactMarkdown>
+                  <div>
+                    <ReactMarkdown
+                      components={{
+                        h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
+                        h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
+                        h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
+                        h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
+                        h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
+                        h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
+                        strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                        ul: ({ children }) => <ul className="list-disc pl-5 mb-2">{children}</ul>,
+                        ol: ({ children }) => <ol className="list-decimal pl-5 mb-2">{children}</ol>,
+                      }}
+                    >
+                      {ensureVisibleReply(message.content)}
+                    </ReactMarkdown>
+                    <TaxRuleTimeline timelines={message.taxRuleTimelines} compact />
+                  </div>
                 ) : (
                   message.content
                 )}

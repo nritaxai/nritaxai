@@ -16,6 +16,37 @@ const chatMessageSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
+    taxRuleTimelines: {
+      type: [
+        new mongoose.Schema(
+          {
+            id: String,
+            ruleName: String,
+            helperText: String,
+            periods: {
+              type: [
+                new mongoose.Schema(
+                  {
+                    label: String,
+                    value: String,
+                    rate: Number,
+                    exemption: Number,
+                    threshold: Number,
+                    effectiveStartDate: String,
+                    effectiveEndDate: String,
+                    active: Boolean,
+                  },
+                  { _id: false }
+                ),
+              ],
+              default: [],
+            },
+          },
+          { _id: false }
+        ),
+      ],
+      default: [],
+    },
   },
   { _id: false }
 );

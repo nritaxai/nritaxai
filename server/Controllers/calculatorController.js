@@ -1,3 +1,5 @@
+import { getCapitalGainsRuleTimelines, resolveApplicablePeriod } from "../Utils/taxRuleTimelines.js";
+
 const toNumber = (value) => {
   const num = Number(value);
   return Number.isFinite(num) ? num : NaN;
@@ -88,8 +90,15 @@ export const calculateCapitalGainsTax = (req, res) => {
       });
     }
     const gain = salePrice - purchasePrice;
-
-    const rate = period === "long-term" ? 0.125 : 0.2;
+    const saleDate = typeof req.body?.saleDate === "string" ? req.body.saleDate : "";
+    const ruleTimelines = getCapitalGainsRuleTimelines({ holdingPeriod: period });
+    const applicableRule = resolveApplicablePeriod(ruleTimelines[0]?.periods || [], saleDate);
+    const rate =
+      period === "long-term"
+        ? Number.isFinite(Number(applicableRule?.rate))
+          ? Number(applicableRule.rate)
+          : 0.125
+        : 0.2;
     const baseTax = gain > 0 ? gain * rate : 0;
     const cess = baseTax > 0 ? baseTax * 0.04 : 0;
     const tax = baseTax + cess;
@@ -104,6 +113,15 @@ export const calculateCapitalGainsTax = (req, res) => {
         baseTax: roundTo2(baseTax),
         cess: roundTo2(cess),
         tax: roundTo2(tax),
+        saleDate: saleDate || null,
+        taxRuleTimelines: ruleTimelines,
+        applicableRule:
+          applicableRule && period === "long-term"
+            ? {
+                ...applicableRule,
+                helperText: ruleTimelines[0]?.helperText || "",
+              }
+            : null,
       },
     });
   } catch (error) {
