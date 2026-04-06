@@ -14,6 +14,7 @@ const envLinkedInAuthBaseUrl = String(import.meta.env.VITE_LINKEDIN_AUTH_BASE_UR
 export const IS_NATIVE_APP = Capacitor.isNativePlatform();
 export const PLATFORM = Capacitor.getPlatform();
 export const IS_IOS_NATIVE_APP = IS_NATIVE_APP && PLATFORM === "ios";
+export const IOS_EXTERNAL_PURCHASES_DISABLED = IS_IOS_NATIVE_APP;
 
 const resolvedProdApiUrl = normalizeUrl(envProdApiUrl || PROD_API_URL_DEFAULT);
 const resolvedDevApiUrl = normalizeUrl(envDevApiUrl || DEV_API_URL_DEFAULT);
@@ -36,6 +37,10 @@ export const APPLE_AUTH_CONFIG = {
   redirectURI: String(import.meta.env.VITE_APPLE_REDIRECT_URI || "").trim(),
   scope: "name email",
   usePopup: true,
+  isConfigured: Boolean(
+    String(import.meta.env.VITE_APPLE_CLIENT_ID || "").trim() &&
+      String(import.meta.env.VITE_APPLE_REDIRECT_URI || "").trim()
+  ),
 };
 
 const googleClientId = String(import.meta.env.VITE_GOOGLE_CLIENT_ID || "").trim();

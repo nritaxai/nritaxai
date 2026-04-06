@@ -6,7 +6,7 @@ import { AuthGateCard } from "../components/AuthGateCard";
 import { Button } from "../components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { convertInrToCurrency, formatCurrency, formatInr, resolveCurrencyByCode, SUPPORTED_CURRENCIES } from "../../utils/currency";
-import { GSTIN, IS_IOS_NATIVE_APP } from "../../config/appConfig";
+import { GSTIN, IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { CLIENT_PLAN_CONFIG, CLIENT_PLAN_ORDER, getPlanLabel, isCurrentPlan, type PlanKey, type SubscriptionMe } from "../../utils/subscription";
@@ -20,7 +20,7 @@ interface PricingProps {
 export function Pricing({ onRequireLogin }: PricingProps) {
   const navigate = useNavigate();
   const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
-  const isIosNativeApp = IS_IOS_NATIVE_APP;
+  const isIosNativeApp = IOS_EXTERNAL_PURCHASES_DISABLED;
   const [billingCycle, setBillingCycle] = useState<BillingCycle>("monthly");
   const [syncMessage, setSyncMessage] = useState("");
   const [isSyncing, setIsSyncing] = useState(false);
@@ -47,7 +47,11 @@ export function Pricing({ onRequireLogin }: PricingProps) {
         planKey === "starter"
           ? "Included"
           : planKey === "professional"
-          ? "Continue to Checkout"
+          ? isIosNativeApp
+            ? "Unavailable on iOS"
+            : "Continue to Checkout"
+          : isIosNativeApp
+          ? "Contact Support"
           : "Contact Enterprise",
       popular: planKey === "professional",
       features: config.pricingFeatures,
@@ -103,7 +107,12 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       onRequireLogin();
       return;
     }
-    if (isIosNativeApp) return;
+    if (isIosNativeApp) {
+      setSyncMessage(
+        "Purchases are hidden in the iOS app build until Apple In-App Purchase is implemented. Existing paid access can still be restored."
+      );
+      return;
+    }
     if (isCurrentPlan(subscription, planName)) return;
 
     if (planName === "professional") {
@@ -211,7 +220,8 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       {isIosNativeApp && (
         <div className="mx-auto mb-8 max-w-4xl rounded-lg border border-blue-200 bg-blue-50 p-4">
           <p className="text-sm text-blue-900">
-            Subscriptions can be purchased on our website. If you already subscribed, use sync below.
+            Purchases are not offered inside the iOS app in this build. If your account already has paid access, use
+            sync below.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-3">
             <Button type="button" variant="outline" onClick={handleRestoreSubscription} disabled={isSyncing}>
@@ -324,14 +334,14 @@ export function Pricing({ onRequireLogin }: PricingProps) {
 
               <button
                 onClick={() => handleSelect(plan.name)}
-                disabled={isButtonDisabled}
+                disabled={isButtonDisabled || (isIosNativeApp && plan.name !== "starter")}
                 className={`block w-full rounded-md py-3 text-center font-semibold transition-all ${
                   isPopular
                     ? "bg-white text-blue-700 hover:bg-gray-50"
                     : plan.name === "enterprise"
                     ? "bg-blue-500 text-white hover:bg-blue-600"
                     : "border border-blue-600 text-blue-600 hover:bg-blue-50"
-                } ${isButtonDisabled ? "cursor-not-allowed opacity-70" : ""}`}
+                } ${isButtonDisabled || (isIosNativeApp && plan.name !== "starter") ? "cursor-not-allowed opacity-70" : ""}`}
               >
                 {isActivePlan ? "Current Plan" : plan.cta}
                 {plan.name === "professional" && !isActivePlan ? <ArrowRight className="ml-2 inline h-4 w-4" /> : null}
@@ -339,6 +349,10 @@ export function Pricing({ onRequireLogin }: PricingProps) {
               {isActivePlan ? (
                 <p className={`mt-3 text-sm ${isPopular ? "text-blue-100" : "text-[#475569]"}`}>
                   Your current plan is active. You cannot select the same plan again.
+                </p>
+              ) : isIosNativeApp && plan.name !== "starter" ? (
+                <p className={`mt-3 text-sm ${isPopular ? "text-blue-100" : "text-[#475569]"}`}>
+                  Purchase and upgrade actions are hidden on iOS until Apple In-App Purchase is available.
                 </p>
               ) : null}
             </motion.div>
@@ -355,7 +369,11 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 <Zap className="h-5 w-5 text-blue-600" />
                 What happens after free messages are used?
               </h3>
-              <p className="text-[#64748B]">Upgrade to Professional for unlimited chat or wait for monthly reset.</p>
+              <p className="text-[#64748B]">
+                {isIosNativeApp
+                  ? "Paid plan purchases are not available in this iOS build yet. Existing paid access can still be restored."
+                  : "Upgrade to Professional for unlimited chat or wait for monthly reset."}
+              </p>
             </div>
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-semibold text-[#0F172A]">

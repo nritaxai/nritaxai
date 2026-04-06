@@ -301,10 +301,6 @@ export default function App() {
   const isStandaloneRoute = isHeroRoute || location.pathname === "/reset-password";
   const protectedPaths = new Set([
     "/calculators",
-    "/Pricing",
-    "/pricing",
-    "/checkout",
-    "/login",
     "/profile",
     "/chat",
     "/dashboard",

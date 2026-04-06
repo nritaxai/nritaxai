@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
+import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { changePassword, deleteAccount, getMySubscription, getUserProfile, updateUserProfile } from "../../utils/api";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 import { getPlanLabel, type SubscriptionMe } from "../../utils/subscription";
@@ -31,7 +32,7 @@ type ProfileData = {
   preferredLanguage?: "english" | "hindi" | "tamil" | "indonesian";
   bio?: string;
   linkedinProfile?: string;
-  provider?: "local" | "google";
+  provider?: "local" | "google" | "apple" | "linkedin";
   usage?: {
     queriesUsed?: number;
     lastReset?: string;
@@ -895,7 +896,7 @@ export function Profile() {
               </div>
               <Button variant="ghost" size="sm" onClick={() => navigate("/pricing")}>
                 <Pencil className="size-4 mr-2" />
-                Manage
+                {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Access" : "Manage"}
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">

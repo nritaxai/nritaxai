@@ -12,6 +12,7 @@ const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base
 const MAX_PROFILE_IMAGE_LENGTH = 2_800_000;
 
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
+const sanitizeEmail = (value) => sanitizeString(value).toLowerCase();
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEYS_ENDPOINT = "https://appleid.apple.com/auth/keys";
 const APPLE_TOKEN_ENDPOINT = "https://appleid.apple.com/auth/token";
@@ -274,7 +275,7 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
 
   const profile = await getLinkedInUserInfo(accessToken);
   const linkedinId = sanitizeString(profile?.sub);
-  const email = sanitizeString(profile?.email).toLowerCase();
+  const email = sanitizeEmail(profile?.email);
   const name =
     sanitizeString(profile?.name) ||
     [sanitizeString(profile?.given_name), sanitizeString(profile?.family_name)].filter(Boolean).join(" ");
@@ -432,21 +433,45 @@ export const googleLogin = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
+    const { sub, email, name, picture } = payload || {};
+    const normalizedEmail = sanitizeEmail(email);
 
-    const { sub, email, name, picture } = payload;
+    if (!sub || !normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Google account is missing a verified email address.",
+      });
+    }
 
     // Check if user already exists
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ email: normalizedEmail });
 
     if (!user) {
       // Create new Google user
       user = await User.create({
         name,
-        email,
+        email: normalizedEmail,
         googleId: sub,
         profileImage: picture,
         provider: "google",
       });
+    } else {
+      let changed = false;
+      if (!user.googleId) {
+        user.googleId = sub;
+        changed = true;
+      }
+      if (!user.profileImage && picture) {
+        user.profileImage = picture;
+        changed = true;
+      }
+      if (!user.provider || user.provider === "local") {
+        user.provider = "google";
+        changed = true;
+      }
+      if (changed) {
+        await user.save();
+      }
     }
 
     const token = generateToken(user._id);
@@ -492,7 +517,7 @@ export const appleLogin = async (req, res) => {
 
     const payload = await verifyAppleIdentityToken(identityToken);
     const appleId = String(payload.sub);
-    const email = sanitizeString(payload.email).toLowerCase();
+    const email = sanitizeEmail(payload.email);
 
     let user = null;
 
@@ -545,19 +570,26 @@ export const appleLogin = async (req, res) => {
 export const registerUser = async (req, res) => {
   try {
     const name = sanitizeString(req.body?.name);
-    const email = sanitizeString(req.body?.email).toLowerCase();
+    const email = sanitizeEmail(req.body?.email);
     const password = String(req.body?.password || "");
     const confirmPassword = String(req.body?.confirmPassword || "");
     const linkedinProfile = sanitizeString(req.body?.linkedinProfile);
 
-    if (!name || !email || !password || !confirmPassword || !linkedinProfile) {
-      return res.status(404).json({
+    if (!name || !email || !password || !confirmPassword) {
+      return res.status(400).json({
         success: false,
-        message: "Please enter all required fields: Name, Email, LinkedIn Profile and Password"
+        message: "Please enter all required fields: Name, Email, Password, and Confirm Password."
       });
-    };
+    }
 
-    if (!isValidLinkedInProfile(linkedinProfile)) {
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters.",
+      });
+    }
+
+    if (linkedinProfile && !isValidLinkedInProfile(linkedinProfile)) {
       return res.status(400).json({
         success: false,
         message: "LinkedIn profile must be a valid linkedin.com URL.",
@@ -566,26 +598,27 @@ export const registerUser = async (req, res) => {
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(404).json({
+      return res.status(409).json({
         success: false,
         message: "User with this email already exists"
       });
     }
 
     if (password !== confirmPassword) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         message: "Passwords do not match"
       });
     }
 
-    const newUser = new User({ name, email, password, linkedinProfile });
+    const newUser = new User({ name, email, password, linkedinProfile, provider: "local" });
     await newUser.save();
 
     const token = generateToken(newUser._id);
     return res.status(200).json({
       success: true,
-      message: 'User registered successfully.Please sign in to continue',
+      message: "User registered successfully.",
+      user: toSafeUser(newUser),
       data: toSafeUser(newUser),
       token
     });
@@ -602,15 +635,16 @@ export const registerUser = async (req, res) => {
 
 // -------------------------------- Login --------------------------------------------------------------
 export const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const email = sanitizeEmail(req.body?.email);
+  const password = String(req.body?.password || "");
 
   try {
     if (!email || !password) {
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
         message: "Please enter Email and Password"
       });
-    };
+    }
 
     const user = await User.findOne({ email }).select("+password");
     if (!user) {
@@ -630,7 +664,7 @@ export const loginUser = async (req, res) => {
 
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
-      return res.status(404).json({
+      return res.status(401).json({
         success: false,
         message: "Invalid credentials"
       });
@@ -656,7 +690,7 @@ export const loginUser = async (req, res) => {
 
 // -------------------------------- Forgot Password --------------------------------------------------------------
 export const forgotPassword = async (req, res) => {
-  const email = sanitizeString(req.body?.email).toLowerCase();
+  const email = sanitizeEmail(req.body?.email);
 
   try {
     if (!email) {
@@ -965,14 +999,7 @@ export const updateUserProfile = async (req, res) => {
       });
     }
 
-    if (!linkedinProfile) {
-      return res.status(400).json({
-        success: false,
-        message: "LinkedIn profile is required.",
-      });
-    }
-
-    if (!isValidLinkedInProfile(linkedinProfile)) {
+    if (linkedinProfile && !isValidLinkedInProfile(linkedinProfile)) {
       return res.status(400).json({
         success: false,
         message: "LinkedIn profile must be a valid linkedin.com URL.",
@@ -991,7 +1018,9 @@ export const updateUserProfile = async (req, res) => {
     user.phone = phone;
     user.countryOfResidence = countryOfResidence;
     user.bio = bio;
-    user.linkedinProfile = linkedinProfile;
+    if (linkedinProfile || user.linkedinProfile) {
+      user.linkedinProfile = linkedinProfile;
+    }
     if (preferredLanguage) user.preferredLanguage = preferredLanguage;
 
     await user.save();

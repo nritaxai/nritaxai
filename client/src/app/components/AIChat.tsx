@@ -11,6 +11,7 @@ import ReactMarkdown from "react-markdown";
 import { PDFDownloadLink } from "@react-pdf/renderer";
 import { TaxReportPDF } from "./TaxReportPDF";
 import { TaxRuleTimeline, type TaxRuleTimelineItem } from "./TaxRuleTimeline";
+import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
 
@@ -496,7 +497,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                   onClick={() => navigate("/pricing")}
                 >
                   <Download className="size-4 mr-2" />
-                  Subscribe to Download
+                  {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Plan Access" : "Subscribe to Download"}
                 </Button>
               </div>
             )}
@@ -683,7 +684,11 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
             )}
           </form>
           {starterLimitReached ? (
-            <p className="mt-2 text-sm text-amber-900">Free plan limit reached. Upgrade to Professional.</p>
+            <p className="mt-2 text-sm text-amber-900">
+              {IOS_EXTERNAL_PURCHASES_DISABLED
+                ? "Free plan limit reached. Paid upgrades are not available inside this iOS build yet."
+                : "Free plan limit reached. Upgrade to Professional."}
+            </p>
           ) : null}
         </CardFooter>
         {isListening && !minimal && (
@@ -694,9 +699,9 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
       </Card>
       {!minimal && isAuthenticated && !hasActivePaidSubscription && (
         <div className="mt-2 w-full rounded-lg border border-[#2563eb]/40 bg-[#2563eb]/12 p-3 text-xs text-[#0F172A]">
-          Need expert support?{" "}
+          {IOS_EXTERNAL_PURCHASES_DISABLED ? "Need expert support?" : "Need expert support?"}{" "}
           <button type="button" onClick={() => navigate("/pricing")} className="font-semibold underline underline-offset-2">
-            View plans
+            {IOS_EXTERNAL_PURCHASES_DISABLED ? "View access options" : "View plans"}
           </button>
         </div>
       )}

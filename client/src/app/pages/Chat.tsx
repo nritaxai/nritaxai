@@ -13,6 +13,7 @@ import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
 import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square, X } from "lucide-react";
+import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
 
@@ -920,9 +921,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
               </CardFooter>
               {starterLimitReached ? (
                 <div className="border-t border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
-                  Free plan limit reached. Upgrade to Professional for unlimited AI chat.
+                  {IOS_EXTERNAL_PURCHASES_DISABLED
+                    ? "Free plan limit reached. Paid upgrades are not available inside this iOS build yet."
+                    : "Free plan limit reached. Upgrade to Professional for unlimited AI chat."}
                   <Button type="button" variant="link" className="ml-2 h-auto p-0 text-amber-900" onClick={() => navigate("/pricing")}>
-                    Upgrade to Professional
+                    {IOS_EXTERNAL_PURCHASES_DISABLED ? "View plan access" : "Upgrade to Professional"}
                   </Button>
                 </div>
               ) : null}
@@ -970,7 +973,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 <CardHeader>
                   <CardTitle className="text-lg text-[#0F172A]">Need expert-level support?</CardTitle>
                   <CardDescription className="text-[#0F172A]">
-                    Upgrade for deeper guidance and uninterrupted chat access.
+                    {IOS_EXTERNAL_PURCHASES_DISABLED
+                      ? "Review available plan access and restore any existing paid subscription."
+                      : "Upgrade for deeper guidance and uninterrupted chat access."}
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -979,7 +984,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     className="w-full bg-[#2563eb] text-[#0F172A] hover:opacity-95"
                     onClick={() => navigate("/pricing")}
                   >
-                    View Plans
+                    {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Access Options" : "View Plans"}
                   </Button>
                 </CardContent>
               </Card>
