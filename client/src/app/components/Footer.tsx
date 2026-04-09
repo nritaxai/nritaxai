@@ -1,4 +1,4 @@
-import { Github, Linkedin, Twitter } from "lucide-react";
+import { Instagram, Linkedin, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 
@@ -73,7 +73,7 @@ const footerColumns: FooterColumn[] = [
 const socialLinks = [
   { label: "LinkedIn", href: "https://www.linkedin.com", icon: Linkedin },
   { label: "Twitter", href: "https://twitter.com", icon: Twitter },
-  { label: "GitHub", href: "https://github.com/nritaxai/Nritaxai", icon: Github },
+  { label: "Instagram", href: "https://www.instagram.com", icon: Instagram },
 ] as const;
 
 const footerLinkClass =
