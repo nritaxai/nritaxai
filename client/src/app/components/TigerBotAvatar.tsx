@@ -5,7 +5,8 @@ import { getStoredAuthToken } from "../../utils/api";
 
 type ServiceOption = {
   label: string;
-  to: string;
+  action: "route" | "email";
+  value: string;
   icon: typeof Calculator;
 };
 
@@ -15,18 +16,28 @@ type WidgetMessage = {
 };
 
 const serviceOptions: ServiceOption[] = [
-  { label: "Tax Calculator", to: "/calculators", icon: Calculator },
-  { label: "AI Tax Chat", to: "/chat", icon: MessageSquareText },
-  { label: "Consult a CPA", to: "/consult", icon: Briefcase },
-  { label: "Pricing Plans", to: "/pricing", icon: CreditCard },
-  { label: "Compliance", to: "/compliance", icon: ShieldCheck },
+  { label: "Tax Calculator", action: "route", value: "/calculators", icon: Calculator },
+  { label: "AI Tax Chat", action: "route", value: "/chat", icon: MessageSquareText },
+  { label: "Consult a CPA", action: "route", value: "/consult", icon: Briefcase },
+  { label: "Pricing Plans", action: "route", value: "/pricing", icon: CreditCard },
+  { label: "Compliance", action: "route", value: "/compliance", icon: ShieldCheck },
+];
+
+const supportOptions: ServiceOption[] = [
+  {
+    label: "Email Support",
+    action: "email",
+    value: "mailto:ask@nritax.ai?subject=Support%20Request%20-%20NRITAX.AI",
+    icon: MessageSquareText,
+  },
+  { label: "Send Support Message", action: "route", value: "/consult", icon: Briefcase },
 ];
 
 const initialMessages: WidgetMessage[] = [
   {
     role: "bot",
     content:
-      "Hi, I am YUKTI. Ask me about this website, our services, pricing, calculators, compliance, or how to contact an expert.",
+      "Hi, I am YUKTI. Ask me about this website, our services, pricing, calculators, compliance, or contact support by email or message.",
   },
 ];
 
@@ -43,7 +54,7 @@ const getWebsiteBotReply = (query: string) => {
   if (/(price|pricing|plan|subscription|cost|fee)/.test(text)) {
     return {
       message: "You can check all subscription and pricing details on our Pricing page. If you want, I can open it for you now.",
-      actions: serviceOptions.filter((item) => item.to === "/pricing"),
+      actions: serviceOptions.filter((item) => item.value === "/pricing"),
     };
   }
 
@@ -64,49 +75,57 @@ const getWebsiteBotReply = (query: string) => {
   if (/(calculator|calculate|tax calculator|residency|income tax|dtaa credit)/.test(text)) {
     return {
       message: "We provide Tax Calculators including residency status, income tax, and DTAA tax credit tools. I can take you to the calculator page.",
-      actions: serviceOptions.filter((item) => item.to === "/calculators"),
+      actions: serviceOptions.filter((item) => item.value === "/calculators"),
     };
   }
 
   if (/(cpa|consult|expert|book|appointment|consultation)/.test(text)) {
     return {
       message: "You can book expert help through our Consult a CPA page for personalized assistance.",
-      actions: serviceOptions.filter((item) => item.to === "/consult"),
+      actions: serviceOptions.filter((item) => item.value === "/consult"),
     };
   }
 
   if (/(compliance|security|ssl|soc 2|dtaa compliant|encrypted)/.test(text)) {
     return {
       message: "Our website highlights compliance and trust information such as SSL encryption, ICAI-registered CPA support, DTAA compliance, and security standards.",
-      actions: serviceOptions.filter((item) => item.to === "/compliance"),
+      actions: serviceOptions.filter((item) => item.value === "/compliance"),
     };
   }
 
   if (/(document|documents|trc|form 10f|checklist|upload|pdf)/.test(text)) {
     return {
       message: "For document-related tax guidance like TRC, Form 10F, and checklists, the AI Tax Chat can help. For broader website guidance, I can also direct you to calculators or consultation.",
-      actions: serviceOptions.filter((item) => item.to === "/chat" || item.to === "/consult"),
+      actions: serviceOptions.filter((item) => item.value === "/chat" || item.value === "/consult"),
     };
   }
 
   if (/(how to use|use calculator|calculator help|how does calculator work)/.test(text)) {
     return {
       message: "On the Tax Calculator page, you can choose a calculator type such as residency, income tax, or DTAA credit, then enter your details to view the result.",
-      actions: serviceOptions.filter((item) => item.to === "/calculators"),
+      actions: serviceOptions.filter((item) => item.value === "/calculators"),
     };
   }
 
   if (/(chat|ai chat|assistant|nexa|bot)/.test(text)) {
     return {
       message: "For detailed tax questions, you can open the AI Tax Chat page and continue the conversation there.",
-      actions: serviceOptions.filter((item) => item.to === "/chat"),
+      actions: serviceOptions.filter((item) => item.value === "/chat"),
+    };
+  }
+
+  if (/(support|contact|email|mail|message|help|customer care|customer support)/.test(text)) {
+    return {
+      message:
+        "You can connect with support directly from here. Choose Email Support to write to ask@nritax.ai, or choose Send Support Message to share your issue through our contact form. If you tell me your problem in this chat, I can also guide you to the right page.",
+      actions: supportOptions,
     };
   }
 
   if (/(feature|service|offer|provide|website|platform)/.test(text)) {
     return {
       message: "This platform provides AI tax chat, tax calculators, pricing plans, compliance information, and CPA consultation support for NRI users.",
-      actions: serviceOptions,
+      actions: [...serviceOptions, ...supportOptions],
     };
   }
 
@@ -120,7 +139,7 @@ const getWebsiteBotReply = (query: string) => {
   return {
     message:
       "I can help with website-related questions like pricing, calculators, compliance, AI chat, and CPA consultation. For detailed tax advice, open AI Tax Chat.",
-    actions: serviceOptions.filter((item) => item.to === "/chat"),
+    actions: [...serviceOptions.filter((item) => item.value === "/chat"), ...supportOptions],
   };
 };
 
@@ -132,12 +151,15 @@ export function TigerBotAvatar() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<WidgetMessage[]>(initialMessages);
-  const [suggestedActions, setSuggestedActions] = useState<ServiceOption[]>(serviceOptions);
+  const [suggestedActions, setSuggestedActions] = useState<ServiceOption[]>([
+    ...serviceOptions,
+    ...supportOptions,
+  ]);
 
   const resetWidgetState = () => {
     setQuery("");
     setMessages(initialMessages);
-    setSuggestedActions(serviceOptions);
+    setSuggestedActions([...serviceOptions, ...supportOptions]);
   };
 
   useEffect(() => {
@@ -171,7 +193,13 @@ export function TigerBotAvatar() {
     setIsOpen((prev) => !prev);
   };
 
-  const handleServiceSelect = (to: string) => {
+  const handleServiceSelect = (service: ServiceOption) => {
+    if (service.action === "email") {
+      window.location.href = service.value;
+      return;
+    }
+
+    const to = service.value;
     const requiresAuth = to === "/calculators" || to === "/chat" || to === "/consult";
     setIsOpen(false);
     if (requiresAuth && !getStoredAuthToken()) {
@@ -253,7 +281,7 @@ export function TigerBotAvatar() {
                   <button
                     key={service.label}
                     type="button"
-                    onClick={() => handleServiceSelect(service.to)}
+                    onClick={() => handleServiceSelect(service)}
                     className="flex w-full items-center gap-3 rounded-2xl border border-[#D1FAE5] bg-[#F8FAFC] px-3 py-3 text-left text-[#0F172A] transition hover:border-[#86D39B] hover:bg-[#F0FDF4]"
                   >
                     <span className="rounded-xl bg-white p-2 text-[#4C9A63] shadow-sm">
