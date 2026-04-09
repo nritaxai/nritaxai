@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Bot, Briefcase, Calculator, CreditCard, MessageSquareText, Send, ShieldCheck, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { getStoredAuthToken } from "../../utils/api";
+import { getStoredAuthToken, submitYuktiGrievance } from "../../utils/api";
 
 type ServiceOption = {
   label: string;
@@ -14,6 +14,8 @@ type WidgetMessage = {
   role: "bot" | "user";
   content: string;
 };
+
+type YuktiMode = "default" | "awaiting_grievance_details";
 
 const serviceOptions: ServiceOption[] = [
   { label: "Tax Calculator", action: "route", value: "/calculators", icon: Calculator },
@@ -155,11 +157,15 @@ export function TigerBotAvatar() {
     ...serviceOptions,
     ...supportOptions,
   ]);
+  const [mode, setMode] = useState<YuktiMode>("default");
+  const [isSubmittingGrievance, setIsSubmittingGrievance] = useState(false);
 
   const resetWidgetState = () => {
     setQuery("");
     setMessages(initialMessages);
     setSuggestedActions([...serviceOptions, ...supportOptions]);
+    setMode("default");
+    setIsSubmittingGrievance(false);
   };
 
   useEffect(() => {
@@ -213,8 +219,47 @@ export function TigerBotAvatar() {
 
   const handleQuerySubmit = (event: React.FormEvent) => {
     event.preventDefault();
+    if (isSubmittingGrievance) return;
     const trimmedQuery = query.trim();
     if (!trimmedQuery) return;
+
+    if (mode === "awaiting_grievance_details") {
+      setMessages((prev) => [...prev, { role: "user", content: trimmedQuery }]);
+      setQuery("");
+      setIsSubmittingGrievance(true);
+
+      void submitYuktiGrievance({
+        message: trimmedQuery,
+        source: "Yukti Chat Widget",
+        page: location.pathname,
+      })
+        .then((response: any) => {
+          const ticketNumber = response?.ticketNumber || "Pending";
+          setMessages((prev) => [
+            ...prev,
+            {
+              role: "bot",
+              content: `I’ve submitted your grievance. Your ticket ID is ${ticketNumber}. Our support team will review it and follow up on your registered email if needed. You can also use Email Support here for urgent follow-up.`,
+            },
+          ]);
+          setSuggestedActions(supportOptions);
+          setMode("default");
+        })
+        .catch((error: any) => {
+          const message =
+            error?.response?.data?.message ||
+            error?.message ||
+            "I could not submit your grievance right now. Please try again or use Email Support.";
+          setMessages((prev) => [...prev, { role: "bot", content: message }]);
+          setSuggestedActions(supportOptions);
+          setMode("default");
+        })
+        .finally(() => {
+          setIsSubmittingGrievance(false);
+        });
+
+      return;
+    }
 
     const reply = getWebsiteBotReply(trimmedQuery);
     setMessages((prev) => [
@@ -223,6 +268,15 @@ export function TigerBotAvatar() {
       { role: "bot", content: reply.message },
     ]);
     setSuggestedActions(reply.actions);
+    if (/(support|contact|email|mail|message|help|customer care|customer support|grievance|complaint|issue|problem)/.test(trimmedQuery.toLowerCase())) {
+      setMode("awaiting_grievance_details");
+      setMessages((prev) => [
+        ...prev,
+        { role: "bot", content: "Please describe your grievance in one message, and I’ll submit it for you directly from this chat." },
+      ]);
+    } else {
+      setMode("default");
+    }
     setQuery("");
   };
 
@@ -299,14 +353,16 @@ export function TigerBotAvatar() {
                 onChange={(event) => setQuery(event.target.value)}
                 placeholder="Ask about this website..."
                 rows={2}
+                disabled={isSubmittingGrievance}
                 className="w-full resize-none rounded-2xl border border-[#D1FAE5] bg-white px-3 py-2.5 text-sm text-[#0F172A] outline-none transition focus:border-[#86D39B] focus:ring-2 focus:ring-[#DCFCE7]"
               />
               <button
                 type="submit"
+                disabled={isSubmittingGrievance}
                 className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#86D39B] px-4 py-2.5 text-sm font-semibold text-[#0F172A] transition hover:bg-[#72C68A]"
               >
                 <Send className="size-4" />
-                Ask YUKTI
+                {isSubmittingGrievance ? "Submitting..." : "Ask YUKTI"}
               </button>
             </form>
           </div>

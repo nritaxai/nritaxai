@@ -123,6 +123,14 @@ export const linkedinLoginUser = async (payload: {
   return postRequest("/api/auth/linkedin", payload);
 };
 
+export const submitYuktiGrievance = async (payload: {
+  message: string;
+  source?: string;
+  page?: string;
+}) => {
+  return postRequest("/api/yukti/grievance", payload);
+};
+
 export interface BannerUpdate {
   label: string;
   date: string;
