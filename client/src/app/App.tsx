@@ -47,6 +47,7 @@ export default function App() {
     Boolean(typeof window !== "undefined" && getStoredAuthToken())
   );
   const [successPopup, setSuccessPopup] = useState<string | null>(null);
+  const popupTimeoutRef = useRef<number | null>(null);
   const [isOnline, setIsOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine
   );
@@ -79,15 +80,39 @@ export default function App() {
   useEffect(() => {
     const handleRequireLogin = () => setShowLoginModal(true);
     const syncAuthState = () => setIsAuthenticated(Boolean(getStoredAuthToken()));
+    const handleAuthPopup = (event: Event) => {
+      const customEvent = event as CustomEvent<{
+        message?: string;
+        type?: "success" | "error";
+        duration?: number;
+      }>;
+      const message = customEvent.detail?.message;
+      const duration = customEvent.detail?.duration ?? 1000;
+      if (!message) return;
+
+      setSuccessPopup(message);
+      if (popupTimeoutRef.current) {
+        window.clearTimeout(popupTimeoutRef.current);
+      }
+      popupTimeoutRef.current = window.setTimeout(() => {
+        setSuccessPopup(null);
+        popupTimeoutRef.current = null;
+      }, duration);
+    };
 
     window.addEventListener("nritax:require-login", handleRequireLogin as EventListener);
     window.addEventListener("storage", syncAuthState);
     window.addEventListener("auth-changed", syncAuthState);
+    window.addEventListener("nritax:auth-popup", handleAuthPopup as EventListener);
 
     return () => {
       window.removeEventListener("nritax:require-login", handleRequireLogin as EventListener);
       window.removeEventListener("storage", syncAuthState);
       window.removeEventListener("auth-changed", syncAuthState);
+      window.removeEventListener("nritax:auth-popup", handleAuthPopup as EventListener);
+      if (popupTimeoutRef.current) {
+        window.clearTimeout(popupTimeoutRef.current);
+      }
     };
   }, []);
 

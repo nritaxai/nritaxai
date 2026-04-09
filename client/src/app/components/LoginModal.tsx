@@ -108,12 +108,14 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     localStorage.setItem("user", JSON.stringify(user));
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("auth-changed"));
-
-    setPopup({ message, type: "success" });
+    window.dispatchEvent(
+      new CustomEvent("nritax:auth-popup", {
+        detail: { message, type: "success", duration: 1000 },
+      })
+    );
     window.setTimeout(() => {
-      setPopup(null);
       onClose();
-    }, 800);
+    }, 1000);
   };
 
   const handleForgotPassword = async () => {

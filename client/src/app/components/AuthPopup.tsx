@@ -7,9 +7,9 @@ interface AuthPopupProps {
 
 export function AuthPopup({ message, type }: AuthPopupProps) {
   return (
-    <div className="fixed top-6 right-6 z-50 animate-in fade-in slide-in-from-top-5">
+    <div className="fixed top-6 right-6 z-[80] animate-in fade-in slide-in-from-top-5">
       <div
-        className={`flex items-center gap-3 px-5 py-4 rounded-lg shadow-lg text-[#0F172A] ${
+        className={`flex items-center gap-3 rounded-lg px-5 py-4 text-white shadow-lg ${
           type === "success" ? "bg-blue-600" : "bg-red-600"
         }`}
       >
