@@ -53,21 +53,45 @@ const getWebsiteBotReply = (query: string) => {
     };
   }
 
-  if (/(price|pricing|plan|subscription|cost|fee)/.test(text)) {
+  if (/(can't log in|cant log in|cannot log in|unable to log in|login issue|login problem|trouble logging in|forgot password|reset password|password reset|sign in issue)/.test(text)) {
+    return {
+      message:
+        "If you cannot log in, please open the Login page and use 'Forgot password?' to reset your password. If it still does not work, use Email Support or Send Support Message here and we will help you recover access.",
+      actions: supportOptions,
+    };
+  }
+
+  if (/(cancel my plan|cancel plan|cancel subscription|stop subscription|unsubscribe|end my plan|close subscription|stop my plan)/.test(text)) {
+    return {
+      message:
+        "If you want to cancel your plan, please open Pricing or contact support from this chat and we will help you with cancellation or billing questions.",
+      actions: [...serviceOptions.filter((item) => item.value === "/pricing"), ...supportOptions],
+    };
+  }
+
+  if (/(billing issue|payment issue|charged|charge|refund|invoice|payment failed|transaction|renewal)/.test(text)) {
+    return {
+      message:
+        "For billing, refund, payment, or renewal issues, please contact support directly from this chat. Include the payment details in your message so we can investigate quickly.",
+      actions: supportOptions,
+    };
+  }
+
+  if (/(price|pricing|cost|fee|plans|compare plans)/.test(text)) {
     return {
       message: "You can check all subscription and pricing details on our Pricing page. If you want, I can open it for you now.",
       actions: serviceOptions.filter((item) => item.value === "/pricing"),
     };
   }
 
-  if (/(login|log in|sign in|signup|sign up|register|account)/.test(text)) {
+  if (/(login|log in|sign in|signup|sign up|register)/.test(text)) {
     return {
       message: "You can use Login / Sign Up from the top navigation to access your account and premium features.",
       actions: [],
     };
   }
 
-  if (/(profile|my profile|account details|user profile)/.test(text)) {
+  if (/(account|profile|my profile|account details|user profile)/.test(text)) {
     return {
       message: "Your profile page lets you view and manage your account details after signing in.",
       actions: [],
@@ -239,7 +263,7 @@ export function TigerBotAvatar() {
             ...prev,
             {
               role: "bot",
-              content: `I’ve submitted your grievance. Your ticket ID is ${ticketNumber}. Our support team will review it and follow up on your registered email if needed. You can also use Email Support here for urgent follow-up.`,
+              content: `I've submitted your grievance. Your ticket ID is ${ticketNumber}. Our support team will review it and follow up on your registered email if needed. You can also use Email Support here for urgent follow-up.`,
             },
           ]);
           setSuggestedActions(supportOptions);
@@ -272,7 +296,7 @@ export function TigerBotAvatar() {
       setMode("awaiting_grievance_details");
       setMessages((prev) => [
         ...prev,
-        { role: "bot", content: "Please describe your grievance in one message, and I’ll submit it for you directly from this chat." },
+        { role: "bot", content: "Please describe your grievance in one message, and I'll submit it for you directly from this chat." },
       ]);
     } else {
       setMode("default");
