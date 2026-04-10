@@ -82,6 +82,10 @@ const userSchema = new mongoose.Schema(
       default: null,
       select: false,
     },
+    welcomeEmailSentAt: {
+      type: Date,
+      default: null,
+    },
 
     plan: {
       type: String,

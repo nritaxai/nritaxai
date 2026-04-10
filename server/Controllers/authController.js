@@ -286,7 +286,6 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
   }
 
   let user = null;
-  let isNewUser = false;
 
   if (email) {
     user = await User.findOne({ email });
@@ -304,7 +303,6 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
       profileImage: picture,
       provider: "linkedin",
     });
-    isNewUser = true;
   } else {
     let changed = false;
 
@@ -330,9 +328,7 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
 
   const token = generateToken(user._id);
 
-  if (isNewUser) {
-    await trySendWelcomeEmail({ name: user.name, email: user.email });
-  }
+  await ensureWelcomeEmailSent(user);
 
   return {
     token,
@@ -426,6 +422,18 @@ const trySendWelcomeEmail = async ({ name, email }) => {
   }
 };
 
+const ensureWelcomeEmailSent = async (userDoc) => {
+  if (!userDoc?.email || userDoc?.welcomeEmailSentAt) return;
+
+  try {
+    await sendWelcomeEmail({ name: userDoc.name, email: userDoc.email });
+    userDoc.welcomeEmailSentAt = new Date();
+    await userDoc.save();
+  } catch (error) {
+    logAuthError("welcome-email", error, { email: userDoc?.email || null });
+  }
+};
+
 const toSafeUser = (userDoc) => {
   if (!userDoc) return null;
   normalizeUserSubscriptionState(userDoc);
@@ -501,7 +509,6 @@ export const googleLogin = async (req, res) => {
         profileImage: picture,
         provider: "google",
       });
-      await trySendWelcomeEmail({ name: user.name, email: user.email });
     } else {
       let changed = false;
       if (!user.googleId) {
@@ -521,6 +528,7 @@ export const googleLogin = async (req, res) => {
       }
     }
 
+    await ensureWelcomeEmailSent(user);
     const token = generateToken(user._id);
 
     return res.status(200).json({
@@ -588,13 +596,13 @@ export const appleLogin = async (req, res) => {
         appleId,
         provider: "apple",
       });
-      await trySendWelcomeEmail({ name: user.name, email: user.email });
     } else if (!user.appleId) {
       user.appleId = appleId;
       if (!user.provider || user.provider === "local") user.provider = "apple";
       await user.save();
     }
 
+    await ensureWelcomeEmailSent(user);
     const token = generateToken(user._id);
 
     return res.status(200).json({
@@ -661,7 +669,7 @@ export const registerUser = async (req, res) => {
 
     const newUser = new User({ name, email, password, linkedinProfile, provider: "local" });
     await newUser.save();
-    await trySendWelcomeEmail({ name: newUser.name, email: newUser.email });
+    await ensureWelcomeEmailSent(newUser);
 
     const token = generateToken(newUser._id);
     return res.status(200).json({
@@ -719,6 +727,7 @@ export const loginUser = async (req, res) => {
       });
     }
 
+    await ensureWelcomeEmailSent(user);
     const token = generateToken(user._id);
     return res.status(200).json({
       success: true,
