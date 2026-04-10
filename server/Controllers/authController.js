@@ -286,6 +286,7 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
   }
 
   let user = null;
+  let isNewUser = false;
 
   if (email) {
     user = await User.findOne({ email });
@@ -303,6 +304,7 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
       profileImage: picture,
       provider: "linkedin",
     });
+    isNewUser = true;
   } else {
     let changed = false;
 
@@ -327,6 +329,10 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
   }
 
   const token = generateToken(user._id);
+
+  if (isNewUser) {
+    await trySendWelcomeEmail({ name: user.name, email: user.email });
+  }
 
   return {
     token,
@@ -378,6 +384,46 @@ const buildPasswordResetUrl = (req, token) => {
   const appBase = configuredBase || originBase || fallbackBase;
   const normalizedBase = appBase.replace(/\/+$/, "");
   return `${normalizedBase}/reset-password?token=${encodeURIComponent(token)}`;
+};
+
+const sendWelcomeEmail = async ({ name, email }) => {
+  const safeEmail = sanitizeEmail(email);
+  if (!safeEmail) return;
+
+  const safeName = sanitizeString(name) || "there";
+  const appUrl =
+    sanitizeString(process.env.FRONTEND_URL) ||
+    sanitizeString(process.env.CLIENT_URL) ||
+    sanitizeString(process.env.APP_URL) ||
+    "https://www.nritax.ai";
+
+  await sendEmail({
+    to: safeEmail,
+    subject: "Welcome to NRITAX.AI",
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0F172A">
+        <h2 style="margin-bottom:12px;">Welcome to NRITAX.AI</h2>
+        <p>Hi ${safeName},</p>
+        <p>Your account has been created successfully.</p>
+        <p>You can now access NRITAX.AI and explore tax tools, pricing, and expert support.</p>
+        <p>
+          <a href="${appUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;">
+            Open NRITAX.AI
+          </a>
+        </p>
+        <p>If you did not create this account, please contact support immediately.</p>
+        <p>Thank you,<br />Team NRITAX.AI</p>
+      </div>
+    `,
+  });
+};
+
+const trySendWelcomeEmail = async ({ name, email }) => {
+  try {
+    await sendWelcomeEmail({ name, email });
+  } catch (error) {
+    logAuthError("welcome-email", error, { email });
+  }
 };
 
 const toSafeUser = (userDoc) => {
@@ -455,6 +501,7 @@ export const googleLogin = async (req, res) => {
         profileImage: picture,
         provider: "google",
       });
+      await trySendWelcomeEmail({ name: user.name, email: user.email });
     } else {
       let changed = false;
       if (!user.googleId) {
@@ -541,6 +588,7 @@ export const appleLogin = async (req, res) => {
         appleId,
         provider: "apple",
       });
+      await trySendWelcomeEmail({ name: user.name, email: user.email });
     } else if (!user.appleId) {
       user.appleId = appleId;
       if (!user.provider || user.provider === "local") user.provider = "apple";
@@ -613,6 +661,7 @@ export const registerUser = async (req, res) => {
 
     const newUser = new User({ name, email, password, linkedinProfile, provider: "local" });
     await newUser.save();
+    await trySendWelcomeEmail({ name: newUser.name, email: newUser.email });
 
     const token = generateToken(newUser._id);
     return res.status(200).json({
