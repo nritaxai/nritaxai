@@ -20,23 +20,18 @@ type BillingType = "monthly" | "yearly";
 type PlanType = "pro";
 type PromoCode = {
   code: string;
+  kind?: string;
   discountPercent: number;
   description: string;
   billing?: BillingType;
+  fixedPayableAmount?: number;
+  finalAmountPaise?: number;
 };
 type UserPayload = {
   name?: string;
   email?: string;
   countryOfResidence?: string;
 };
-
-const PROMO_CODES: PromoCode[] = [
-  { code: "NRITAX10", discountPercent: 10, description: "10% off on any plan (test only)" },
-  { code: "NRITAX20", discountPercent: 20, description: "20% off on any plan (test only)" },
-  { code: "NRITAXY25", discountPercent: 25, description: "25% off on yearly billing (test only)", billing: "yearly" },
-  { code: "NRITAX15", discountPercent: 15, description: "15% off on any plan (test only)" },
-  { code: "NRITAX99", discountPercent: 99, description: "99% off on any plan (test only)" },
-];
 
 const PLAN_META: Record<
   PlanType,
@@ -151,10 +146,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
   const selectedPlan = PLAN_META[plan];
   const price = billing === "monthly" ? selectedPlan.monthlyPrice : selectedPlan.yearlyPrice;
-  const discountAmount = appliedPromo
-    ? Number(((price * appliedPromo.discountPercent) / 100).toFixed(2))
-    : 0;
-  const finalTotal = Number((price - discountAmount).toFixed(2));
+  const finalTotal = appliedPromo?.fixedPayableAmount !== undefined
+    ? Number(appliedPromo.fixedPayableAmount.toFixed(2))
+    : Number((price - (appliedPromo ? (price * appliedPromo.discountPercent) / 100 : 0)).toFixed(2));
+  const discountAmount = Number(Math.max(0, price - finalTotal).toFixed(2));
   const storedUserRaw = typeof window !== "undefined" ? localStorage.getItem("user") : null;
   let storedUser: Record<string, unknown> = {};
   try {
@@ -244,7 +239,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
     }
   }, [billing, appliedPromo]);
 
-  const handleApplyPromo = () => {
+  const handleApplyPromo = async () => {
     const normalized = promo.trim().toUpperCase();
     if (!normalized) {
       setPromoError("Please enter a promo code.");
@@ -253,23 +248,55 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
       return;
     }
 
-    const found = PROMO_CODES.find((item) => item.code === normalized);
-    if (!found) {
-      setPromoError("Invalid promo code.");
-      setPromoMessage("");
-      setAppliedPromo(null);
+    const token = localStorage.getItem("token");
+    if (!token) {
+      onRequireLogin();
       return;
     }
 
-    if (found.billing && found.billing !== billing) {
-      setPromoError(`${found.code} is valid only for ${found.billing} billing.`);
+    try {
+      const { data } = await axios.post(
+        buildApiUrl("/api/subscription/validate-promo"),
+        {
+          plan,
+          billing,
+          promoCode: normalized,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const found = data?.promo as PromoCode | undefined;
+      if (!found) {
+        throw new Error("Promo payload missing.");
+      }
+
+      setAppliedPromo({
+        ...found,
+        fixedPayableAmount:
+          typeof found.finalAmountPaise === "number"
+            ? Number((found.finalAmountPaise / 100).toFixed(2))
+            : undefined,
+      });
+      setPromoError("");
+      setPromoMessage(found.description || `${found.code} applied successfully.`);
+    } catch (error: any) {
+      if (error?.response?.status === 401) {
+        clearStoredAuth();
+        setSessionMessage("Your session expired. Please sign in again.");
+        setPromoError("Your session expired. Please sign in again.");
+        setPromoMessage("");
+        setAppliedPromo(null);
+        onRequireLogin();
+        return;
+      }
+      setPromoError(error?.response?.data?.message || "Invalid promo code.");
       setPromoMessage("");
       setAppliedPromo(null);
-      return;
     }
-    setAppliedPromo(found);
-    setPromoError("");
-    setPromoMessage(`${found.code} applied: ${found.discountPercent}% off.`);
   };
 
   const handleProceedToPayment = async (e: React.FormEvent) => {
@@ -341,6 +368,38 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
           },
         }
       );
+
+      if (data?.freeCheckout) {
+        const verifiedSubscription = data?.subscription || null;
+        if (verifiedSubscription && typeof window !== "undefined") {
+          try {
+            const storedUserRaw = localStorage.getItem("user");
+            const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+            localStorage.setItem(
+              "user",
+              JSON.stringify({
+                ...storedUser,
+                subscription: verifiedSubscription,
+              })
+            );
+            window.dispatchEvent(new Event("storage"));
+            window.dispatchEvent(new Event("auth-changed"));
+            window.dispatchEvent(new Event("user-updated"));
+          } catch {
+            // Ignore malformed localStorage payload.
+          }
+        }
+        setPaymentStatus("success");
+        setCheckoutError("");
+        sessionStorage.setItem(
+          "subscription_popup",
+          data?.message || "Promo applied successfully. Your free month has been activated."
+        );
+        setTimeout(() => {
+          navigate("/home");
+        }, 500);
+        return;
+      }
 
       const serverPayable = Number((Number(data?.amount || 0) / 100).toFixed(2));
       const clientPayable = Number(finalTotal.toFixed(2));
@@ -772,11 +831,6 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                     Apply
                   </Button>
                 </div>
-
-                <p className="mt-2 text-xs text-[#0F172A]">
-                  If you need a promo code, please contact us.
-                </p>
-
                 {promoMessage && <p className="text-sm text-[#2563eb] mt-2">{promoMessage}</p>}
                 {promoError && <p className="text-sm text-red-600 mt-2">{promoError}</p>}
               </div>
@@ -789,7 +843,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
               {paymentStatus === "success" && (
                 <p className="text-sm text-[#2563eb] rounded-lg bg-[#2563eb]/12 border border-[#2563eb]/40 p-3">
-                  Payment successful. Your plan has been activated.
+                  Your plan has been activated successfully.
                 </p>
               )}
 
@@ -800,11 +854,15 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
               >
                 {isProcessingPayment
                   ? "Starting Payment..."
+                  : finalTotal <= 0
+                  ? "Activate 1 Month Free"
                   : `Pay ${formatDisplayAmount(finalTotal)} Securely`}
               </Button>
 
               <p className="text-xs text-center text-[#0F172A]">
-                You will be redirected to secure Razorpay checkout in INR.
+                {finalTotal <= 0
+                  ? "Eligible free-month promo codes activate instantly after validation."
+                  : "You will be redirected to secure Razorpay checkout in INR."}
               </p>
             </form>
           </section>

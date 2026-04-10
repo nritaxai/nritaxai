@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "test": "node --test"
+    "test": "node --test",
+    "promo:generate": "node scripts/promoCodes.js generate",
+    "promo:list": "node scripts/promoCodes.js list"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

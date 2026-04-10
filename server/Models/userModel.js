@@ -134,7 +134,7 @@ const userSchema = new mongoose.Schema(
       },
       provider: {
         type: String,
-        enum: ["razorpay"],
+        enum: ["razorpay", "promo"],
         default: "razorpay",
      },
       subscriptionId: {

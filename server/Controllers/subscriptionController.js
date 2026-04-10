@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import User from "../Models/userModel.js";
+import PromoCode from "../Models/promoCodeModel.js";
 import razorpay from "../Config/razorpay.js";
 import {
   PLAN_KEYS,
@@ -18,25 +19,6 @@ const PLAN_ALIAS = {
   pro: PLAN_KEYS.PROFESSIONAL,
   professional: PLAN_KEYS.PROFESSIONAL,
   enterprise: PLAN_KEYS.ENTERPRISE,
-};
-
-const PROMO_CODES = {
-  NRITAX10: {
-    discountPercent: 10,
-  },
-  NRITAX15: {
-    discountPercent: 15,
-  },
-  NRITAX20: {
-    discountPercent: 20,
-  },
-  NRITAX99: {
-    discountPercent: 99,
-  },
-  NRITAXY25: {
-    discountPercent: 25,
-    billing: "yearly",
-  },
 };
 
 const mapPlanFromRazorpayPlanId = (planId) => {
@@ -159,6 +141,94 @@ const getRazorpayErrorMessage = (error) => {
   return apiDescription || directMessage || "Unknown Razorpay error";
 };
 
+const addMonthsToDate = (startDate, months) => {
+  const end = new Date(startDate);
+  end.setMonth(end.getMonth() + months);
+  return end;
+};
+
+const buildPromoPresentation = (promoDoc) => {
+  if (!promoDoc) return null;
+
+  if (promoDoc.kind === "free_month") {
+    return {
+      code: promoDoc.code,
+      kind: promoDoc.kind,
+      description: promoDoc.description || "1 month free on Professional monthly plan",
+      billing: "monthly",
+      discountPercent: 100,
+      durationMonths: 1,
+      finalAmountPaise: 0,
+    };
+  }
+
+  return null;
+};
+
+const loadActivePromoCode = async ({ code, billing, planKey }) => {
+  const normalizedCode = normalizeUpper(code);
+  if (!normalizedCode) return null;
+
+  const promo = await PromoCode.findOne({ code: normalizedCode });
+  if (!promo) {
+    return { error: "Invalid promo code." };
+  }
+  if (promo.status !== "active") {
+    return { error: "This promo code has already been used or is inactive." };
+  }
+  if (promo.planKey !== planKey) {
+    return { error: "This promo code is not valid for the selected plan." };
+  }
+  if (promo.billing !== billing) {
+    return { error: `This promo code is valid only for ${promo.billing} billing.` };
+  }
+
+  return { promo, presentation: buildPromoPresentation(promo) };
+};
+
+const redeemPromoCode = async ({ code, user, subscriptionId }) => {
+  const normalizedCode = normalizeUpper(code);
+  const now = new Date();
+
+  return PromoCode.findOneAndUpdate(
+    { code: normalizedCode, status: "active", redeemedAt: null },
+    {
+      $set: {
+        status: "redeemed",
+        redeemedAt: now,
+        redeemedByUser: user._id,
+        redeemedByEmail: user.email || "",
+        redemptionOrderId: subscriptionId || null,
+        redemptionContext: "free_checkout",
+      },
+    },
+    { new: true }
+  );
+};
+
+const activatePromoSubscription = async ({ user, promoPresentation, subscriptionId }) => {
+  const start = new Date();
+  const end = addMonthsToDate(start, promoPresentation?.durationMonths || 1);
+
+  user.subscription.subscriptionId = subscriptionId;
+  user.subscription.provider = "promo";
+  user.subscription.plan = "PRO";
+  user.subscription.status = "active";
+  user.subscription.currentPeriodStart = start;
+  user.subscription.currentPeriodEnd = end;
+  user.plan = PLAN_KEYS.PROFESSIONAL;
+  user.subscriptionStatus = SUBSCRIPTION_STATUSES.ACTIVE;
+  user.subscriptionStartDate = start;
+  user.subscriptionEndDate = end;
+
+  await user.save();
+
+  return {
+    start,
+    end,
+  };
+};
+
 export const getRazorpayDebugConfig = async (_req, res) => {
   try {
     const required = [
@@ -254,21 +324,20 @@ export const createSubscription = async (req, res) => {
     const promoCode = String(req.body?.promoCode || "").trim().toUpperCase();
     const baseAmountInPaise = billing === "yearly" ? 999900 : 99900;
 
-    let discountPercent = 0;
+    let promoPresentation = null;
     if (promoCode) {
-      if (!Object.prototype.hasOwnProperty.call(PROMO_CODES, promoCode)) {
+      const promoResult = await loadActivePromoCode({
+        code: promoCode,
+        billing,
+        planKey: meta.planKey,
+      });
+      if (promoResult?.error) {
         return res.status(400).json({
           success: false,
-          message: "Invalid promo code.",
+          message: promoResult.error,
         });
       }
-      if (promoCode === "NRITAXY25" && billing !== "yearly") {
-        return res.status(400).json({
-          success: false,
-          message: "NRITAXY25 is valid only for yearly billing.",
-        });
-      }
-      discountPercent = PROMO_CODES[promoCode].discountPercent;
+      promoPresentation = promoResult.presentation;
     }
     const billingCountry = normalizeText(req.body?.billingCountry);
     const billingState = normalizeText(req.body?.billingState);
@@ -291,8 +360,48 @@ export const createSubscription = async (req, res) => {
     }
     normalizeUserSubscriptionState(user);
 
-    const discountPaise = Math.round((baseAmountInPaise * discountPercent) / 100);
-    const amountInPaise = Math.max(100, baseAmountInPaise - discountPaise);
+    const discountPercent = promoPresentation?.discountPercent || 0;
+    const discountPaise = promoPresentation ? baseAmountInPaise : 0;
+    const amountInPaise = promoPresentation ? 0 : baseAmountInPaise;
+
+    if (promoPresentation && amountInPaise === 0) {
+      const promoSubscriptionId = `promo_${promoCode}_${Date.now()}`;
+      const redeemedPromo = await redeemPromoCode({
+        code: promoCode,
+        user,
+        subscriptionId: promoSubscriptionId,
+      });
+      if (!redeemedPromo) {
+        return res.status(409).json({
+          success: false,
+          message: "This promo code was just redeemed. Please request a fresh code.",
+        });
+      }
+
+      await activatePromoSubscription({
+        user,
+        promoPresentation,
+        subscriptionId: promoSubscriptionId,
+      });
+
+      return res.status(200).json({
+        success: true,
+        freeCheckout: true,
+        promoCode,
+        plan: meta.planName,
+        planKey: meta.planKey,
+        billing,
+        discountPercent,
+        baseAmount: baseAmountInPaise,
+        discountAmount: discountPaise,
+        amount: 0,
+        currency: "INR",
+        tax,
+        subscription: user.subscription,
+        subscriptionDetails: getSubscriptionSummary(user),
+        message: `${promoCode} applied successfully. 1 month has been activated.`,
+      });
+    }
 
     const order = await razorpay.orders.create({
       amount: amountInPaise,
@@ -641,6 +750,51 @@ export const razorpayWebhook = async (req, res) => {
   } catch (error) {
     console.error("razorpayWebhook error:", error);
     return res.status(500).json({ success: false, message: "Webhook handling failed" });
+  }
+};
+
+export const validatePromoCode = async (req, res) => {
+  try {
+    const meta = resolvePlanMeta(req.body || {});
+    if (!meta) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid plan.",
+      });
+    }
+
+    const billing = String(req.body?.billing || "monthly").toLowerCase();
+    const promoCode = String(req.body?.promoCode || "").trim().toUpperCase();
+
+    if (!promoCode) {
+      return res.status(400).json({
+        success: false,
+        message: "Please enter a promo code.",
+      });
+    }
+
+    const promoResult = await loadActivePromoCode({
+      code: promoCode,
+      billing,
+      planKey: meta.planKey,
+    });
+    if (promoResult?.error || !promoResult.presentation) {
+      return res.status(400).json({
+        success: false,
+        message: promoResult?.error || "Invalid promo code.",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      promo: promoResult.presentation,
+    });
+  } catch (error) {
+    console.error("validatePromoCode error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to validate promo code right now.",
+    });
   }
 };
 

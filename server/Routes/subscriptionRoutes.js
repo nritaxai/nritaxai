@@ -8,6 +8,7 @@ import {
   getSubscriptionStatus,
   razorpayWebhook,
   subscribeToPlan,
+  validatePromoCode,
   verifySubscriptionPayment,
 } from "../Controllers/subscriptionController.js";
 
@@ -15,6 +16,7 @@ const router = express.Router();
 
 // Create subscription (protected route)
 router.post("/create-subscription", protect, createSubscription);
+router.post("/validate-promo", protect, validatePromoCode);
 router.post("/verify-subscription", protect, verifySubscriptionPayment);
 router.get("/me", protect, getMySubscription);
 router.post("/subscribe", protect, subscribeToPlan);
