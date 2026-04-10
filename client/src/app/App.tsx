@@ -42,11 +42,13 @@ function PageScaffold({ children }: { children: ReactNode }) {
 export default function App() {
   const stagingModeEnabled = import.meta.env.VITE_STAGING_MODE === "true";
   const stagingPassword = String(import.meta.env.VITE_STAGING_ACCESS_PASSWORD || "");
+  const promoUpgradePromptSessionKey = "promo_upgrade_prompt_seen";
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() =>
     Boolean(typeof window !== "undefined" && getStoredAuthToken())
   );
   const [successPopup, setSuccessPopup] = useState<string | null>(null);
+  const [showPromoUpgradePrompt, setShowPromoUpgradePrompt] = useState(false);
   const popupTimeoutRef = useRef<number | null>(null);
   const [isOnline, setIsOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine
@@ -194,6 +196,60 @@ export default function App() {
       }
     }
   }, [location]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setShowPromoUpgradePrompt(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const loadSubscriptionStatus = async () => {
+      try {
+        const token = getStoredAuthToken();
+        if (!token) return;
+
+        const response = await fetch(buildApiUrl("/api/subscription/status"), {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (isCancelled) return;
+
+        const subscription = data?.subscription || null;
+        const subscriptionDetails = data?.subscriptionDetails || null;
+        const promptKey = `${promoUpgradePromptSessionKey}:${subscription?.subscriptionId || "promo-expired"}`;
+        const hasSeenPrompt = sessionStorage.getItem(promptKey) === "true";
+        const shouldShowPrompt =
+          subscription?.provider === "promo" &&
+          subscriptionDetails?.subscriptionStatus === "inactive";
+
+        if (shouldShowPrompt && !hasSeenPrompt) {
+          sessionStorage.setItem(promptKey, "true");
+          setShowPromoUpgradePrompt(true);
+          return;
+        }
+
+        if (!shouldShowPrompt) {
+          setShowPromoUpgradePrompt(false);
+        }
+      } catch (error) {
+        console.error("[subscription-status] failed to load promo upgrade state", error);
+      }
+    };
+
+    void loadSubscriptionStatus();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAuthenticated, location.pathname]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -413,6 +469,37 @@ export default function App() {
       )}
 
       {successPopup && <AuthPopup message={successPopup} type="success" />}
+
+      {showPromoUpgradePrompt ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0F172A]/55 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-[#E2E8F0] bg-white p-6 shadow-2xl">
+            <h2 className="text-2xl font-semibold text-[#0F172A]">Your free month has ended</h2>
+            <p className="mt-3 text-sm leading-6 text-[#475569]">
+              Your 1-month free trial has expired. Upgrade now to continue using paid features and complete payment on the website.
+            </p>
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => {
+                  setShowPromoUpgradePrompt(false);
+                  navigate("/pricing");
+                }}
+              >
+                Upgrade Plan
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowPromoUpgradePrompt(false)}
+              >
+                Maybe Later
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
