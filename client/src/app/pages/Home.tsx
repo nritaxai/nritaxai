@@ -210,7 +210,7 @@ export function Home({ onRequireLogin }: HomeProps) {
             ) : null}
             <motion.span
               variants={fadeUp}
-              className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-600"
+              className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-600 [word-spacing:0.2rem]"
             >
               {renderTextWithShortForms(heroContent.badge)}
             </motion.span>
