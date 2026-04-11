@@ -295,6 +295,8 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
     user = await User.findOne({ linkedinId });
   }
 
+  const isNewUser = !user;
+
   if (!user) {
     user = await User.create({
       name: name || "LinkedIn User",
@@ -328,7 +330,9 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
 
   const token = generateToken(user._id);
 
-  await ensureWelcomeEmailSent(user);
+  if (isNewUser) {
+    await ensureWelcomeEmailSent(user);
+  }
 
   return {
     token,
@@ -500,6 +504,8 @@ export const googleLogin = async (req, res) => {
     // Check if user already exists
     let user = await User.findOne({ email: normalizedEmail });
 
+    const isNewUser = !user;
+
     if (!user) {
       // Create new Google user
       user = await User.create({
@@ -528,7 +534,9 @@ export const googleLogin = async (req, res) => {
       }
     }
 
-    await ensureWelcomeEmailSent(user);
+    if (isNewUser) {
+      await ensureWelcomeEmailSent(user);
+    }
     const token = generateToken(user._id);
 
     return res.status(200).json({
@@ -584,6 +592,8 @@ export const appleLogin = async (req, res) => {
       user = await User.findOne({ appleId });
     }
 
+    const isNewUser = !user;
+
     if (!user) {
       const parsedFirstName = sanitizeString(fullName?.firstName);
       const parsedLastName = sanitizeString(fullName?.lastName);
@@ -602,7 +612,9 @@ export const appleLogin = async (req, res) => {
       await user.save();
     }
 
-    await ensureWelcomeEmailSent(user);
+    if (isNewUser) {
+      await ensureWelcomeEmailSent(user);
+    }
     const token = generateToken(user._id);
 
     return res.status(200).json({
@@ -727,7 +739,6 @@ export const loginUser = async (req, res) => {
       });
     }
 
-    await ensureWelcomeEmailSent(user);
     const token = generateToken(user._id);
     return res.status(200).json({
       success: true,
