@@ -396,23 +396,39 @@ const sendWelcomeEmail = async ({ name, email }) => {
     sanitizeString(process.env.CLIENT_URL) ||
     sanitizeString(process.env.APP_URL) ||
     "https://www.nritax.ai";
+  const supportEmail = sanitizeString(process.env.SUPPORT_EMAIL) || "ask@nritax.ai";
 
   await sendEmail({
     to: safeEmail,
     subject: "Welcome to NRITAX.AI",
     html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0F172A">
-        <h2 style="margin-bottom:12px;">Welcome to NRITAX.AI</h2>
+      <div style="font-family:Arial,sans-serif;line-height:1.6;color:#0F172A;max-width:640px">
         <p>Hi ${safeName},</p>
-        <p>Your account has been created successfully.</p>
-        <p>You can now access NRITAX.AI and explore tax tools, pricing, and expert support.</p>
+        <p>Welcome to <strong>NRITAX.AI</strong> - great to see you logged in.</p>
+        <p>Now that you're inside, here's what you can start doing right away:</p>
+        <h3 style="margin:20px 0 12px;font-size:18px;color:#0F172A;">What You Can Do</h3>
+        <ul style="padding-left:20px;margin:0 0 18px;">
+          <li>Access your dashboard and manage everything in one place</li>
+          <li>Automate tax-related tasks to save time and effort</li>
+          <li>Track real-time insights for better decisions</li>
+          <li>Customize your settings to fit your workflow</li>
+          <li>Enjoy a secure and seamless experience</li>
+        </ul>
+        <h3 style="margin:20px 0 12px;font-size:18px;color:#0F172A;">Quick Start Tips</h3>
+        <ul style="padding-left:20px;margin:0 0 18px;">
+          <li>Complete your profile for a better experience</li>
+          <li>Explore the dashboard to discover key features</li>
+          <li>Try your first action and start using NRITAX.AI tools</li>
+        </ul>
         <p>
           <a href="${appUrl}" style="display:inline-block;padding:12px 18px;background:#2563eb;color:#ffffff;text-decoration:none;border-radius:8px;">
-            Open NRITAX.AI
+            Continue to NRITAX.AI
           </a>
         </p>
-        <p>If you did not create this account, please contact support immediately.</p>
-        <p>Thank you,<br />Team NRITAX.AI</p>
+        <p>Website: <a href="${appUrl}" style="color:#2563eb;text-decoration:none;">${appUrl}</a></p>
+        <p>If you need any help along the way, our support team is just a message away at <a href="mailto:${supportEmail}" style="color:#2563eb;text-decoration:none;">${supportEmail}</a>.</p>
+        <p>Glad to have you with us - let's get things moving!</p>
+        <p>Best,<br /><strong>The NRITAX.AI Team</strong></p>
       </div>
     `,
   });
