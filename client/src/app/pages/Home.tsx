@@ -10,7 +10,7 @@ import { renderTextWithShortForms } from "../utils/shortForms";
 import { fadeUp, fadeUpSoft, PREMIUM_EASE, staggerContainer } from "../utils/motion";
 
 const heroContent = {
-  badge: "Trusted NRI Tax Platform",
+  badge: "Trusted NRITAX Platform",
   headline: "NRITAX.AI",
   subheadline: "AI-Powered Tax Solutions for Non-Resident Indians",
   description:

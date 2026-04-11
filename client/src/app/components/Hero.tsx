@@ -16,7 +16,7 @@ export function Hero({ onAskAI, onContactCPA }: HeroProps) {
         <div className="text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-[#2563eb]/40 bg-[#F7FAFC]/70 px-4 py-1.5 text-xs text-[#2563eb] shadow-sm mb-6">
             <ShieldCheck className="size-3.5" />
-            <span className="[word-spacing:0.2rem]">Trusted NRI Tax Platform</span>
+            <span className="[word-spacing:0.2rem]">Trusted NRITAX Platform</span>
           </div>
 
           <div className="mb-6 flex items-center justify-center">
