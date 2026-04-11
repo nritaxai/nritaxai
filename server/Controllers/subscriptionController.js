@@ -186,6 +186,24 @@ const loadActivePromoCode = async ({ code, billing, planKey }) => {
   return { promo, presentation: buildPromoPresentation(promo) };
 };
 
+const findExistingPromoRedemptionForUser = async (user) => {
+  if (!user?._id && !user?.email) return null;
+
+  const query = [];
+  if (user?._id) {
+    query.push({ redeemedByUser: user._id });
+  }
+  if (user?.email) {
+    query.push({ redeemedByEmail: normalizeText(user.email).toLowerCase() });
+  }
+  if (!query.length) return null;
+
+  return PromoCode.findOne({
+    status: "redeemed",
+    $or: query,
+  }).sort({ redeemedAt: -1, updatedAt: -1, createdAt: -1 });
+};
+
 const redeemPromoCode = async ({ code, user, subscriptionId }) => {
   const normalizedCode = normalizeUpper(code);
   const now = new Date();
@@ -359,6 +377,16 @@ export const createSubscription = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
     normalizeUserSubscriptionState(user);
+
+    if (promoCode) {
+      const existingPromoRedemption = await findExistingPromoRedemptionForUser(user);
+      if (existingPromoRedemption) {
+        return res.status(409).json({
+          success: false,
+          message: `You have already redeemed promo code ${existingPromoRedemption.code}. Each user can redeem only one promo code.`,
+        });
+      }
+    }
 
     const discountPercent = promoPresentation?.discountPercent || 0;
     const discountPaise = promoPresentation ? baseAmountInPaise : 0;
@@ -770,6 +798,22 @@ export const validatePromoCode = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Please enter a promo code.",
+      });
+    }
+
+    const user = await User.findById(req.user._id).select("_id email");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    const existingPromoRedemption = await findExistingPromoRedemptionForUser(user);
+    if (existingPromoRedemption) {
+      return res.status(409).json({
+        success: false,
+        message: `You have already redeemed promo code ${existingPromoRedemption.code}. Each user can redeem only one promo code.`,
       });
     }
 
