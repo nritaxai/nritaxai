@@ -133,7 +133,7 @@ ${answer}`
     if (params.mode === "GEMINI_FALLBACK") {
       const answer = await this.generateWithGemini(
         params.systemPrompt,
-        `Use any retrieved context below if it is relevant. If the context is insufficient, say you do not know.\n\nContext:\n${params.contextText || "No context retrieved."}\n\nQuestion:\n${params.query}`
+        `Use any retrieved context below if it is relevant. If the context is insufficient, say "I don't know."\n\nContext:\n${params.contextText || "No context retrieved."}\n\nQuestion:\n${params.query}`
       );
 
       return {

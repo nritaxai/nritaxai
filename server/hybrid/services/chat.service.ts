@@ -1,4 +1,4 @@
-import { HYBRID_DISCLAIMER, HYBRID_SYSTEM_PROMPT, HybridChatClient, isModelUncertain } from "../llm/chat";
+import { HYBRID_DISCLAIMER, HYBRID_SYSTEM_PROMPT, HybridChatClient } from "../llm/chat";
 import type { KnowledgeChunkRecord } from "../db/mongodb";
 import { buildContext } from "../rag/context-builder";
 import { HybridRetriever } from "../rag/retriever";
@@ -82,9 +82,16 @@ export class ChatService {
     this.retriever = new HybridRetriever();
   }
 
-  private logRoute(message: string, route: string, confidence: number, chunkCount: number) {
+  private logRoute(
+    message: string,
+    type: HybridChatResponse["classification"],
+    route: string,
+    confidence: number,
+    chunkCount: number
+  ) {
     console.log({
       query: message,
+      type,
       route,
       confidence,
       chunkCount,
@@ -107,16 +114,7 @@ export class ChatService {
   ): Promise<ChatExecution> {
     const answer = await this.chatClient.generateWithGemini(
       HYBRID_SYSTEM_PROMPT,
-      `Use any retrieved context below if it is relevant. If the context is insufficient, say "I don't know."
-
-Context:
-${contextText || "No context retrieved."}
-
-References:
-${citationsText}
-
-Question:
-${message}`
+      `Use any retrieved context below if it is relevant. If the context is insufficient, say "I don't know."\n\nContext:\n${contextText || "No context retrieved."}\n\nReferences:\n${citationsText || "No references available."}\n\nQuestion:\n${message}`
     );
 
     return {
@@ -165,9 +163,12 @@ ${message}`
       chunks: retrieval.chunks,
     });
 
-    this.logRoute(message, routing.mode, retrieval.confidence, retrieval.chunks.length);
+    this.logRoute(message, classification.type, routing.mode, retrieval.confidence, retrieval.chunks.length);
 
     let execution: ChatExecution;
+    const builtContext = buildContext(retrieval.chunks, retrieval.confidence);
+    const citations = builtContext.citations;
+    const citationsText = buildCitationsText(citations);
 
     try {
       if (routing.mode === "GEMINI_DIRECT") {
@@ -181,19 +182,13 @@ ${message}`
       } else if (routing.mode === "GEMINI_FALLBACK") {
         execution = await this.runGeminiFallback(message, "", "");
       } else {
-        const builtContext = buildContext(retrieval.chunks, retrieval.confidence);
-        const citationsText = buildCitationsText(builtContext.citations);
         const gemmaAnswer = await this.chatClient.generateWithGemma(
           HYBRID_SYSTEM_PROMPT,
           message,
           builtContext.contextText
         );
 
-        if (isModelUncertain(gemmaAnswer)) {
-          routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_uncertain"] };
-          this.logRoute(message, routing.mode, retrieval.confidence, retrieval.chunks.length);
-          execution = await this.runGeminiFallback(message, builtContext.contextText, citationsText);
-        } else if (routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
+        if (routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
           execution = await this.verifyWithGemini(
             message,
             builtContext.contextText,
@@ -210,15 +205,20 @@ ${message}`
       }
     } catch (error) {
       if (routing.mode === "GEMMA_ONLY" || routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
+        console.error(`HYBRID_SYSTEM_FALLBACK: ${routing.mode} failed`, {
+          error: error instanceof Error ? error.message : "Unknown error",
+          query: message.substring(0, 100),
+          previousRoute: routing.mode,
+        });
+
         routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_failed"] };
-        this.logRoute(message, routing.mode, retrieval.confidence, retrieval.chunks.length);
+        this.logRoute(message, classification.type, routing.mode, retrieval.confidence, retrieval.chunks.length);
 
         try {
-          const builtContext = buildContext(retrieval.chunks, retrieval.confidence);
           execution = await this.runGeminiFallback(
             message,
             builtContext.contextText,
-            buildCitationsText(builtContext.citations)
+            citationsText
           );
         } catch (fallbackError) {
           throw new Error(
@@ -236,7 +236,7 @@ ${message}`
       mode: routing.mode,
       classification: classification.type,
       confidence: retrieval.confidence,
-      citations: buildContext(retrieval.chunks, retrieval.confidence).citations,
+      citations,
       disclaimer: HYBRID_DISCLAIMER,
       requestId,
       latencyMs: Date.now() - startedAt,
