@@ -19,7 +19,7 @@ export class RagPipeline {
     const normalizedQuery = query.replace(/\s+/g, " ").trim();
     const embeddingResult = await this.ollamaClient.embed(normalizedQuery);
     const retrievalResult = await this.retriever.search(embeddingResult.embedding);
-    const builtContext = buildContext(retrievalResult.chunks);
+    const builtContext = buildContext(retrievalResult.chunks, retrievalResult.confidence);
 
     return {
       ...builtContext,

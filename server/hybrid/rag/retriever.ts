@@ -2,7 +2,30 @@ import { vectorSearchKnowledge, type KnowledgeChunkRecord } from "../db/mongodb"
 
 export type RetrievalResult = {
   chunks: KnowledgeChunkRecord[];
-  topScore: number;
+  confidence: number;
+};
+
+const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const normalizeVectorScore = (score: number): number => {
+  if (!Number.isFinite(score)) {
+    return 0;
+  }
+
+  return clamp(score, 0, 1);
+};
+
+const computeConfidence = (chunks: KnowledgeChunkRecord[]): number => {
+  if (!chunks.length) {
+    return 0;
+  }
+
+  const normalizedScores = chunks.map((chunk) => normalizeVectorScore(Number(chunk.score || 0)));
+  const averageScore =
+    normalizedScores.reduce((total, score) => total + score, 0) / normalizedScores.length;
+  const bestScore = Math.max(...normalizedScores);
+
+  return Number(clamp(bestScore * 0.6 + averageScore * 0.4, 0, 1).toFixed(3));
 };
 
 export class HybridRetriever {
@@ -16,7 +39,7 @@ export class HybridRetriever {
 
     return {
       chunks,
-      topScore: Number(chunks[0]?.score || 0),
+      confidence: computeConfidence(chunks),
     };
   }
 }

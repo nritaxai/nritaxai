@@ -1,4 +1,4 @@
-import { HybridChatClient, isModelUncertain } from "../llm/chat";
+import { HYBRID_DISCLAIMER, HYBRID_SYSTEM_PROMPT, HybridChatClient, isModelUncertain } from "../llm/chat";
 import { RagPipeline } from "../rag/pipeline";
 import type { RagPipelineResult } from "../rag/pipeline";
 import { ClassifierService } from "./classifier.service";
@@ -32,6 +32,12 @@ export type HybridChatResponse = {
   fallbackReason?: string;
 };
 
+type ChatExecution = {
+  answer: string;
+  verificationApplied: boolean;
+  providerTrail: string[];
+};
+
 const EMPTY_RAG_RESULT: RagPipelineResult = {
   contextText: "",
   citations: [],
@@ -40,17 +46,6 @@ const EMPTY_RAG_RESULT: RagPipelineResult = {
   hasSufficientContext: false,
   queryEmbedding: [],
 };
-
-const DISCLAIMER =
-  "This response is for general informational purposes only and is not legal or tax advice. Please consult a qualified tax professional for advice on your specific facts.";
-
-const SYSTEM_PROMPT = `You are a legal-tax assistant for nritax.ai.
-Answer ONLY using the retrieved context provided to you.
-Include legal or tax references when they are available in the context.
-Do not hallucinate facts, rates, sections, or case law.
-If the context is insufficient, say "I don't know based on the available documents."
-Keep the answer precise, practical, and compliant.
-Always end with this disclaimer: ${DISCLAIMER}`;
 
 const createRequestId = () => {
   return `hyb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -82,6 +77,57 @@ export class ChatService {
     this.chatClient = new HybridChatClient();
   }
 
+  private logRoute(message: string, route: string, confidence: number, fallback: boolean) {
+    console.log({
+      query: message,
+      route,
+      confidence,
+      fallback,
+    });
+  }
+
+  private async runGeminiFallback(message: string, ragResult: RagPipelineResult): Promise<ChatExecution> {
+    const answer = await this.chatClient.generateWithGemini(
+      HYBRID_SYSTEM_PROMPT,
+      `Use any retrieved context below if it is relevant. If the context is insufficient, say "I don't know."
+
+Context:
+${ragResult.contextText || "No context retrieved."}
+
+References:
+${buildCitationsText(ragResult.citations)}
+
+Question:
+${message}`
+    );
+
+    return {
+      answer,
+      verificationApplied: false,
+      providerTrail: ["gemini_fallback"],
+    };
+  }
+
+  private async verifyWithGemini(
+    message: string,
+    ragResult: RagPipelineResult,
+    answer: string
+  ): Promise<ChatExecution> {
+    const improvedAnswer = await this.chatClient.verifyWithGemini(
+      HYBRID_SYSTEM_PROMPT,
+      message,
+      ragResult.contextText,
+      buildCitationsText(ragResult.citations),
+      answer
+    );
+
+    return {
+      answer: improvedAnswer,
+      verificationApplied: true,
+      providerTrail: ["gemma", "gemini_verify"],
+    };
+  }
+
   async handleChat(input: HybridChatRequest): Promise<HybridChatResponse> {
     const startedAt = Date.now();
     const requestId = createRequestId();
@@ -109,32 +155,62 @@ export class ChatService {
       chunkCount: ragResult.chunkCount,
     });
 
-    let execution = await this.chatClient.execute({
-      mode: routing.mode,
-      query: message,
-      contextText: ragResult.contextText,
-      citationsText: buildCitationsText(ragResult.citations),
-      systemPrompt: SYSTEM_PROMPT,
-    });
+    this.logRoute(
+      message,
+      routing.mode,
+      ragResult.confidence,
+      routing.mode === "GEMINI_FALLBACK" || routing.mode === "GEMINI_DIRECT"
+    );
 
-    if (
-      (routing.mode === "GEMMA_ONLY" || routing.mode === "GEMMA_WITH_GEMINI_VERIFY") &&
-      isModelUncertain(execution.answer)
-    ) {
-      routing = this.routerService.decide({
-        queryType: classification.type,
-        retrievalConfidence: ragResult.confidence,
-        chunkCount: ragResult.chunkCount,
-        modelUncertain: true,
-      });
+    let execution: ChatExecution;
 
-      execution = await this.chatClient.execute({
-        mode: routing.mode,
-        query: message,
-        contextText: ragResult.contextText,
-        citationsText: buildCitationsText(ragResult.citations),
-        systemPrompt: SYSTEM_PROMPT,
-      });
+    try {
+      if (routing.mode === "GEMINI_DIRECT") {
+        execution = await this.chatClient.execute({
+          mode: "GEMINI_DIRECT",
+          query: message,
+          contextText: ragResult.contextText,
+          citationsText: buildCitationsText(ragResult.citations),
+          systemPrompt: HYBRID_SYSTEM_PROMPT,
+        });
+      } else if (routing.mode === "GEMINI_FALLBACK") {
+        execution = await this.runGeminiFallback(message, ragResult);
+      } else {
+        const gemmaAnswer = await this.chatClient.generateWithGemma(
+          HYBRID_SYSTEM_PROMPT,
+          message,
+          ragResult.contextText
+        );
+
+        if (isModelUncertain(gemmaAnswer)) {
+          routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_uncertain"] };
+          this.logRoute(message, routing.mode, ragResult.confidence, true);
+          execution = await this.runGeminiFallback(message, ragResult);
+        } else if (routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
+          execution = await this.verifyWithGemini(message, ragResult, gemmaAnswer);
+        } else {
+          execution = {
+            answer: gemmaAnswer,
+            verificationApplied: false,
+            providerTrail: ["gemma"],
+          };
+        }
+      }
+    } catch (error) {
+      if (routing.mode === "GEMMA_ONLY" || routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
+        routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_failed"] };
+        this.logRoute(message, routing.mode, ragResult.confidence, true);
+
+        try {
+          execution = await this.runGeminiFallback(message, ragResult);
+        } catch (fallbackError) {
+          throw new Error(
+            fallbackError instanceof Error ? fallbackError.message : "Hybrid providers are currently unavailable"
+          );
+        }
+      } else {
+        throw new Error(error instanceof Error ? error.message : "Hybrid providers are currently unavailable");
+      }
     }
 
     return {
@@ -144,7 +220,7 @@ export class ChatService {
       classification: classification.type,
       confidence: ragResult.confidence,
       citations: ragResult.citations,
-      disclaimer: DISCLAIMER,
+      disclaimer: HYBRID_DISCLAIMER,
       requestId,
       latencyMs: Date.now() - startedAt,
       verificationApplied: execution.verificationApplied,
