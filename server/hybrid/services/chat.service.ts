@@ -1,6 +1,8 @@
 import { HYBRID_DISCLAIMER, HYBRID_SYSTEM_PROMPT, HybridChatClient, isModelUncertain } from "../llm/chat";
-import { RagPipeline } from "../rag/pipeline";
-import type { RagPipelineResult } from "../rag/pipeline";
+import type { KnowledgeChunkRecord } from "../db/mongodb";
+import { buildContext } from "../rag/context-builder";
+import { HybridRetriever } from "../rag/retriever";
+import { OllamaClient } from "../llm/ollama.client";
 import { ClassifierService } from "./classifier.service";
 import { RouterService, type HybridMode } from "./router.service";
 
@@ -38,13 +40,14 @@ type ChatExecution = {
   providerTrail: string[];
 };
 
-const EMPTY_RAG_RESULT: RagPipelineResult = {
-  contextText: "",
-  citations: [],
+type RetrievalState = {
+  chunks: KnowledgeChunkRecord[];
+  confidence: number;
+};
+
+const EMPTY_RETRIEVAL_RESULT: RetrievalState = {
+  chunks: [],
   confidence: 0,
-  chunkCount: 0,
-  hasSufficientContext: false,
-  queryEmbedding: [],
 };
 
 const createRequestId = () => {
@@ -66,36 +69,51 @@ const buildCitationsText = (
 
 export class ChatService {
   private readonly classifierService: ClassifierService;
-  private readonly ragPipeline: RagPipeline;
   private readonly routerService: RouterService;
   private readonly chatClient: HybridChatClient;
+  private readonly ollamaClient: OllamaClient;
+  private readonly retriever: HybridRetriever;
 
   constructor() {
     this.classifierService = new ClassifierService();
-    this.ragPipeline = new RagPipeline();
     this.routerService = new RouterService();
     this.chatClient = new HybridChatClient();
+    this.ollamaClient = new OllamaClient();
+    this.retriever = new HybridRetriever();
   }
 
-  private logRoute(message: string, route: string, confidence: number, fallback: boolean) {
+  private logRoute(message: string, route: string, confidence: number, chunkCount: number) {
     console.log({
       query: message,
       route,
       confidence,
-      fallback,
+      chunkCount,
     });
   }
 
-  private async runGeminiFallback(message: string, ragResult: RagPipelineResult): Promise<ChatExecution> {
+  private async retrieve(message: string): Promise<RetrievalState> {
+    try {
+      const embeddingResult = await this.ollamaClient.embed(message);
+      return await this.retriever.search(embeddingResult.embedding);
+    } catch {
+      return EMPTY_RETRIEVAL_RESULT;
+    }
+  }
+
+  private async runGeminiFallback(
+    message: string,
+    contextText: string,
+    citationsText: string
+  ): Promise<ChatExecution> {
     const answer = await this.chatClient.generateWithGemini(
       HYBRID_SYSTEM_PROMPT,
       `Use any retrieved context below if it is relevant. If the context is insufficient, say "I don't know."
 
 Context:
-${ragResult.contextText || "No context retrieved."}
+${contextText || "No context retrieved."}
 
 References:
-${buildCitationsText(ragResult.citations)}
+${citationsText}
 
 Question:
 ${message}`
@@ -110,14 +128,15 @@ ${message}`
 
   private async verifyWithGemini(
     message: string,
-    ragResult: RagPipelineResult,
+    contextText: string,
+    citationsText: string,
     answer: string
   ): Promise<ChatExecution> {
     const improvedAnswer = await this.chatClient.verifyWithGemini(
       HYBRID_SYSTEM_PROMPT,
       message,
-      ragResult.contextText,
-      buildCitationsText(ragResult.citations),
+      contextText,
+      citationsText,
       answer
     );
 
@@ -138,29 +157,15 @@ ${message}`
     }
 
     const classification = this.classifierService.classify(message);
-
-    let ragResult: RagPipelineResult = EMPTY_RAG_RESULT;
-
-    if (classification.type !== "EDGE") {
-      try {
-        ragResult = await this.ragPipeline.run(message);
-      } catch {
-        ragResult = EMPTY_RAG_RESULT;
-      }
-    }
+    const retrieval = classification.type === "EDGE" ? EMPTY_RETRIEVAL_RESULT : await this.retrieve(message);
 
     let routing = this.routerService.decide({
-      queryType: classification.type,
-      retrievalConfidence: ragResult.confidence,
-      chunkCount: ragResult.chunkCount,
+      type: classification.type,
+      confidence: retrieval.confidence,
+      chunks: retrieval.chunks,
     });
 
-    this.logRoute(
-      message,
-      routing.mode,
-      ragResult.confidence,
-      routing.mode === "GEMINI_FALLBACK" || routing.mode === "GEMINI_DIRECT"
-    );
+    this.logRoute(message, routing.mode, retrieval.confidence, retrieval.chunks.length);
 
     let execution: ChatExecution;
 
@@ -169,25 +174,32 @@ ${message}`
         execution = await this.chatClient.execute({
           mode: "GEMINI_DIRECT",
           query: message,
-          contextText: ragResult.contextText,
-          citationsText: buildCitationsText(ragResult.citations),
+          contextText: "",
+          citationsText: "",
           systemPrompt: HYBRID_SYSTEM_PROMPT,
         });
       } else if (routing.mode === "GEMINI_FALLBACK") {
-        execution = await this.runGeminiFallback(message, ragResult);
+        execution = await this.runGeminiFallback(message, "", "");
       } else {
+        const builtContext = buildContext(retrieval.chunks, retrieval.confidence);
+        const citationsText = buildCitationsText(builtContext.citations);
         const gemmaAnswer = await this.chatClient.generateWithGemma(
           HYBRID_SYSTEM_PROMPT,
           message,
-          ragResult.contextText
+          builtContext.contextText
         );
 
         if (isModelUncertain(gemmaAnswer)) {
           routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_uncertain"] };
-          this.logRoute(message, routing.mode, ragResult.confidence, true);
-          execution = await this.runGeminiFallback(message, ragResult);
+          this.logRoute(message, routing.mode, retrieval.confidence, retrieval.chunks.length);
+          execution = await this.runGeminiFallback(message, builtContext.contextText, citationsText);
         } else if (routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
-          execution = await this.verifyWithGemini(message, ragResult, gemmaAnswer);
+          execution = await this.verifyWithGemini(
+            message,
+            builtContext.contextText,
+            citationsText,
+            gemmaAnswer
+          );
         } else {
           execution = {
             answer: gemmaAnswer,
@@ -199,10 +211,15 @@ ${message}`
     } catch (error) {
       if (routing.mode === "GEMMA_ONLY" || routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
         routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_failed"] };
-        this.logRoute(message, routing.mode, ragResult.confidence, true);
+        this.logRoute(message, routing.mode, retrieval.confidence, retrieval.chunks.length);
 
         try {
-          execution = await this.runGeminiFallback(message, ragResult);
+          const builtContext = buildContext(retrieval.chunks, retrieval.confidence);
+          execution = await this.runGeminiFallback(
+            message,
+            builtContext.contextText,
+            buildCitationsText(builtContext.citations)
+          );
         } catch (fallbackError) {
           throw new Error(
             fallbackError instanceof Error ? fallbackError.message : "Hybrid providers are currently unavailable"
@@ -218,14 +235,14 @@ ${message}`
       answer: execution.answer,
       mode: routing.mode,
       classification: classification.type,
-      confidence: ragResult.confidence,
-      citations: ragResult.citations,
+      confidence: retrieval.confidence,
+      citations: buildContext(retrieval.chunks, retrieval.confidence).citations,
       disclaimer: HYBRID_DISCLAIMER,
       requestId,
       latencyMs: Date.now() - startedAt,
       verificationApplied: execution.verificationApplied,
       providerTrail: execution.providerTrail,
-      chunkCount: ragResult.chunkCount,
+      chunkCount: retrieval.chunks.length,
       fallbackReason: routing.reasons[0],
     };
   }

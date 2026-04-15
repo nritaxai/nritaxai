@@ -1,3 +1,4 @@
+import type { KnowledgeChunkRecord } from "../db/mongodb";
 import type { QueryType } from "./classifier.service";
 
 export type HybridMode =
@@ -12,26 +13,26 @@ export type RoutingDecision = {
 };
 
 export type RoutingInput = {
-  queryType: QueryType;
-  retrievalConfidence: number;
-  chunkCount: number;
+  type: QueryType;
+  confidence: number;
+  chunks: KnowledgeChunkRecord[];
 };
 
 export class RouterService {
   decide(input: RoutingInput): RoutingDecision {
-    if (input.queryType === "EDGE") {
+    if (input.type === "EDGE") {
       return { mode: "GEMINI_DIRECT", reasons: ["edge_query"] };
     }
 
-    if (input.chunkCount === 0) {
+    if (!input.chunks || input.chunks.length === 0) {
       return { mode: "GEMINI_FALLBACK", reasons: ["no_chunks"] };
     }
 
-    if (input.retrievalConfidence < 0.7) {
+    if (input.confidence < 0.7) {
       return { mode: "GEMINI_FALLBACK", reasons: ["low_retrieval_confidence"] };
     }
 
-    if (input.queryType === "COMPLEX") {
+    if (input.type === "COMPLEX") {
       return { mode: "GEMMA_WITH_GEMINI_VERIFY", reasons: ["complex_query_requires_verification"] };
     }
 
