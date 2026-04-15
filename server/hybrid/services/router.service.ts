@@ -28,10 +28,6 @@ export class RouterService {
       return { mode: "GEMINI_FALLBACK", reasons: ["no_chunks"] };
     }
 
-    if (input.confidence < 0.7) {
-      return { mode: "GEMINI_FALLBACK", reasons: ["low_retrieval_confidence"] };
-    }
-
     if (input.type === "COMPLEX") {
       return { mode: "GEMMA_WITH_GEMINI_VERIFY", reasons: ["complex_query_requires_verification"] };
     }
