@@ -1,8 +1,9 @@
-import { Instagram, Linkedin, Twitter } from "lucide-react";
+import { ArrowRight, Instagram, Linkedin, LifeBuoy, Twitter } from "lucide-react";
 import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { Button } from "./ui/button";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { fadeUp, staggerContainer } from "../utils/motion";
 
@@ -43,7 +44,7 @@ const footerColumns: FooterColumn[] = [
   {
     heading: "Resources",
     links: [
-      { label: "Help Center", to: "/consult" },
+      { label: "Help Center", to: "/support" },
       { label: "Blog", to: "/home#tax-updates" },
       { label: "Tax Guides", to: "/calculators" },
       { label: "FAQs", to: "/disclaimer" },
@@ -143,6 +144,13 @@ export function Footer() {
           </div>
 
           <div className="flex flex-col gap-4 md:items-end">
+            <Button asChild className="h-11 bg-white text-black hover:bg-slate-200">
+              <Link to="/support" className="inline-flex items-center gap-2">
+                <LifeBuoy className="size-4" />
+                Support
+                <ArrowRight className="size-4" />
+              </Link>
+            </Button>
             <div className="flex items-center gap-4">
               {socialLinks.map((item) => {
                 const Icon = item.icon;

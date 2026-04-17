@@ -27,6 +27,7 @@ const Cancel = lazy(() => import("./pages/Cancel").then((m) => ({ default: m.Can
 const Builder = lazy(() => import("./pages/Builder").then((m) => ({ default: m.Builder })));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard").then((m) => ({ default: m.AdminDashboard })));
 const AboutUs = lazy(() => import("./pages/AboutUs").then((m) => ({ default: m.AboutUs })));
+const Support = lazy(() => import("./pages/Support").then((m) => ({ default: m.Support })));
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions").then((m) => ({ default: m.TermsAndConditions })));
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy").then((m) => ({ default: m.RefundPolicy })));
 const Disclaimer = lazy(() => import("./pages/Disclaimer").then((m) => ({ default: m.Disclaimer })));
@@ -448,6 +449,7 @@ export default function App() {
             <Route path="/cancel" element={withPageScaffold(<Cancel />)} />
             <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
             <Route path="/about-us" element={withPageScaffold(<AboutUs />)} />
+            <Route path="/support" element={withPageScaffold(<Support />)} />
             <Route path="/terms-and-conditions" element={withPageScaffold(<TermsAndConditions />)} />
             <Route path="/refund-policy" element={withPageScaffold(<RefundPolicy />)} />
             <Route path="/disclaimer" element={withPageScaffold(<Disclaimer />)} />
