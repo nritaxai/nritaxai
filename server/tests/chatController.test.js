@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildBasicRagContext,
+  buildGemmaPrompt,
   isTaxRelatedQuery,
   NON_TAX_QUERY_REPLY,
 } from "../Controllers/chatController.js";
@@ -33,4 +34,18 @@ test("buildBasicRagContext includes DTAA and TDS context when relevant", () => {
   assert.match(context, /DTAA Context:/);
   assert.match(context, /TDS Context:/);
   assert.match(context, /NRI Taxation Context:/);
+});
+
+test("buildGemmaPrompt includes strict NRI and DTAA definitions", () => {
+  const prompt = buildGemmaPrompt({
+    selectedLanguage: { instruction: "Respond only in English." },
+    contextualMessages: [{ role: "user", content: "What is DTAA for NRIs?" }],
+    hiddenContext: "",
+  });
+
+  assert.match(prompt, /You are an expert assistant specialized ONLY in NRI taxation and Indian tax laws\./);
+  assert.match(prompt, /STRICT RULES:/);
+  assert.match(prompt, /NRI means Non-Resident Indian, a person who resides outside India as per the Income Tax Act\./);
+  assert.match(prompt, /DTAA means Double Tax Avoidance Agreement between two countries to prevent double taxation\./);
+  assert.match(prompt, /I can only assist with NRI and tax-related queries\./);
 });

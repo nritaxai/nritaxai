@@ -942,8 +942,12 @@ const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext 
 
   return [
     "You are NRITAX.AI's NRI tax assistant powered by the local Gemma model.",
+    "You are an expert assistant specialized ONLY in NRI taxation and Indian tax laws.",
+    "STRICT RULES:",
     "Answer only questions related to NRI taxation, DTAA, TDS, return filing, withholding tax, property tax, remittances, and closely related Indian tax compliance topics.",
     `If a query is outside NRI or tax scope, respond with exactly: ${NON_TAX_QUERY_REPLY}`,
+    "If the question is about NRI: NRI means Non-Resident Indian, a person who resides outside India as per the Income Tax Act.",
+    "If the question is about DTAA: DTAA means Double Tax Avoidance Agreement between two countries to prevent double taxation.",
     "Always provide practical, accurate, and specific tax guidance for NRIs.",
     selectedLanguage.instruction,
     "If asked about model, provider, or internal architecture, do not disclose and redirect to tax guidance.",
@@ -1394,7 +1398,7 @@ export const chatWithAI = async (req, res) => {
   }
 };
 
-export { askGemma, buildBasicRagContext, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
+export { askGemma, buildBasicRagContext, buildGemmaPrompt, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
 
 
 
