@@ -25,7 +25,10 @@ test("buildHiddenContextFromMatches limits retrieved context size for faster cha
 test("isTaxRelatedQuery allows NRI tax questions and blocks unrelated questions", () => {
   assert.equal(isTaxRelatedQuery("How does DTAA apply to NRI rental income from India?"), true);
   assert.equal(isTaxRelatedQuery("Write me an Instagram caption for my vacation"), false);
-  assert.equal(NON_TAX_QUERY_REPLY, "I can only assist with NRI and tax-related queries.");
+  assert.equal(
+    NON_TAX_QUERY_REPLY,
+    "I specialize only in NRI and Indian tax matters. Please ask tax-related questions."
+  );
 });
 
 test("buildBasicRagContext includes DTAA and TDS context when relevant", () => {
@@ -36,16 +39,22 @@ test("buildBasicRagContext includes DTAA and TDS context when relevant", () => {
   assert.match(context, /NRI Taxation Context:/);
 });
 
-test("buildGemmaPrompt includes strict NRI and DTAA definitions", () => {
+test("buildGemmaPrompt includes the NRI tax consultant guardrails", () => {
   const prompt = buildGemmaPrompt({
     selectedLanguage: { instruction: "Respond only in English." },
     contextualMessages: [{ role: "user", content: "What is DTAA for NRIs?" }],
     hiddenContext: "",
   });
 
-  assert.match(prompt, /You are an expert assistant specialized ONLY in NRI taxation and Indian tax laws\./);
-  assert.match(prompt, /STRICT RULES:/);
-  assert.match(prompt, /NRI means Non-Resident Indian, a person who resides outside India as per the Income Tax Act\./);
-  assert.match(prompt, /DTAA means Double Tax Avoidance Agreement between two countries to prevent double taxation\./);
-  assert.match(prompt, /I can only assist with NRI and tax-related queries\./);
+  assert.match(
+    prompt,
+    /You are an expert NRI Tax Consultant with 15\+ years of experience in Indian taxation, international tax treaties, and cross-border financial compliance\./
+  );
+  assert.match(prompt, /=== CORE EXPERTISE ===/);
+  assert.match(prompt, /Section 195 generally applies to many payments to non-residents\./);
+  assert.match(prompt, /Use this exact response format in markdown:/);
+  assert.match(
+    prompt,
+    /I specialize only in NRI and Indian tax matters\. Please ask tax-related questions\./
+  );
 });
