@@ -39,20 +39,18 @@ test("buildBasicRagContext includes DTAA and TDS context when relevant", () => {
   assert.match(context, /NRI Taxation Context:/);
 });
 
-test("buildGemmaPrompt includes the NRI tax consultant guardrails", () => {
+test("buildGemmaPrompt prioritizes retrieved context and preserves tax-only guardrails", () => {
   const prompt = buildGemmaPrompt({
     selectedLanguage: { instruction: "Respond only in English." },
     contextualMessages: [{ role: "user", content: "What is DTAA for NRIs?" }],
-    hiddenContext: "",
+    hiddenContext: "DTAA stands for Double Tax Avoidance Agreement.",
   });
 
-  assert.match(
-    prompt,
-    /You are an expert NRI Tax Consultant with 15\+ years of experience in Indian taxation, international tax treaties, and cross-border financial compliance\./
-  );
-  assert.match(prompt, /=== CORE EXPERTISE ===/);
-  assert.match(prompt, /Section 195 generally applies to many payments to non-residents\./);
-  assert.match(prompt, /Use this exact response format in markdown:/);
+  assert.match(prompt, /=== RETRIEVED KNOWLEDGE \(HIGHEST PRIORITY\) ===/);
+  assert.match(prompt, /DTAA stands for Double Tax Avoidance Agreement\./);
+  assert.match(prompt, /If the answer is present in the above context, you MUST use it\./);
+  assert.match(prompt, /DO NOT create your own definition if context is available\./);
+  assert.match(prompt, /Section 195 applies to payments made to NRIs\./);
   assert.match(
     prompt,
     /I specialize only in NRI and Indian tax matters\. Please ask tax-related questions\./
