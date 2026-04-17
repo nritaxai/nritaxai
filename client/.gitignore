@@ -27,5 +27,7 @@ dist-ssr
 node_modules/
 
 # Environment variables
-.env/
+.env
+.env.*
+!.env.example
 
