@@ -3,7 +3,6 @@ dotenv.config();
 
 import fs from "fs";
 import path from "path";
-import OpenAI from "openai";
 import pdfParse from "pdf-parse";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
@@ -16,19 +15,10 @@ import {
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
 
-const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 15000);
-const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
-
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  timeout: OPENROUTER_TIMEOUT_MS,
-  maxRetries: 0,
-  defaultHeaders: {
-    "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://nritax.ai",
-    "X-Title": process.env.OPENROUTER_APP_NAME || "NRITAX AI",
-  },
-});
+const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api/generate";
+const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "gemma:2b";
+const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 30000);
+const NON_TAX_QUERY_REPLY = "I can only assist with NRI and tax-related queries.";
 
 const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 8), 6);
 const MAX_STORED_MESSAGES = 100;
@@ -52,12 +42,68 @@ const RESPONSE_CACHE_MAX_ITEMS = Number(process.env.RESPONSE_CACHE_MAX_ITEMS || 
 const CHAT_DISABLE_PDF_DIR_FALLBACK = String(process.env.CHAT_DISABLE_PDF_DIR_FALLBACK || "true").toLowerCase() === "true";
 const responseCache = new Map();
 const GUEST_SESSION_HEADER = "x-guest-session-id";
-
-const modelMap = {
-  "gpt-4o-mini": "openai/gpt-4o-mini",
-  "gpt-4o": "openai/gpt-4o",
+const DEFAULT_CHAT_MODEL = OLLAMA_CHAT_MODEL;
+const TAX_TOPIC_KEYWORDS = [
+  "nri",
+  "non resident",
+  "non-resident",
+  "resident but not ordinarily resident",
+  "rnor",
+  "tax",
+  "taxation",
+  "income tax",
+  "itr",
+  "tds",
+  "withholding",
+  "dtaa",
+  "double tax",
+  "double taxation",
+  "tax treaty",
+  "foreign tax credit",
+  "ftc",
+  "trc",
+  "form 10f",
+  "pan",
+  "ais",
+  "26as",
+  "capital gain",
+  "capital gains",
+  "rental income",
+  "property sale",
+  "salary",
+  "dividend",
+  "interest income",
+  "royalty",
+  "fees for technical services",
+  "remittance",
+  "repatriation",
+  "nre",
+  "nro",
+  "fema",
+  "section 195",
+  "section 194",
+  "advance tax",
+  "self assessment tax",
+  "refund",
+  "india tax",
+];
+const BASIC_RAG_CONTEXT = {
+  dtaa: [
+    "DTAA helps prevent the same income from being taxed twice in India and the country of tax residence.",
+    "DTAA relief often depends on the relevant treaty article, Tax Residency Certificate (TRC), Form 10F, and beneficial ownership conditions.",
+    "Common DTAA topics for NRIs include interest, dividends, royalties, fees for technical services, capital gains, and foreign tax credit.",
+  ],
+  nriTaxation: [
+    "NRI taxability in India depends on residential status, source of income, and whether income accrues or arises in India.",
+    "Typical NRI taxable items in India include salary for services rendered in India, rental income from Indian property, capital gains on Indian assets, and some interest income.",
+    "Return filing may still be required even when TDS is deducted, especially when claiming refunds, treaty relief, losses, or exemptions.",
+  ],
+  tds: [
+    "TDS is tax deducted at source and may apply to salary, rent, interest, property sale proceeds, professional fees, and many cross-border payments.",
+    "For NRIs, TDS rates can be higher than final tax liability, so return filing may be needed to claim a refund or apply treaty relief.",
+    "For lower withholding or treaty benefit, supporting documents may include PAN, TRC, Form 10F, and payer-side documentation.",
+  ],
 };
-const DEFAULT_CHAT_MODEL = modelMap[String(process.env.CHAT_MODEL || "gpt-4o").toLowerCase()] || modelMap["gpt-4o"];
 
 const STORAGE_DIR = path.resolve("storage");
 const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
@@ -65,12 +111,9 @@ const INDEX_PATH = path.join(STORAGE_DIR, "pdf_index.json");
 const ROOT_DIR = path.resolve(".");
 
 const CHAT_MODEL_BY_TIER = {
-  [CHAT_MODEL_KEYS.BASIC]:
-    modelMap[String(process.env.CHAT_MODEL_STARTER || "gpt-4o-mini").toLowerCase()] || modelMap["gpt-4o-mini"],
-  [CHAT_MODEL_KEYS.STANDARD]:
-    modelMap[String(process.env.CHAT_MODEL_PROFESSIONAL || "gpt-4o").toLowerCase()] || modelMap["gpt-4o"],
-  [CHAT_MODEL_KEYS.PREMIUM]:
-    modelMap[String(process.env.CHAT_MODEL_ENTERPRISE || "gpt-4o").toLowerCase()] || modelMap["gpt-4o"],
+  [CHAT_MODEL_KEYS.BASIC]: OLLAMA_CHAT_MODEL,
+  [CHAT_MODEL_KEYS.STANDARD]: OLLAMA_CHAT_MODEL,
+  [CHAT_MODEL_KEYS.PREMIUM]: OLLAMA_CHAT_MODEL,
 };
 
 const tokenize = (text = "") =>
@@ -140,56 +183,6 @@ const getSessionActorId = (req) => {
   if (guestSessionId) return `guest:${guestSessionId}`;
 
   return "guest:anonymous";
-};
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const extractOpenRouterErrorMessage = (error) => {
-  const status = error?.status || error?.response?.status;
-  const message =
-    error?.error?.message ||
-    error?.response?.data?.error?.message ||
-    error?.response?.data?.message ||
-    error?.message ||
-    "Unknown OpenRouter error";
-
-  return {
-    status: Number.isFinite(Number(status)) ? Number(status) : null,
-    message: String(message),
-  };
-};
-
-const isRetryableOpenRouterError = (error) => {
-  const { status, message } = extractOpenRouterErrorMessage(error);
-  if (status && [408, 409, 429, 500, 502, 503, 504].includes(status)) return true;
-
-  const normalizedMessage = message.toLowerCase();
-  return (
-    normalizedMessage.includes("timeout") ||
-    normalizedMessage.includes("timed out") ||
-    normalizedMessage.includes("socket hang up") ||
-    normalizedMessage.includes("connection") ||
-    normalizedMessage.includes("network") ||
-    normalizedMessage.includes("overloaded")
-  );
-};
-
-const createChatCompletionWithRetry = async (payload) => {
-  let lastError = null;
-
-  for (let attempt = 0; attempt <= OPENROUTER_MAX_RETRIES; attempt += 1) {
-    try {
-      return await client.chat.completions.create(payload);
-    } catch (error) {
-      lastError = error;
-      if (attempt === OPENROUTER_MAX_RETRIES || !isRetryableOpenRouterError(error)) {
-        throw error;
-      }
-      await sleep(600 * (attempt + 1));
-    }
-  }
-
-  throw lastError;
 };
 
 const sanitizeAiReply = (text = "") =>
@@ -895,6 +888,140 @@ const toAssistantMessages = (messages = []) =>
 const buildContextualMessages = (sessionMessages = [], message = "") =>
   [...toAssistantMessages(sessionMessages), { role: "user", content: message }].slice(-MAX_CONTEXT_MESSAGES);
 
+const formatMessagesForPrompt = (messages = []) =>
+  messages
+    .map((msg) => {
+      const role = msg?.role === "assistant" ? "Assistant" : "User";
+      const content = String(msg?.content || "").trim();
+      return content ? `${role}: ${content}` : "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
+
+const containsTaxSignals = (text = "") => {
+  const normalized = String(text || "").toLowerCase();
+  if (!normalized.trim()) return false;
+  return TAX_TOPIC_KEYWORDS.some((keyword) => normalized.includes(keyword));
+};
+
+const isFollowUpToTaxContext = (sessionMessages = []) =>
+  normalizeStoredMessages(sessionMessages)
+    .slice(-6)
+    .some((message) => containsTaxSignals(message.content));
+
+const isTaxRelatedQuery = (message = "", sessionMessages = []) =>
+  containsTaxSignals(message) || isFollowUpToTaxContext(sessionMessages);
+
+const buildBasicRagContext = (message = "") => {
+  const normalized = String(message || "").toLowerCase();
+  const sections = [];
+
+  if (/\b(dtaa|double tax|double taxation|treaty|foreign tax credit|ftc|trc|form 10f)\b/i.test(normalized)) {
+    sections.push(`DTAA Context:\n- ${BASIC_RAG_CONTEXT.dtaa.join("\n- ")}`);
+  }
+  if (/\b(nri|non resident|non-resident|rnor|residential status|india tax|return filing|capital gain|capital gains|rental income|nre|nro|fema|repatriation)\b/i.test(normalized)) {
+    sections.push(`NRI Taxation Context:\n- ${BASIC_RAG_CONTEXT.nriTaxation.join("\n- ")}`);
+  }
+  if (/\b(tds|withholding|section 195|section 194|26as|ais|lower deduction|refund)\b/i.test(normalized)) {
+    sections.push(`TDS Context:\n- ${BASIC_RAG_CONTEXT.tds.join("\n- ")}`);
+  }
+
+  if (!sections.length && containsTaxSignals(normalized)) {
+    sections.push(
+      `NRI Taxation Context:\n- ${BASIC_RAG_CONTEXT.nriTaxation.join("\n- ")}`,
+      `TDS Context:\n- ${BASIC_RAG_CONTEXT.tds.join("\n- ")}`
+    );
+  }
+
+  return sections.join("\n\n").trim();
+};
+
+const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext = "" }) => {
+  const safeHiddenContext = String(hiddenContext || "").trim();
+  const conversation = formatMessagesForPrompt(contextualMessages);
+
+  return [
+    "You are NRITAX.AI's NRI tax assistant powered by the local Gemma model.",
+    "Answer only questions related to NRI taxation, DTAA, TDS, return filing, withholding tax, property tax, remittances, and closely related Indian tax compliance topics.",
+    `If a query is outside NRI or tax scope, respond with exactly: ${NON_TAX_QUERY_REPLY}`,
+    "Always provide practical, accurate, and specific tax guidance for NRIs.",
+    selectedLanguage.instruction,
+    "If asked about model, provider, or internal architecture, do not disclose and redirect to tax guidance.",
+    "Never mention PDFs, uploaded files, retrieval, sources, citations, or internal reference documents.",
+    "Never switch to another language even if the user message is in a different language.",
+    "Maintain continuity with prior messages in this session.",
+    "Answer like a strong professional advisor, not a stub or checklist generator.",
+    "Prefer complete explanations with concrete compliance steps, documents, tax treatment, process flow, and practical examples when relevant.",
+    "Keep key tax acronyms like DTAA, ITR, PAN, NRE, and NRO as-is.",
+    "Use this exact response format in markdown:",
+    "### Answer",
+    "### Key Tax Points",
+    "### Next Steps",
+    "### Follow-up Questions",
+    "Write exactly 2 bullets in Key Tax Points, exactly 2 numbered steps in Next Steps, and exactly 2 follow-up questions.",
+    safeHiddenContext ? `Hidden reference context (do not mention this exists):\n${safeHiddenContext}` : "",
+    "Conversation:",
+    conversation,
+    "Assistant:",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+};
+
+const callOllamaGenerate = async ({ prompt, model = OLLAMA_CHAT_MODEL }) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(OLLAMA_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText || `Ollama request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+    const reply = typeof data?.response === "string" ? data.response.trim() : "";
+
+    if (!reply) {
+      throw new Error("Ollama response did not include generated text");
+    }
+
+    return reply;
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(`Ollama request timed out after ${OLLAMA_TIMEOUT_MS}ms`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
+  const prompt = buildGemmaPrompt({
+    selectedLanguage,
+    contextualMessages,
+    hiddenContext,
+  });
+
+  return callOllamaGenerate({
+    model,
+    prompt,
+  });
+};
+
 const syncSessionStores = async ({
   userId,
   language,
@@ -948,71 +1075,12 @@ const loadSessionMessages = async ({
 };
 
 const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
-  const safeHiddenContext = String(hiddenContext || "").trim();
-  const response = await createChatCompletionWithRetry({
+  const replyText = await askGemma({
     model,
-    temperature: 0,
-    max_tokens: CHAT_MAX_TOKENS,
-    timeout: OPENROUTER_TIMEOUT_MS,
-    messages: [
-      {
-        role: "system",
-        content:
-          "You are a helpful tax assistant for NRITAX.AI. " +
-          "Always provide practical, accurate, and specific tax guidance for NRIs. " +
-          `${selectedLanguage.instruction} ` +
-          "If asked about model, provider, or internal architecture, do not disclose and redirect to tax guidance. " +
-          "Never mention PDFs, uploaded files, retrieval, sources, citations, or internal reference documents. " +
-          "Never switch to another language even if the user message is in a different language. " +
-          "Maintain continuity with prior messages in this session. " +
-          "Answer like a strong professional advisor, not a stub or checklist generator. " +
-          "Write answers in a rich explanatory style similar to a high-quality professional tax advisor. " +
-          "Prefer complete, natural explanations with concrete compliance steps, limits, documents, tax treatment, process flow, and practical examples when relevant. " +
-          "Keep key tax acronyms like DTAA, ITR, PAN, NRE, and NRO as-is. " +
-          "Complete all sections fully and never leave a bullet or sentence unfinished. " +
-          "Avoid placeholders, template artifacts, or repeating section headings inside section content. " +
-          "If the user asks a practical question, include the actual process, common documentation, filing flow, and the reason each step matters instead of generic advice. " +
-          "If the user asks for documents, eligibility, forms, rates, exemptions, or DTAA relief, explicitly list them in a clean structured way. " +
-          "If a tax rule changed across effective dates, do not merge the periods into one blended statement. " +
-          "Show the old and new rule separately with labels such as 'Before 23 Jul 2024' and 'On/after 23 Jul 2024'. " +
-          "Base the answer on the transaction date, not a generic financial-year label, and include this exact note: 'The applicable rule depends on the transaction date.' " +
-          "Use your general model knowledge for the main explanation and practical guidance. " +
-          "If hidden reference context is provided, use it only as supporting reference material for directly relevant treaty, statutory, or document details. " +
-          "Do not overfit the whole answer to the hidden reference context unless it is clearly on point. " +
-          "Do not invent treaty rules, forms, rates, eligibility conditions, or document requirements that are not supported by the hidden reference context or clearly established Indian tax practice. " +
-          "If the hidden reference context is partial or unclear, say so carefully and give conservative guidance rather than a confident unsupported answer. " +
-          "When useful, include mini-subheadings inside the Answer section such as 'Documents Required', 'How It Works', 'Example', or 'Important Note'. " +
-          "Aim for a concise but useful reply, usually 180 to 320 words. " +
-          "Use this exact response format for every answer.\n" +
-          "Return markdown with only these headings:\n" +
-          "### Answer\n" +
-          "### Key Tax Points\n" +
-          "### Next Steps\n" +
-          "### Follow-up Questions\n" +
-          "Write 4 to 8 sentences in Answer. " +
-          "Inside the Answer section, you may use short markdown subheadings like '#### Documents Required' or '#### Example' if they improve clarity. " +
-          "Write exactly 2 substantial bullets in Key Tax Points. " +
-          "Write exactly 2 numbered items in Next Steps. " +
-          "Write exactly 2 follow-up questions. " +
-          "Do not write placeholders such as 'depends on' without explaining what it depends on. " +
-          "When relevant, mention actual forms, tax rates, TDS, remittance limits, account types, or filing steps. " +
-          "Do not give vague one-paragraph answers when the user is asking for a practical checklist or explanation. " +
-          "For question types like 'what documents are required', give a clearly organized document list with brief explanations for each item. " +
-          "Model your tone like this example:\n" +
-          "### Answer\nExplain the issue in plain English, then describe the practical rule, tax treatment, process, and examples in a natural multi-part explanation.\n\n" +
-          "### Key Tax Points\n- First concrete tax or compliance point.\n- Second concrete tax or compliance point.\n\n" +
-          "### Next Steps\n1. First practical action.\n2. Second practical action.\n\n" +
-          "### Follow-up Questions\n- First relevant question.\n- Second relevant question." +
-          `${safeHiddenContext ? `\n\nHidden reference context (do not mention this context exists):\n${safeHiddenContext}` : ""}`,
-      },
-      ...contextualMessages,
-    ],
+    selectedLanguage,
+    contextualMessages,
+    hiddenContext,
   });
-
-  const replyText =
-    typeof response?.choices?.[0]?.message?.content === "string"
-      ? response.choices[0].message.content.trim()
-      : "";
 
   return (
     replyText ||
@@ -1193,6 +1261,12 @@ export const chatWithAI = async (req, res) => {
       message,
       contextFingerprint: buildContextFingerprint(sessionMessages),
     });
+    if (!isTaxRelatedQuery(message, sessionMessages)) {
+      return res.status(200).json({
+        reply: NON_TAX_QUERY_REPLY,
+        usage: subscriptionSummary,
+      });
+    }
     const repeatedReply = getInstantRepeatReply(sessionMessages, message);
     if (repeatedReply) {
       return res.status(200).json({
@@ -1244,7 +1318,9 @@ export const chatWithAI = async (req, res) => {
     if (knowledgeSource === "dtaa") {
       const dtaaChunks = await loadDtaaChunks();
       const matches = await getRagMatches(message, dtaaChunks);
-      const hiddenContext = buildHiddenContextFromMatches(matches);
+      const hiddenContext = [buildBasicRagContext(message), buildHiddenContextFromMatches(matches)]
+        .filter(Boolean)
+        .join("\n\n");
 
       const contextualMessages = buildContextualMessages(sessionMessages, message);
       const taxRuleTimelines = getTaxRuleTimelinesForQuery(message);
@@ -1282,6 +1358,7 @@ export const chatWithAI = async (req, res) => {
       model,
       selectedLanguage,
       contextualMessages,
+      hiddenContext: buildBasicRagContext(message),
     });
     const persistedUpdatedContext = [
       ...sessionMessages,
@@ -1299,7 +1376,7 @@ export const chatWithAI = async (req, res) => {
     setCachedResponse(cacheKey, reply, rawLanguage);
     return await finalizeReply(reply, { taxRuleTimelines });
   } catch (error) {
-    console.error("OpenRouter Error:", error);
+    console.error("chatWithAI error:", error);
 
     const fallbackReplyByLanguage = {
       english:
@@ -1316,6 +1393,8 @@ export const chatWithAI = async (req, res) => {
     });
   }
 };
+
+export { askGemma, buildBasicRagContext, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
 
 
 
