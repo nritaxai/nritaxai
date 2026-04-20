@@ -840,7 +840,7 @@ const normalizeStoredMessages = (messages = []) =>
     }));
 
 const loadPersistedMessages = async (userId, language, knowledgeSource) => {
-  if (!userId || userId === "guest") return [];
+  if (!userId || userId.startsWith("guest:")) return [];
   const history = await ChatHistory.findOne({
     user: userId,
     language,
@@ -853,7 +853,7 @@ const loadPersistedMessages = async (userId, language, knowledgeSource) => {
 };
 
 const savePersistedMessages = async (userId, language, knowledgeSource, messages) => {
-  if (!userId || userId === "guest") return;
+  if (!userId || userId.startsWith("guest:")) return;
 
   const normalized = normalizeStoredMessages(messages).slice(-MAX_STORED_MESSAGES);
   await ChatHistory.findOneAndUpdate(
