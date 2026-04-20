@@ -18,8 +18,28 @@ import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api/generate";
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "gemma:2b";
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 30000);
-const NON_TAX_QUERY_REPLY =
-  "I specialize only in NRI and Indian tax matters. Please ask tax-related questions.";
+const NON_TAX_QUERY_REPLY = "Please ask a tax-related question.";
+const SYSTEM_PROMPT = `
+You are a professional NRI tax assistant.
+
+Rules:
+- Answer ONLY tax-related questions (India, NRI, DTAA, FEMA, income tax)
+- If question is not tax-related, respond: "Please ask a tax-related question."
+- Always give accurate, legally correct answers
+- Keep answers SHORT and CLEAR (3-6 lines max)
+- Prefer bullet points where useful
+- Always expand abbreviations (e.g., DTAA = Double Taxation Avoidance Agreement)
+- Do NOT hallucinate or guess
+- If unsure, say: "This requires professional review."
+
+Focus Areas:
+- DTAA (Double Taxation Avoidance Agreements)
+- NRI taxation
+- Residential status
+- Foreign income taxation
+- Capital gains, salary, TDS
+- India ↔ other country tax rules
+`.trim();
 const OLLAMA_TEMPERATURE = Number(process.env.OLLAMA_TEMPERATURE || 0.3);
 const OLLAMA_TOP_P = Number(process.env.OLLAMA_TOP_P || 0.9);
 const OLLAMA_TOP_K = Number(process.env.OLLAMA_TOP_K || 40);
@@ -947,7 +967,7 @@ const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext 
   const conversation = formatMessagesForPrompt(contextualMessages);
 
   return [
-    "You are a STRICT NRI Tax Assistant. You ONLY answer based on provided context and verified tax knowledge.",
+    SYSTEM_PROMPT,
     "==================================================",
     "=== RETRIEVED CONTEXT (HIGHEST PRIORITY) ===",
     safeHiddenContext || "[no retrieved context available]",
@@ -1437,7 +1457,6 @@ export const chatWithAI = async (req, res) => {
   } catch (error) {
     console.error("chatWithAI error:", error);
 
-    // Fallback to Gemini if Ollama fails
     try {
       const geminiResponse = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
