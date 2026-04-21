@@ -16,6 +16,9 @@ import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/ta
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
 
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api/generate";
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const USE_GEMINI_PRIMARY =
+  GEMINI_API_KEY && String(process.env.USE_GEMINI_PRIMARY || "false") === "true";
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "gemma:2b";
 const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 30000);
 const NON_TAX_QUERY_REPLY = "Please ask a tax-related question.";
@@ -1084,6 +1087,25 @@ const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextua
     hiddenContext,
   });
 
+  // Use Gemini as primary if enabled.
+  if (USE_GEMINI_PRIMARY && GEMINI_API_KEY) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
+        }),
+      }
+    );
+
+    const data = await response.json();
+    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  }
+
+  // Fallback to Ollama.
   return callOllamaGenerate({
     model,
     prompt,
