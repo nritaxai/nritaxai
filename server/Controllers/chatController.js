@@ -1101,13 +1101,18 @@ const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextua
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: prompt }] }],
+          contents: [{
+            role: "user",
+            parts: [{ text: prompt.slice(0, 8000) }],
+          }],
           generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
         })
       }
     );
 
-    const data = await response.json();
+    const responseText = await response.text();
+    console.log("Gemini status:", response.status, responseText.slice(0, 200));
+    const data = JSON.parse(responseText);
     const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     if (!reply) throw new Error("Gemini also failed");
