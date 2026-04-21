@@ -14,6 +14,7 @@ import {
 } from "../Utils/subscriptionAccess.js";
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
+import { generateChatResponse } from "../Config/openaiService.js";
 
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api/generate";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -1093,31 +1094,42 @@ const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextua
     const geminiKey = process.env.GEMINI_API_KEY;
     if (!geminiKey) throw ollamaError;
 
-    console.log("Gemini key present:", !!process.env.GEMINI_API_KEY);
+    try {
+      console.log("Gemini key present:", !!process.env.GEMINI_API_KEY);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            role: "user",
-            parts: [{ text: prompt.slice(0, 8000) }],
-          }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
-        })
-      }
-    );
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{
+              role: "user",
+              parts: [{ text: prompt.slice(0, 8000) }],
+            }],
+            generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
+          })
+        }
+      );
 
-    const responseText = await response.text();
-    console.log("Gemini status:", response.status, responseText.slice(0, 200));
-    const data = JSON.parse(responseText);
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const responseText = await response.text();
+      console.log("Gemini status:", response.status, responseText.slice(0, 200));
+      const data = JSON.parse(responseText);
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    if (!reply) throw new Error("Gemini also failed");
+      if (!reply) throw new Error("Gemini also failed");
 
-    return reply;
+      return reply;
+    } catch (geminiError) {
+      console.warn("Gemini failed, falling back to OpenRouter:", geminiError?.message);
+
+      return await generateChatResponse([
+        {
+          role: "user",
+          content: prompt,
+        },
+      ]);
+    }
   }
 };
 
