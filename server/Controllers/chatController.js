@@ -21,7 +21,7 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const USE_GEMINI_PRIMARY =
   GEMINI_API_KEY && String(process.env.USE_GEMINI_PRIMARY || "false") === "true";
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "gemma:2b";
-const OLLAMA_TIMEOUT_MS = Number(process.env.OLLAMA_TIMEOUT_MS || 30000);
+const OLLAMA_TIMEOUT_MS = Math.max(Number(process.env.OLLAMA_TIMEOUT_MS || 45000), 45000);
 const NON_TAX_QUERY_REPLY = "Please ask a tax-related question.";
 const SYSTEM_PROMPT = `
 You are a professional NRI tax assistant.
@@ -48,7 +48,8 @@ const OLLAMA_TEMPERATURE = Number(process.env.OLLAMA_TEMPERATURE || 0.3);
 const OLLAMA_TOP_P = Number(process.env.OLLAMA_TOP_P || 0.9);
 const OLLAMA_TOP_K = Number(process.env.OLLAMA_TOP_K || 40);
 const OLLAMA_REPEAT_PENALTY = Number(process.env.OLLAMA_REPEAT_PENALTY || 1.2);
-const OLLAMA_NUM_PREDICT = Number(process.env.OLLAMA_NUM_PREDICT || 400);
+const OLLAMA_NUM_PREDICT = Number(process.env.OLLAMA_NUM_PREDICT || 220);
+const OLLAMA_PROMPT_MAX_CHARS = Number(process.env.OLLAMA_PROMPT_MAX_CHARS || 6000);
 
 const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 8), 6);
 const MAX_STORED_MESSAGES = 100;
@@ -1036,6 +1037,7 @@ const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext 
 const callOllamaGenerate = async ({ prompt, model = OLLAMA_CHAT_MODEL }) => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
+  const trimmedPrompt = String(prompt || "").slice(0, OLLAMA_PROMPT_MAX_CHARS);
 
   try {
     const response = await fetch(OLLAMA_API_URL, {
@@ -1045,7 +1047,7 @@ const callOllamaGenerate = async ({ prompt, model = OLLAMA_CHAT_MODEL }) => {
       },
       body: JSON.stringify({
         model,
-        prompt,
+        prompt: trimmedPrompt,
         stream: false,
         options: {
           temperature: OLLAMA_TEMPERATURE,
