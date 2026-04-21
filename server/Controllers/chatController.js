@@ -1113,6 +1113,7 @@ const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextua
       );
 
       const responseText = await response.text();
+      console.log("Gemini full response:", response.status, responseText.slice(0, 500));
       console.log("Gemini status:", response.status, responseText.slice(0, 200));
       const data = JSON.parse(responseText);
       const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
