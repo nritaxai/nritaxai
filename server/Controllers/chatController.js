@@ -1081,35 +1081,37 @@ const callOllamaGenerate = async ({ prompt, model = OLLAMA_CHAT_MODEL }) => {
 };
 
 const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
-  const prompt = buildGemmaPrompt({
-    selectedLanguage,
-    contextualMessages,
-    hiddenContext,
-  });
+  const prompt = buildGemmaPrompt({ selectedLanguage, contextualMessages, hiddenContext });
 
-  // Use Gemini as primary if enabled.
-  if (USE_GEMINI_PRIMARY && GEMINI_API_KEY) {
+  // Try Ollama first
+  try {
+    return await callOllamaGenerate({ prompt, model });
+  } catch (ollamaError) {
+    console.warn("Ollama failed, falling back to Gemini:", ollamaError?.message);
+
+    // Fallback to Gemini
+    const geminiKey = process.env.GEMINI_API_KEY;
+    if (!geminiKey) throw ollamaError;
+
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 800 },
-        }),
+          generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
+        })
       }
     );
 
     const data = await response.json();
-    return data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  }
+    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-  // Fallback to Ollama.
-  return callOllamaGenerate({
-    model,
-    prompt,
-  });
+    if (!reply) throw new Error("Gemini also failed");
+
+    return reply;
+  }
 };
 
 const syncSessionStores = async ({
