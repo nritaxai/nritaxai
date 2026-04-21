@@ -18,6 +18,7 @@ import { generateChatResponse } from "../Config/openaiService.js";
 
 const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api/generate";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const USE_GEMINI_PRIMARY =
   GEMINI_API_KEY && String(process.env.USE_GEMINI_PRIMARY || "false") === "true";
 const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "gemma:2b";
@@ -1107,10 +1108,13 @@ const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextua
       console.log("Gemini key present:", !!process.env.GEMINI_API_KEY);
 
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": geminiKey,
+          },
           body: JSON.stringify({
             contents: [{
               role: "user",
@@ -1512,10 +1516,13 @@ export const chatWithAI = async (req, res) => {
 
     try {
       const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": process.env.GEMINI_API_KEY,
+          },
           body: JSON.stringify({
             contents: [
               {
