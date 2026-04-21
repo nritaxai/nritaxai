@@ -110,6 +110,10 @@ const TAX_TOPIC_KEYWORDS = [
   "repatriation",
   "nre",
   "nro",
+  "nre account",
+  "nro account",
+  "fcnr",
+  "resident foreign currency",
   "fema",
   "section 195",
   "section 194",
@@ -128,6 +132,8 @@ const BASIC_RAG_CONTEXT = {
     "NRI taxability in India depends on residential status, source of income, and whether income accrues or arises in India.",
     "Typical NRI taxable items in India include salary for services rendered in India, rental income from Indian property, capital gains on Indian assets, and some interest income.",
     "Return filing may still be required even when TDS is deducted, especially when claiming refunds, treaty relief, losses, or exemptions.",
+    "NRE and NRO accounts are valid NRI tax-related topics because taxability, TDS, interest exemptions, and repatriation rules differ between them.",
+    "Interest on NRE accounts is generally exempt in India for eligible NRIs, while NRO account interest is generally taxable in India and may be subject to TDS.",
   ],
   tds: [
     "TDS is tax deducted at source and may apply to salary, rent, interest, property sale proceeds, professional fees, and many cross-border payments.",
@@ -196,6 +202,7 @@ const QUERY_EXPANSIONS = {
   resident: ["tax resident", "residency status"],
   nre: ["non resident external"],
   nro: ["non resident ordinary"],
+  fcnr: ["foreign currency non resident", "fcnr account"],
 };
 
 const compact = (text = "") => text.toLowerCase().replace(/[^a-z0-9]/g, "");

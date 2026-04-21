@@ -24,6 +24,7 @@ test("buildHiddenContextFromMatches limits retrieved context size for faster cha
 
 test("isTaxRelatedQuery allows NRI tax questions and blocks unrelated questions", () => {
   assert.equal(isTaxRelatedQuery("How does DTAA apply to NRI rental income from India?"), true);
+  assert.equal(isTaxRelatedQuery("What's the difference between NRO and NRE accounts?"), true);
   assert.equal(isTaxRelatedQuery("Write me an Instagram caption for my vacation"), false);
   assert.equal(
     NON_TAX_QUERY_REPLY,
