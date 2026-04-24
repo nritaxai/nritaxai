@@ -1,6 +1,6 @@
 import express from 'express';
 import {
-  appleLogin,
+  appleAuthController,
   changePassword,
   deleteAccount,
   forgotPassword,
@@ -29,7 +29,7 @@ router.post("/forgot-password", authRateLimiter, forgotPassword);
 router.post("/reset-password", authRateLimiter, resetPassword);
 
 router.post("/google-login", authRateLimiter, googleLogin);
-router.post("/apple", authRateLimiter, appleLogin);
+router.post("/apple", authRateLimiter, appleAuthController);
 router.post("/linkedin", authRateLimiter, linkedinLogin);
 router.get("/linkedin", authRateLimiter, startLinkedInAuth);
 router.get("/linkedin/callback", linkedinCallback);

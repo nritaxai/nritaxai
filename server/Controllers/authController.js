@@ -485,6 +485,58 @@ const toSafeUser = (userDoc) => {
   };
 };
 
+const toAppleAuthResponseUser = (userDoc) => {
+  const safeUser = toSafeUser(userDoc);
+  if (!safeUser) return null;
+
+  return {
+    email: safeUser.email,
+    name: safeUser.name,
+    _id: safeUser._id,
+    provider: safeUser.provider,
+    profileImage: safeUser.profileImage,
+  };
+};
+
+const getAppleAuthErrorStatus = (error) => {
+  const message = String(error?.message || "").toLowerCase();
+
+  if (
+    message.includes("missing apple identity token") ||
+    message.includes("apple token subject missing") ||
+    message.includes("apple user email missing") ||
+    message.includes("invalid jwt format")
+  ) {
+    return 400;
+  }
+
+  if (
+    message.includes("invalid apple token") ||
+    message.includes("apple token expired") ||
+    message.includes("apple signing key not found") ||
+    message.includes("unexpected apple token algorithm") ||
+    message.includes("invalid apple token signature")
+  ) {
+    return 401;
+  }
+
+  if (
+    message.includes("apple client id is not configured") ||
+    message.includes("missing apple client secret configuration")
+  ) {
+    return 500;
+  }
+
+  if (
+    error?.name === "ValidationError" ||
+    error?.name === "CastError"
+  ) {
+    return 400;
+  }
+
+  return 500;
+};
+
 // -------------------------------- Google Login --------------------------------------------------------------
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -577,10 +629,14 @@ export const appleLogin = async (req, res) => {
     const authorizationCode = sanitizeString(req.body?.authorizationCode || req.body?.code);
     let identityToken = sanitizeString(req.body?.identityToken || req.body?.idToken || req.body?.id_token);
     const appleUser = typeof req.body?.user === "object" && req.body?.user !== null ? req.body.user : null;
+    const fullNameValue = req.body?.fullName;
     const fullName =
-      typeof req.body?.fullName === "object" && req.body?.fullName !== null
-        ? req.body.fullName
+      typeof fullNameValue === "object" && fullNameValue !== null
+        ? fullNameValue
         : appleUser?.name || {};
+    const providedFullName = sanitizeString(
+      typeof fullNameValue === "string" ? fullNameValue : req.body?.name
+    );
 
     if (!identityToken && authorizationCode) {
       const exchangeResult = await exchangeAppleAuthorizationCode(authorizationCode);
@@ -588,15 +644,12 @@ export const appleLogin = async (req, res) => {
     }
 
     if (!identityToken) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing Apple identity token",
-      });
+      throw new Error("Missing Apple identity token");
     }
 
     const payload = await verifyAppleIdentityToken(identityToken);
     const appleId = String(payload.sub);
-    const email = sanitizeEmail(payload.email);
+    const email = sanitizeEmail(payload.email || req.body?.email);
 
     let user = null;
 
@@ -617,7 +670,7 @@ export const appleLogin = async (req, res) => {
       const fallbackName = [parsedFirstName, parsedLastName].filter(Boolean).join(" ");
 
       user = await User.create({
-        name: fallbackName || providedName || "Apple User",
+        name: fallbackName || providedFullName || providedName || "Apple User",
         email: email || `apple_${appleId}@privaterelay.appleid.com`,
         appleId,
         provider: "apple",
@@ -635,19 +688,22 @@ export const appleLogin = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Apple login successful",
-      user: toSafeUser(user),
       token,
+      user: toAppleAuthResponseUser(user),
+      profile: toSafeUser(user),
+      message: "Apple login successful",
     });
   } catch (error) {
     logAuthError("apple-login", error);
-    return res.status(401).json({
+    return res.status(getAppleAuthErrorStatus(error)).json({
       success: false,
       message: "Apple authentication failed",
       error: error?.message || "Unknown Apple authentication error",
     });
   }
 };
+
+export const appleAuthController = appleLogin;
 
 
 // -------------------------------- Register --------------------------------------------------------------
