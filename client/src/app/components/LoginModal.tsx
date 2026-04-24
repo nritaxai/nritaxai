@@ -29,7 +29,7 @@ import {
 } from "../../config/appConfig";
 import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
-import { API_URL } from "../../utils/api";
+import { signInWithNativeGoogle } from "../../services/googleSignIn";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -86,12 +86,21 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
 
       const authUrl = new URL("/auth/linkedin", `${LINKEDIN_AUTH_CONFIG.authBaseUrl}/`);
       authUrl.searchParams.set("mode", mode);
-      authUrl.searchParams.set("origin", window.location.origin);
+      const authOrigin = IS_ANDROID_NATIVE_APP ? NATIVE_APP_CALLBACK_URL : window.location.origin;
+      authUrl.searchParams.set("origin", authOrigin);
 
       console.info("[auth] starting LinkedIn auth", {
         mode,
-        origin: window.location.origin,
+        origin: authOrigin,
       });
+
+      if (IS_ANDROID_NATIVE_APP) {
+        const openedWindow = window.open(authUrl.toString(), "_blank", "noopener,noreferrer");
+        if (!openedWindow) {
+          window.location.href = authUrl.toString();
+        }
+        return;
+      }
 
       window.location.href = authUrl.toString();
     } catch (error: any) {
@@ -99,17 +108,29 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     }
   };
 
-  const handleGoogleNativeAuth = (mode: "login" | "signup") => {
+  const handleGoogleNativeAuth = async (mode: "login" | "signup") => {
     try {
-      const authUrl = new URL("/api/auth/google", `${API_URL}/`);
-      authUrl.searchParams.set("mode", mode);
-      authUrl.searchParams.set("origin", NATIVE_APP_CALLBACK_URL);
-      const openedWindow = window.open(authUrl.toString(), "_blank", "noopener,noreferrer");
-      if (!openedWindow) {
-        window.location.href = authUrl.toString();
-      }
+      setLoginError(null);
+      setSignupError(null);
+      setLoading(true);
+      const response = await signInWithNativeGoogle();
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(
+        response,
+        mode === "signup"
+          ? `Account created successfully! WELCOME ${user?.name || "User"}`
+          : `WELCOME ${user?.name || "User"}!`
+      );
     } catch (error: any) {
-      showPopup(getApiErrorMessage(error, "Google Sign-In could not start."), "error");
+      const message = getApiErrorMessage(error, "Google Sign-In could not start.");
+      if (mode === "signup") {
+        setSignupError(message);
+      } else {
+        setLoginError(message);
+      }
+      showPopup(message, "error");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -451,7 +472,8 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                           type="button"
                           variant="outline"
                           className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                          onClick={() => handleGoogleNativeAuth("login")}
+                          disabled={loading}
+                          onClick={() => void handleGoogleNativeAuth("login")}
                         >
                           Sign in with Google
                         </Button>
@@ -614,7 +636,8 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                           type="button"
                           variant="outline"
                           className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
-                          onClick={() => handleGoogleNativeAuth("signup")}
+                          disabled={loading}
+                          onClick={() => void handleGoogleNativeAuth("signup")}
                         >
                           Sign up with Google
                         </Button>

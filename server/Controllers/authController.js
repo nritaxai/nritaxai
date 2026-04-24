@@ -583,7 +583,7 @@ const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 export const googleLogin = async (req, res) => {
   try {
-    const { credential } = req.body;
+    const credential = sanitizeString(req.body?.credential || req.body?.idToken);
 
     if (!credential) {
       return res.status(400).json({
@@ -1017,9 +1017,9 @@ export const startLinkedInAuth = async (req, res) => {
     }
 
     const mode = sanitizeString(req.query?.mode) === "signup" ? "signup" : "login";
-    const frontendOrigin = resolveFrontendOrigin(req.query?.origin);
+    const returnTarget = resolveAuthReturnTarget(req.query?.origin);
     const redirectUri = getLinkedInCallbackUri(req);
-    const state = encodeLinkedInState({ mode, frontendOrigin });
+    const state = encodeLinkedInState({ mode, returnTarget });
     const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", clientId);
@@ -1039,13 +1039,13 @@ export const startLinkedInAuth = async (req, res) => {
 
 export const linkedinCallback = async (req, res) => {
   const statePayload = decodeLinkedInState(req.query?.state);
-  const frontendOrigin = resolveFrontendOrigin(statePayload?.frontendOrigin);
+  const returnTarget = resolveAuthReturnTarget(statePayload?.returnTarget);
   const mode = statePayload?.mode === "signup" ? "signup" : "login";
   try {
     const errorMessage = sanitizeString(req.query?.error_description || req.query?.error);
     if (errorMessage) {
       return res.redirect(
-        buildFrontendAuthRedirect(frontendOrigin, {
+        buildAuthRedirect(returnTarget, {
           auth_provider: "linkedin",
           auth_mode: mode,
           auth_error: errorMessage,
@@ -1062,7 +1062,7 @@ export const linkedinCallback = async (req, res) => {
     const { token, user } = await completeLinkedInLogin({ code, redirectUri });
 
     return res.redirect(
-      buildFrontendAuthRedirect(frontendOrigin, {
+      buildAuthRedirect(returnTarget, {
         auth_provider: "linkedin",
         auth_mode: mode,
         token,
@@ -1072,7 +1072,7 @@ export const linkedinCallback = async (req, res) => {
   } catch (error) {
     logAuthError("linkedin-callback", error);
     return res.redirect(
-      buildFrontendAuthRedirect(frontendOrigin, {
+      buildAuthRedirect(returnTarget, {
         auth_provider: "linkedin",
         auth_mode: mode,
         auth_error: error?.message || "LinkedIn authentication failed",

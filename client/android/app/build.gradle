@@ -1,14 +1,36 @@
 apply plugin: 'com.android.application'
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('key.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
-    namespace = "www.nritaxai.com"
-    compileSdk = rootProject.ext.compileSdkVersion
+    // Reverse-domain notation keeps the Android namespace globally unique for Play Store publishing.
+    namespace = "com.nritaxai.app"
+    // Updated to 36 — required by androidx.core:1.17.0
+    // and androidx.activity:1.11.0
+    compileSdk = 36
+    signingConfigs {
+        release {
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+        }
+    }
     defaultConfig {
-        applicationId "www.nritaxai.com"
-        minSdkVersion rootProject.ext.minSdkVersion
-        targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Reverse-domain notation keeps the Android application id globally unique for Play Store publishing.
+        applicationId "com.nritaxai.app"
+        // Lowest Android version allowed to install the app. Supports Android 7.0+
+        minSdkVersion 24
+        // Android API level the app is tested and optimized against.
+        targetSdkVersion 36
+        // INCREMENT THIS before every Play Store release
+        versionCode 6
+        // Human-readable version shown to users and in Play Console.
+        versionName "1.0.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -18,8 +40,10 @@ android {
     }
     buildTypes {
         release {
+            // Reads credentials from android/key.properties (not committed to Git)
+            signingConfig signingConfigs.release
             minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }

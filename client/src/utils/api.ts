@@ -1,6 +1,6 @@
 import axios from "axios";
 import { API_BASE_URL } from "../config/api";
-import { BANNER_API_BASE_URL } from "../config/appConfig";
+import { API_FALLBACK_BASE_URLS, BANNER_API_BASE_URL } from "../config/appConfig";
 
 export const API_URL = API_BASE_URL;
 export const buildApiUrl = (path: string) => `${API_URL}${path}`;
@@ -26,6 +26,26 @@ const apiClient = axios.create({
   withCredentials: true,
 });
 
+const getNetworkFallbackError = async (method: string, path: string, payload?: unknown) => {
+  const fallbackBaseUrl = API_FALLBACK_BASE_URLS[0];
+  if (!fallbackBaseUrl) return null;
+
+  try {
+    console.info(`[api:${method}] retrying ${path} via fallback base URL`, { fallbackBaseUrl });
+    const response = await apiClient.request({
+      method,
+      url: path,
+      data: payload,
+      baseURL: fallbackBaseUrl,
+      headers: getAuthHeaders(),
+    });
+    return response.data;
+  } catch (fallbackError: any) {
+    logClientApiError(method, `${fallbackBaseUrl}${path}`, fallbackError);
+    return null;
+  }
+};
+
 const logClientApiError = (method: string, path: string, error: any) => {
   const status = error?.response?.status || "NO_RESPONSE";
   const message = error?.response?.data?.message || error?.message || "Unknown error";
@@ -39,6 +59,10 @@ const postRequest = async (path: string, payload: unknown) => {
     });
     return response.data;
   } catch (error: any) {
+    if (!error?.response && error?.code === "ERR_NETWORK") {
+      const fallbackResponse = await getNetworkFallbackError("POST", path, payload);
+      if (fallbackResponse) return fallbackResponse;
+    }
     logClientApiError("POST", path, error);
     throw error;
   }
@@ -51,6 +75,10 @@ const getRequest = async (path: string) => {
     });
     return response.data;
   } catch (error: any) {
+    if (!error?.response && error?.code === "ERR_NETWORK") {
+      const fallbackResponse = await getNetworkFallbackError("GET", path);
+      if (fallbackResponse) return fallbackResponse;
+    }
     logClientApiError("GET", path, error);
     throw error;
   }
@@ -63,6 +91,10 @@ const putRequest = async (path: string, payload: unknown) => {
     });
     return response.data;
   } catch (error: any) {
+    if (!error?.response && error?.code === "ERR_NETWORK") {
+      const fallbackResponse = await getNetworkFallbackError("PUT", path, payload);
+      if (fallbackResponse) return fallbackResponse;
+    }
     logClientApiError("PUT", path, error);
     throw error;
   }
@@ -75,6 +107,10 @@ const deleteRequest = async (path: string) => {
     });
     return response.data;
   } catch (error: any) {
+    if (!error?.response && error?.code === "ERR_NETWORK") {
+      const fallbackResponse = await getNetworkFallbackError("DELETE", path);
+      if (fallbackResponse) return fallbackResponse;
+    }
     logClientApiError("DELETE", path, error);
     throw error;
   }
@@ -100,8 +136,13 @@ export const resetPassword = async (payload: {
   return postRequest("/api/auth/reset-password", payload);
 };
 
-export const googleLoginUser = async (credential: string) => {
-  return postRequest("/api/auth/google-login", { credential });
+export const googleLoginUser = async (
+  payload: string | { credential?: string; idToken?: string }
+) => {
+  return postRequest(
+    "/api/auth/google-login",
+    typeof payload === "string" ? { credential: payload } : payload
+  );
 };
 
 export const appleLoginUser = async (payload: {
