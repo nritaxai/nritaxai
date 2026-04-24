@@ -300,7 +300,7 @@ const buildAuthRedirect = (returnTarget, params = {}) => {
 };
 
 const getGoogleCallbackUri = (req) =>
-  sanitizeString(process.env.GOOGLE_REDIRECT_URI) || `${req.protocol}://${req.get("host")}/auth/google/callback`;
+  sanitizeString(process.env.GOOGLE_REDIRECT_URI) || `${req.protocol}://${req.get("host")}/api/auth/google/callback`;
 
 const getGoogleOAuthClient = (req) =>
   new OAuth2Client(

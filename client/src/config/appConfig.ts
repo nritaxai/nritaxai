@@ -1,26 +1,67 @@
 import { Capacitor } from "@capacitor/core";
 
-const PROD_API_URL_DEFAULT = "https://nritax.ai";
+const PROD_API_URL_DEFAULT = "https://api.nritax.ai";
 const DEV_API_URL_DEFAULT = "http://localhost:5000";
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
+const ANDROID_EMULATOR_LOOPBACK_HOST = "10.0.2.2";
 
 const envApiUrl = String(import.meta.env.VITE_API_URL || "").trim();
 const envProdApiUrl = String(import.meta.env.VITE_API_URL_PROD || "").trim();
 const envDevApiUrl = String(import.meta.env.VITE_API_URL_DEV || "").trim();
+const envAndroidEmulatorApiUrl = String(import.meta.env.VITE_ANDROID_EMULATOR_API_URL || "").trim();
+const envUseAndroidEmulatorApi = String(import.meta.env.VITE_USE_ANDROID_EMULATOR_API || "").trim() === "true";
 const envBannerApiUrl = String(import.meta.env.VITE_BANNER_API_URL || "").trim();
 const envLinkedInAuthBaseUrl = String(import.meta.env.VITE_LINKEDIN_AUTH_BASE_URL || "").trim();
 
 export const IS_NATIVE_APP = Capacitor.isNativePlatform();
 export const PLATFORM = Capacitor.getPlatform();
 export const IS_IOS_NATIVE_APP = IS_NATIVE_APP && PLATFORM === "ios";
+export const IS_ANDROID_NATIVE_APP = IS_NATIVE_APP && PLATFORM === "android";
 export const IOS_EXTERNAL_PURCHASES_DISABLED = IS_IOS_NATIVE_APP;
+export const NATIVE_APP_CALLBACK_URL = "com.nritaxai.app://auth/callback";
 
-const resolvedProdApiUrl = normalizeUrl(envProdApiUrl || PROD_API_URL_DEFAULT);
-const resolvedDevApiUrl = normalizeUrl(envDevApiUrl || DEV_API_URL_DEFAULT);
+const rewriteNativeLocalhostUrl = (value: string) => {
+  if (!value) return value;
 
-export const API_BASE_URL = normalizeUrl(
-  envApiUrl || (import.meta.env.DEV && !IS_NATIVE_APP ? resolvedDevApiUrl : resolvedProdApiUrl)
+  try {
+    const parsed = new URL(value);
+    const isLoopbackHost = parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1";
+
+    if (IS_NATIVE_APP && PLATFORM === "android" && isLoopbackHost) {
+      parsed.hostname = ANDROID_EMULATOR_LOOPBACK_HOST;
+      return normalizeUrl(parsed.toString());
+    }
+
+    return normalizeUrl(parsed.toString());
+  } catch {
+    return normalizeUrl(value);
+  }
+};
+
+const resolvedProdApiUrl = rewriteNativeLocalhostUrl(envProdApiUrl || PROD_API_URL_DEFAULT);
+const resolvedDevApiUrl = rewriteNativeLocalhostUrl(envDevApiUrl || DEV_API_URL_DEFAULT);
+const resolvedAndroidEmulatorApiUrl = rewriteNativeLocalhostUrl(
+  envAndroidEmulatorApiUrl || resolvedDevApiUrl
+);
+const shouldUseAndroidEmulatorApi =
+  IS_NATIVE_APP && PLATFORM === "android" && envUseAndroidEmulatorApi && Boolean(envAndroidEmulatorApiUrl);
+
+export const API_BASE_URL = rewriteNativeLocalhostUrl(
+  envApiUrl ||
+    (shouldUseAndroidEmulatorApi
+      ? resolvedAndroidEmulatorApiUrl
+      : import.meta.env.DEV && !IS_NATIVE_APP
+        ? resolvedDevApiUrl
+        : resolvedProdApiUrl)
+);
+
+export const API_FALLBACK_BASE_URLS = Array.from(
+  new Set(
+    shouldUseAndroidEmulatorApi && resolvedAndroidEmulatorApiUrl !== API_BASE_URL
+      ? [resolvedAndroidEmulatorApiUrl]
+      : []
+  )
 );
 
 const getBannerOrigin = () => {

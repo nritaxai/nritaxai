@@ -22,11 +22,14 @@ import {
 import {
   APPLE_AUTH_CONFIG,
   GOOGLE_AUTH_CONFIG,
+  IS_ANDROID_NATIVE_APP,
   IS_IOS_NATIVE_APP,
   LINKEDIN_AUTH_CONFIG,
+  NATIVE_APP_CALLBACK_URL,
 } from "../../config/appConfig";
 import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
+import { API_URL } from "../../utils/api";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -62,7 +65,7 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     type: "success" | "error";
   } | null>(null);
 
-  const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId) && !IS_IOS_NATIVE_APP;
+  const canUseGoogleAuth = (IS_ANDROID_NATIVE_APP || Boolean(GOOGLE_AUTH_CONFIG.clientId)) && !IS_IOS_NATIVE_APP;
   const canUseLinkedInAuth =
     Boolean(LINKEDIN_AUTH_CONFIG.clientId && LINKEDIN_AUTH_CONFIG.authBaseUrl) && !IS_IOS_NATIVE_APP;
   const canUseAppleAuth = APPLE_AUTH_CONFIG.isConfigured;
@@ -93,6 +96,20 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
       window.location.href = authUrl.toString();
     } catch (error: any) {
       showPopup(getApiErrorMessage(error, "LinkedIn Sign-In could not start."), "error");
+    }
+  };
+
+  const handleGoogleNativeAuth = (mode: "login" | "signup") => {
+    try {
+      const authUrl = new URL("/api/auth/google", `${API_URL}/`);
+      authUrl.searchParams.set("mode", mode);
+      authUrl.searchParams.set("origin", NATIVE_APP_CALLBACK_URL);
+      const openedWindow = window.open(authUrl.toString(), "_blank", "noopener,noreferrer");
+      if (!openedWindow) {
+        window.location.href = authUrl.toString();
+      }
+    } catch (error: any) {
+      showPopup(getApiErrorMessage(error, "Google Sign-In could not start."), "error");
     }
   };
 
@@ -429,30 +446,41 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                   ) : null}
                   {canUseGoogleAuth ? (
                     <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
-                      <GoogleLogin
-                        text="signin_with"
-                        {...googleButtonProps}
-                        onSuccess={async (credentialResponse) => {
-                          try {
-                            if (!credentialResponse.credential) {
-                              throw new Error("Missing Google credential.");
+                      {IS_ANDROID_NATIVE_APP ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                          onClick={() => handleGoogleNativeAuth("login")}
+                        >
+                          Sign in with Google
+                        </Button>
+                      ) : (
+                        <GoogleLogin
+                          text="signin_with"
+                          {...googleButtonProps}
+                          onSuccess={async (credentialResponse) => {
+                            try {
+                              if (!credentialResponse.credential) {
+                                throw new Error("Missing Google credential.");
+                              }
+                              const response = await googleLoginUser(credentialResponse.credential);
+                              const user = resolveAuthUser(response);
+                              handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
+                            } catch (error: any) {
+                              const message = getApiErrorMessage(error, "Google login failed.");
+                              console.error("[auth] google login failed", { message });
+                              setLoginError(message);
+                              showPopup(message, "error");
                             }
-                            const response = await googleLoginUser(credentialResponse.credential);
-                            const user = resolveAuthUser(response);
-                            handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
-                          } catch (error: any) {
-                            const message = getApiErrorMessage(error, "Google login failed.");
-                            console.error("[auth] google login failed", { message });
+                          }}
+                          onError={() => {
+                            const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setLoginError(message);
-                            showPopup(message, "error");
-                          }
-                        }}
-                        onError={() => {
-                          const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
-                          setLoginError(message);
-                          showPopup(message, "error", 4000);
-                        }}
-                      />
+                            showPopup(message, "error", 4000);
+                          }}
+                        />
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -581,33 +609,44 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                   ) : null}
                   {canUseGoogleAuth ? (
                     <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
-                      <GoogleLogin
-                        text="signup_with"
-                        {...googleButtonProps}
-                        onSuccess={async (credentialResponse) => {
-                          try {
-                            if (!credentialResponse.credential) {
-                              throw new Error("Missing Google credential.");
+                      {IS_ANDROID_NATIVE_APP ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                          onClick={() => handleGoogleNativeAuth("signup")}
+                        >
+                          Sign up with Google
+                        </Button>
+                      ) : (
+                        <GoogleLogin
+                          text="signup_with"
+                          {...googleButtonProps}
+                          onSuccess={async (credentialResponse) => {
+                            try {
+                              if (!credentialResponse.credential) {
+                                throw new Error("Missing Google credential.");
+                              }
+                              const response = await googleLoginUser(credentialResponse.credential);
+                              const user = resolveAuthUser(response);
+                              handleAuthSuccess(
+                                response,
+                                `Account created successfully! WELCOME ${user?.name || "User"}`
+                              );
+                            } catch (error: any) {
+                              const message = getApiErrorMessage(error, "Google signup failed.");
+                              console.error("[auth] google signup failed", { message });
+                              setSignupError(message);
+                              showPopup(message, "error");
                             }
-                            const response = await googleLoginUser(credentialResponse.credential);
-                            const user = resolveAuthUser(response);
-                            handleAuthSuccess(
-                              response,
-                              `Account created successfully! WELCOME ${user?.name || "User"}`
-                            );
-                          } catch (error: any) {
-                            const message = getApiErrorMessage(error, "Google signup failed.");
-                            console.error("[auth] google signup failed", { message });
+                          }}
+                          onError={() => {
+                            const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setSignupError(message);
-                            showPopup(message, "error");
-                          }
-                        }}
-                        onError={() => {
-                          const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
-                          setSignupError(message);
-                          showPopup(message, "error", 4000);
-                        }}
-                      />
+                            showPopup(message, "error", 4000);
+                          }}
+                        />
+                      )}
                     </div>
                   ) : null}
                 </div>

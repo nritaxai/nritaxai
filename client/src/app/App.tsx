@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState, useEffect, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
 import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { WifiOff } from "lucide-react";
+import { App as CapacitorApp } from "@capacitor/app";
 
 import { Header } from "./components/Header";
 import NewsTicker from "./components/NewsTicker";
@@ -9,12 +10,14 @@ import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
 import { TigerBotAvatar } from "./components/TigerBotAvatar";
 import { Button } from "./components/ui/button";
+import { Toaster } from "./components/ui/sonner";
 import { Chat } from "./pages/Chat";
 import { Home } from "./pages/Home";
 import { HeroPage } from "./pages/HeroPage";
 import { Pricing } from "./pages/Pricing";
-import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { buildApiUrl, getStoredAuthToken } from "../utils/api";
+import { PrivacyPolicy } from "../pages/PrivacyPolicy";
+import { IS_NATIVE_APP } from "../config/appConfig";
 const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
@@ -64,6 +67,62 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const routeContentRef = useRef<HTMLDivElement>(null);
+
+  const handleNativeAuthCallback = (url: string) => {
+    try {
+      const parsed = new URL(url);
+      const provider = parsed.searchParams.get("auth_provider");
+      if (provider !== "google" && provider !== "linkedin") return;
+      finalizeSocialAuth(parsed.searchParams, provider);
+    } catch (error) {
+      console.error("[auth] failed to parse native callback", error);
+    }
+  };
+
+  const finalizeSocialAuth = (params: URLSearchParams, provider: "google" | "linkedin") => {
+    const authError = params.get("auth_error");
+    const token = params.get("token");
+    const encodedUser = params.get("user");
+    const authMode = params.get("auth_mode") === "signup" ? "signup" : "login";
+
+    if (authError) {
+      sessionStorage.setItem("auth_popup", decodeURIComponent(authError));
+      navigate("/home", { replace: true });
+      return;
+    }
+
+    if (!token || !encodedUser) {
+      sessionStorage.setItem(
+        "auth_popup",
+        provider === "google" ? "Google authentication failed" : "LinkedIn authentication failed"
+      );
+      navigate("/home", { replace: true });
+      return;
+    }
+
+    try {
+      const user = JSON.parse(encodedUser);
+      localStorage.setItem("token", token);
+      localStorage.setItem("user", JSON.stringify(user));
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("auth-changed"));
+      setIsAuthenticated(true);
+      sessionStorage.setItem(
+        "auth_popup",
+        authMode === "signup"
+          ? `Account created successfully! WELCOME ${user?.name || "User"}!`
+          : `WELCOME ${user?.name || "User"}!`
+      );
+    } catch (error) {
+      console.error(`[${provider}-auth] failed to hydrate auth result`, error);
+      sessionStorage.setItem(
+        "auth_popup",
+        provider === "google" ? "Google authentication failed" : "LinkedIn authentication failed"
+      );
+    }
+
+    navigate("/home", { replace: true });
+  };
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -118,6 +177,24 @@ export default function App() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!IS_NATIVE_APP) return;
+
+    void CapacitorApp.getLaunchUrl().then((launch) => {
+      if (launch?.url) {
+        handleNativeAuthCallback(launch.url);
+      }
+    });
+
+    const listenerPromise = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      handleNativeAuthCallback(url);
+    });
+
+    return () => {
+      void listenerPromise.then((listener) => listener.remove());
+    };
+  }, [navigate]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -254,43 +331,9 @@ export default function App() {
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    if (params.get("auth_provider") !== "linkedin") return;
-
-    const authError = params.get("auth_error");
-    const token = params.get("token");
-    const encodedUser = params.get("user");
-    const authMode = params.get("auth_mode") === "signup" ? "signup" : "login";
-
-    if (authError) {
-      sessionStorage.setItem("auth_popup", decodeURIComponent(authError));
-      navigate("/home", { replace: true });
-      return;
-    }
-
-    if (!token || !encodedUser) {
-      navigate("/home", { replace: true });
-      return;
-    }
-
-    try {
-      const user = JSON.parse(encodedUser);
-      localStorage.setItem("token", token);
-      localStorage.setItem("user", JSON.stringify(user));
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("auth-changed"));
-      setIsAuthenticated(true);
-      sessionStorage.setItem(
-        "auth_popup",
-        authMode === "signup"
-          ? `Account created successfully! WELCOME ${user?.name || "User"}!`
-          : `WELCOME ${user?.name || "User"}!`
-      );
-    } catch (error) {
-      console.error("[linkedin-auth] failed to hydrate auth result", error);
-      sessionStorage.setItem("auth_popup", "LinkedIn authentication failed");
-    }
-
-    navigate("/home", { replace: true });
+    const provider = params.get("auth_provider");
+    if (provider !== "linkedin" && provider !== "google") return;
+    finalizeSocialAuth(params, provider);
   }, [location.search, navigate]);
 
   useLayoutEffect(() => {
@@ -391,7 +434,6 @@ export default function App() {
     "/consult",
     "/reschedule",
     "/cancel",
-    "/privacy-policy",
     "/about-us",
     "/terms-and-conditions",
     "/refund-policy",
@@ -471,6 +513,7 @@ export default function App() {
       )}
 
       {successPopup && <AuthPopup message={successPopup} type="success" />}
+      <Toaster position="top-right" richColors />
 
       {showPromoUpgradePrompt ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0F172A]/55 px-4">
