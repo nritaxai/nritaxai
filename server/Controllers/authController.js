@@ -19,6 +19,8 @@ const APPLE_TOKEN_ENDPOINT = "https://appleid.apple.com/auth/token";
 const LINKEDIN_TOKEN_ENDPOINT = "https://www.linkedin.com/oauth/v2/accessToken";
 const LINKEDIN_USERINFO_ENDPOINT = "https://api.linkedin.com/v2/userinfo";
 const LINKEDIN_SCOPE = "openid profile email";
+const GOOGLE_SCOPE = "openid email profile";
+const NATIVE_GOOGLE_CALLBACK_PREFIX = "com.nritaxai.app://auth/callback";
 let appleSigningKeysCache = { keys: [], fetchedAt: 0 };
 
 const logAuthError = (action, error, context = {}) => {
@@ -224,7 +226,14 @@ const getAllowedFrontendOrigins = () =>
         sanitizeString(process.env.APP_URL),
         "https://www.nritax.ai",
         "https://nritax.ai",
+        "https://localhost",
+        "https://127.0.0.1",
+        "http://localhost",
+        "http://127.0.0.1",
         "http://localhost:5173",
+        "https://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://127.0.0.1:5173",
       ].filter(Boolean)
     )
   );
@@ -236,6 +245,16 @@ const resolveFrontendOrigin = (requestedOrigin) => {
     return normalizedRequestedOrigin;
   }
   return allowedOrigins[0] || "https://www.nritax.ai";
+};
+
+const isAllowedNativeCallback = (value) => sanitizeString(value).startsWith(NATIVE_GOOGLE_CALLBACK_PREFIX);
+
+const resolveAuthReturnTarget = (requestedOrigin) => {
+  const normalizedRequestedOrigin = sanitizeString(requestedOrigin).replace(/\/+$/, "");
+  if (isAllowedNativeCallback(normalizedRequestedOrigin)) {
+    return normalizedRequestedOrigin;
+  }
+  return resolveFrontendOrigin(normalizedRequestedOrigin);
 };
 
 const encodeLinkedInState = (payload) =>
@@ -264,6 +283,31 @@ const buildFrontendAuthRedirect = (frontendOrigin, params = {}) => {
   });
   return redirectUrl.toString();
 };
+
+const buildAuthRedirect = (returnTarget, params = {}) => {
+  if (isAllowedNativeCallback(returnTarget)) {
+    const redirectUrl = new URL(returnTarget);
+    redirectUrl.search = "";
+    redirectUrl.hash = "";
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        redirectUrl.searchParams.set(key, String(value));
+      }
+    });
+    return redirectUrl.toString();
+  }
+  return buildFrontendAuthRedirect(returnTarget, params);
+};
+
+const getGoogleCallbackUri = (req) =>
+  sanitizeString(process.env.GOOGLE_REDIRECT_URI) || `${req.protocol}://${req.get("host")}/auth/google/callback`;
+
+const getGoogleOAuthClient = (req) =>
+  new OAuth2Client(
+    sanitizeString(process.env.GOOGLE_CLIENT_ID),
+    sanitizeString(process.env.GOOGLE_CLIENT_SECRET) || undefined,
+    getGoogleCallbackUri(req)
+  );
 
 const completeLinkedInLogin = async ({ code, redirectUri }) => {
   const tokenResponse = await exchangeLinkedInAuthorizationCode({ code, redirectUri });
@@ -485,6 +529,54 @@ const toSafeUser = (userDoc) => {
   };
 };
 
+const completeGoogleLoginFromPayload = async (payload = {}) => {
+  const { sub, email, name, picture } = payload || {};
+  const normalizedEmail = sanitizeEmail(email);
+
+  if (!sub || !normalizedEmail) {
+    throw new Error("Google account is missing a verified email address.");
+  }
+
+  let user = await User.findOne({ email: normalizedEmail });
+  const isNewUser = !user;
+
+  if (!user) {
+    user = await User.create({
+      name,
+      email: normalizedEmail,
+      googleId: sub,
+      profileImage: picture,
+      provider: "google",
+    });
+  } else {
+    let changed = false;
+    if (!user.googleId) {
+      user.googleId = sub;
+      changed = true;
+    }
+    if (!user.profileImage && picture) {
+      user.profileImage = picture;
+      changed = true;
+    }
+    if (!user.provider || user.provider === "local") {
+      user.provider = "google";
+      changed = true;
+    }
+    if (changed) {
+      await user.save();
+    }
+  }
+
+  if (isNewUser) {
+    await ensureWelcomeEmailSent(user);
+  }
+
+  return {
+    token: generateToken(user._id),
+    user,
+  };
+};
+
 // -------------------------------- Google Login --------------------------------------------------------------
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
@@ -507,53 +599,7 @@ export const googleLogin = async (req, res) => {
     });
 
     const payload = ticket.getPayload();
-    const { sub, email, name, picture } = payload || {};
-    const normalizedEmail = sanitizeEmail(email);
-
-    if (!sub || !normalizedEmail) {
-      return res.status(400).json({
-        success: false,
-        message: "Google account is missing a verified email address.",
-      });
-    }
-
-    // Check if user already exists
-    let user = await User.findOne({ email: normalizedEmail });
-
-    const isNewUser = !user;
-
-    if (!user) {
-      // Create new Google user
-      user = await User.create({
-        name,
-        email: normalizedEmail,
-        googleId: sub,
-        profileImage: picture,
-        provider: "google",
-      });
-    } else {
-      let changed = false;
-      if (!user.googleId) {
-        user.googleId = sub;
-        changed = true;
-      }
-      if (!user.profileImage && picture) {
-        user.profileImage = picture;
-        changed = true;
-      }
-      if (!user.provider || user.provider === "local") {
-        user.provider = "google";
-        changed = true;
-      }
-      if (changed) {
-        await user.save();
-      }
-    }
-
-    if (isNewUser) {
-      await ensureWelcomeEmailSent(user);
-    }
-    const token = generateToken(user._id);
+    const { token, user } = await completeGoogleLoginFromPayload(payload);
 
     return res.status(200).json({
       success: true,
@@ -577,10 +623,13 @@ export const appleLogin = async (req, res) => {
     const authorizationCode = sanitizeString(req.body?.authorizationCode || req.body?.code);
     let identityToken = sanitizeString(req.body?.identityToken || req.body?.idToken || req.body?.id_token);
     const appleUser = typeof req.body?.user === "object" && req.body?.user !== null ? req.body.user : null;
+    const requestedEmail = sanitizeEmail(req.body?.email);
     const fullName =
       typeof req.body?.fullName === "object" && req.body?.fullName !== null
         ? req.body.fullName
         : appleUser?.name || {};
+    const fullNameText =
+      typeof req.body?.fullName === "string" ? sanitizeString(req.body.fullName) : "";
 
     if (!identityToken && authorizationCode) {
       const exchangeResult = await exchangeAppleAuthorizationCode(authorizationCode);
@@ -596,7 +645,7 @@ export const appleLogin = async (req, res) => {
 
     const payload = await verifyAppleIdentityToken(identityToken);
     const appleId = String(payload.sub);
-    const email = sanitizeEmail(payload.email);
+    const email = sanitizeEmail(payload.email) || requestedEmail;
 
     let user = null;
 
@@ -614,7 +663,7 @@ export const appleLogin = async (req, res) => {
       const parsedFirstName = sanitizeString(fullName?.firstName);
       const parsedLastName = sanitizeString(fullName?.lastName);
       const providedName = sanitizeString(req.body?.name);
-      const fallbackName = [parsedFirstName, parsedLastName].filter(Boolean).join(" ");
+      const fallbackName = [parsedFirstName, parsedLastName].filter(Boolean).join(" ") || fullNameText;
 
       user = await User.create({
         name: fallbackName || providedName || "Apple User",
@@ -622,10 +671,26 @@ export const appleLogin = async (req, res) => {
         appleId,
         provider: "apple",
       });
-    } else if (!user.appleId) {
-      user.appleId = appleId;
-      if (!user.provider || user.provider === "local") user.provider = "apple";
-      await user.save();
+    } else {
+      let changed = false;
+
+      if (!user.appleId) {
+        user.appleId = appleId;
+        changed = true;
+      }
+      if (!user.provider || user.provider === "local") {
+        user.provider = "apple";
+        changed = true;
+      }
+      if ((!user.name || user.name === "Apple User") && (fullNameText || fullName?.firstName || fullName?.lastName)) {
+        user.name =
+          [sanitizeString(fullName?.firstName), sanitizeString(fullName?.lastName)].filter(Boolean).join(" ") ||
+          fullNameText;
+        changed = true;
+      }
+      if (changed) {
+        await user.save();
+      }
     }
 
     if (isNewUser) {
@@ -636,15 +701,30 @@ export const appleLogin = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Apple login successful",
-      user: toSafeUser(user),
+      user: {
+        email: user.email,
+        name: user.name,
+      },
       token,
     });
   } catch (error) {
     logAuthError("apple-login", error);
-    return res.status(401).json({
+    const message = error?.message || "Unknown Apple authentication error";
+    const statusCode =
+      message.includes("Missing Apple identity token") || message.includes("authorization code")
+        ? 400
+        : message.includes("expired") ||
+            message.includes("issuer") ||
+            message.includes("audience") ||
+            message.includes("signature") ||
+            message.includes("subject")
+          ? 401
+          : 500;
+
+    return res.status(statusCode).json({
       success: false,
       message: "Apple authentication failed",
-      error: error?.message || "Unknown Apple authentication error",
+      error: message,
     });
   }
 };
@@ -829,6 +909,99 @@ export const forgotPassword = async (req, res) => {
       success: false,
       message: `Unable to send password reset email right now. ${error?.message || "Unknown mail error."}`,
     });
+  }
+};
+
+export const startGoogleAuth = async (req, res) => {
+  try {
+    const clientId = sanitizeString(process.env.GOOGLE_CLIENT_ID);
+    if (!clientId) {
+      return res.status(500).json({
+        success: false,
+        message: "Google OAuth is not configured",
+      });
+    }
+
+    const mode = sanitizeString(req.query?.mode) === "signup" ? "signup" : "login";
+    const returnTarget = resolveAuthReturnTarget(req.query?.origin);
+    const state = encodeLinkedInState({ mode, returnTarget });
+    const authClient = getGoogleOAuthClient(req);
+    const authUrl = authClient.generateAuthUrl({
+      scope: GOOGLE_SCOPE,
+      response_type: "code",
+      access_type: "online",
+      prompt: "select_account",
+      state,
+    });
+
+    return res.redirect(authUrl);
+  } catch (error) {
+    logAuthError("google-start", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to start Google authentication",
+    });
+  }
+};
+
+export const googleCallback = async (req, res) => {
+  const statePayload = decodeLinkedInState(req.query?.state);
+  const returnTarget = resolveAuthReturnTarget(statePayload?.returnTarget);
+  const mode = statePayload?.mode === "signup" ? "signup" : "login";
+
+  try {
+    const authError = sanitizeString(req.query?.error);
+    if (authError) {
+      return res.redirect(
+        buildAuthRedirect(returnTarget, {
+          auth_provider: "google",
+          auth_mode: mode,
+          auth_error: authError,
+        })
+      );
+    }
+
+    if (!sanitizeString(process.env.GOOGLE_CLIENT_SECRET)) {
+      throw new Error("Google OAuth server secret is not configured.");
+    }
+
+    const code = sanitizeString(req.query?.code);
+    if (!code) {
+      throw new Error("Google authorization code missing");
+    }
+
+    const authClient = getGoogleOAuthClient(req);
+    const { tokens } = await authClient.getToken(code);
+    const idToken = sanitizeString(tokens?.id_token);
+    if (!idToken) {
+      throw new Error("Google identity token missing");
+    }
+
+    const ticket = await authClient.verifyIdToken({
+      idToken,
+      audience: sanitizeString(process.env.GOOGLE_CLIENT_ID),
+    });
+
+    const payload = ticket.getPayload();
+    const { token, user } = await completeGoogleLoginFromPayload(payload);
+
+    return res.redirect(
+      buildAuthRedirect(returnTarget, {
+        auth_provider: "google",
+        auth_mode: mode,
+        token,
+        user: JSON.stringify(toSafeUser(user)),
+      })
+    );
+  } catch (error) {
+    logAuthError("google-callback", error);
+    return res.redirect(
+      buildAuthRedirect(returnTarget, {
+        auth_provider: "google",
+        auth_mode: mode,
+        auth_error: error?.message || "Google authentication failed",
+      })
+    );
   }
 };
 

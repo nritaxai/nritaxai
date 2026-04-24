@@ -1,21 +1,36 @@
-import dns from 'node:dns/promises';  // or just 'dns' if using CommonJS
+import dns from "node:dns/promises";
+import mongoose from "mongoose";
 
-// Force reliable public DNS servers
-dns.setServers(['1.1.1.1', '8.8.8.8']);
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
 
-// Optional: log to confirm (remove later if you want)
-console.log('DNS servers forced to:', dns.getServers());
-
-import mongoose from 'mongoose';
+let connectionPromise = null;
 
 const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log(`MongoDB connected Successfully✅`);
-  } catch (error) {
-    console.error(`MongoDB connection failed ❌`, error.message);
-    process.exit(1)
+  if (!process.env.MONGO_URI) {
+    throw new Error("MONGO_URI is not configured");
   }
+
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
+  }
+
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
+  connectionPromise = mongoose
+    .connect(process.env.MONGO_URI)
+    .then((connection) => {
+      console.log("MongoDB connected successfully");
+      return connection.connection;
+    })
+    .catch((error) => {
+      connectionPromise = null;
+      console.error("MongoDB connection failed", error.message);
+      throw error;
+    });
+
+  return connectionPromise;
 };
 
 export default connectDB;
