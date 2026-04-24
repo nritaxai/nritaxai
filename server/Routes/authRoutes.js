@@ -1,15 +1,18 @@
 import express from 'express';
 import {
+  appleAuth,
   appleLogin,
   changePassword,
   deleteAccount,
   forgotPassword,
   getUserProfile,
+  googleCallback,
   googleLogin,
   linkedinLogin,
   linkedinCallback,
   loginUser, registerUser,
   resetPassword,
+  startGoogleAuth,
   startLinkedInAuth,
   updateUserProfile
 } from '../Controllers/authController.js';
@@ -29,6 +32,9 @@ router.post("/forgot-password", authRateLimiter, forgotPassword);
 router.post("/reset-password", authRateLimiter, resetPassword);
 
 router.post("/google-login", authRateLimiter, googleLogin);
+router.get("/google", authRateLimiter, startGoogleAuth);
+router.get("/google/callback", googleCallback);
+router.post("/auth/apple", authRateLimiter, appleAuth);
 router.post("/apple", authRateLimiter, appleLogin);
 router.post("/linkedin", authRateLimiter, linkedinLogin);
 router.get("/linkedin", authRateLimiter, startLinkedInAuth);

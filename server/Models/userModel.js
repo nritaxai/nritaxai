@@ -34,6 +34,7 @@ const userSchema = new mongoose.Schema(
     },
     appleId: {
       type: String,
+      sparse: true,
     },
     linkedinId: {
       type: String,

@@ -1398,3 +1398,100 @@ export const deleteAccount = async (req, res) => {
     });
   }
 }
+
+export const appleAuth = async (req, res) => {
+  try {
+    const { identityToken, email, fullName } = req.body || {};
+
+    if (!identityToken) {
+      return res.status(400).json({
+        success: false,
+        message: "Identity token required",
+      });
+    }
+
+    const parts = String(identityToken).split(".");
+    if (parts.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid identity token",
+      });
+    }
+
+    const base64Payload = parts[1];
+    const normalizedPayload = base64Payload.replace(/-/g, "+").replace(/_/g, "/");
+    const paddedPayload = normalizedPayload.padEnd(Math.ceil(normalizedPayload.length / 4) * 4, "=");
+    const payload = JSON.parse(Buffer.from(paddedPayload, "base64").toString("utf8"));
+
+    const appleUserId = sanitizeString(payload?.sub);
+    const userEmail = sanitizeEmail(email || payload?.email);
+    const displayName = sanitizeString(fullName) || "NRI User";
+
+    if (!appleUserId) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid identity token",
+      });
+    }
+
+    let user = await User.findOne({
+      $or: [
+        { appleId: appleUserId },
+        ...(userEmail ? [{ email: userEmail }] : []),
+      ],
+    });
+
+    if (!user) {
+      user = await User.create({
+        appleId: appleUserId,
+        email: userEmail || `apple_${appleUserId}@privaterelay.appleid.com`,
+        name: displayName,
+        provider: "apple",
+      });
+    } else {
+      let changed = false;
+
+      if (!user.appleId) {
+        user.appleId = appleUserId;
+        changed = true;
+      }
+
+      if ((!user.name || user.name === "NRI User" || user.name === "Apple User") && displayName) {
+        user.name = displayName;
+        changed = true;
+      }
+
+      if (!user.provider || user.provider === "local") {
+        user.provider = "apple";
+        changed = true;
+      }
+
+      if (changed) {
+        await user.save();
+      }
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "30d" }
+    );
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+      },
+    });
+  } catch (error) {
+    console.error("Apple auth error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Authentication failed",
+      error: error.message,
+    });
+  }
+};
