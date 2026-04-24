@@ -8,9 +8,8 @@ import { Badge } from "./ui/badge";
 import { Bot, Download, Languages, Send, Shield, Mic, MicOff, Trash2, Square } from "lucide-react";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
-import { PDFDownloadLink } from "@react-pdf/renderer";
-import { TaxReportPDF } from "./TaxReportPDF";
 import { TaxRuleTimeline, type TaxRuleTimelineItem } from "./TaxRuleTimeline";
+import { PdfDownloadButton } from "./PdfDownloadButton";
 import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
@@ -433,11 +432,22 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   };
 
   const latestAIMessage = messages.filter((m) => m.role === "ai").slice(-1)[0]?.content || "";
-  const reportData = [
-    { label: "Language Selected", value: language },
-    { label: "User Query", value: messages.slice(-2)[0]?.content || "-" },
-    { label: "AI Response Summary", value: latestAIMessage.substring(0, 300) },
-  ];
+  const reportData = {
+    userName: userName || "",
+    fileName: "nritax-report.pdf",
+    taxpayerInfo: [
+      { label: "Language Selected", value: language },
+      { label: "Generated For", value: userName || "Not provided" },
+    ],
+    incomeSummary: [{ label: "User Query", value: messages.slice(-2)[0]?.content || "-" }],
+    deductions: [],
+    taxCalculation: [{ label: "AI Response Summary", value: latestAIMessage.substring(0, 300) || "-" }],
+    reportData: [
+      { label: "Language Selected", value: language },
+      { label: "User Query", value: messages.slice(-2)[0]?.content || "-" },
+      { label: "AI Response Summary", value: latestAIMessage.substring(0, 300) || "-" },
+    ],
+  };
 
   return (
     <div className={`mx-auto w-full ${minimal ? "h-full max-w-none" : "max-w-5xl"}`}>
@@ -471,17 +481,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                   <Trash2 className="size-4 mr-2" />
                   Clear Chat
                 </Button>
-                <PDFDownloadLink
-                  document={<TaxReportPDF userName="NRITAX User" reportData={reportData} />}
-                  fileName="nritax-report.pdf"
-                >
-                  {({ loading }) => (
-                    <Button size="sm" variant="outline" className="w-full sm:w-auto">
-                      <Download className="size-4 mr-2" />
-                      {loading ? "Generating..." : "Download PDF"}
-                    </Button>
-                  )}
-                </PDFDownloadLink>
+                <PdfDownloadButton reportData={reportData} onRequireLogin={onRequireLogin} />
               </div>
             ) : (
               <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
