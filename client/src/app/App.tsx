@@ -1,7 +1,6 @@
 import { lazy, Suspense, useState, useEffect, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
 import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
 import { WifiOff } from "lucide-react";
-import { App as CapacitorApp } from "@capacitor/app";
 
 import { Header } from "./components/Header";
 import NewsTicker from "./components/NewsTicker";
@@ -18,6 +17,24 @@ import { Pricing } from "./pages/Pricing";
 import { buildApiUrl, getStoredAuthToken } from "../utils/api";
 import { PrivacyPolicy } from "../pages/PrivacyPolicy";
 import { IS_NATIVE_APP } from "../config/appConfig";
+
+type NativeAppUrlListener = {
+  remove: () => Promise<void> | void;
+};
+
+type NativeAppPlugin = {
+  getLaunchUrl: () => Promise<{ url?: string } | undefined>;
+  addListener: (
+    eventName: "appUrlOpen",
+    listener: (event: { url: string }) => void
+  ) => Promise<NativeAppUrlListener> | NativeAppUrlListener;
+};
+
+const getNativeAppPlugin = (): NativeAppPlugin | null => {
+  if (typeof window === "undefined") return null;
+  return (window as any)?.Capacitor?.Plugins?.App ?? null;
+};
+
 const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
@@ -181,15 +198,20 @@ export default function App() {
   useEffect(() => {
     if (!IS_NATIVE_APP) return;
 
-    void CapacitorApp.getLaunchUrl().then((launch) => {
+    const nativeAppPlugin = getNativeAppPlugin();
+    if (!nativeAppPlugin) return;
+
+    void nativeAppPlugin.getLaunchUrl().then((launch) => {
       if (launch?.url) {
         handleNativeAuthCallback(launch.url);
       }
     });
 
-    const listenerPromise = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
-      handleNativeAuthCallback(url);
-    });
+    const listenerPromise = Promise.resolve(
+      nativeAppPlugin.addListener("appUrlOpen", ({ url }) => {
+        handleNativeAuthCallback(url);
+      })
+    );
 
     return () => {
       void listenerPromise.then((listener) => listener.remove());
