@@ -1,8 +1,3 @@
-import React from "react";
-import { renderToStream } from "@react-pdf/renderer";
-
-import { TaxReportPDF } from "../src/pdf/TaxReportPDF.js";
-
 const MAX_REPORT_ITEMS = 20;
 const MAX_LABEL_LENGTH = 120;
 const MAX_VALUE_LENGTH = 4000;
@@ -62,30 +57,11 @@ export const generatePdf = async (req, res) => {
     });
   }
 
-  try {
-    const document = React.createElement(TaxReportPDF, validatedPayload);
-    const pdfStream = await renderToStream(document);
-
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", 'attachment; filename="nritax-report.pdf"');
-    res.setHeader("Cache-Control", "no-store");
-
-    pdfStream.on("error", () => {
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: "Unable to generate the PDF right now.",
-        });
-      } else {
-        res.end();
-      }
-    });
-
-    return pdfStream.pipe(res);
-  } catch {
-    return res.status(500).json({
-      success: false,
-      message: "Unable to generate the PDF right now.",
-    });
-  }
+  // The client already renders the final PDF, so the server only returns
+  // validated report data and avoids any frontend-only rendering packages.
+  return res.status(200).json({
+    success: true,
+    message: "Report data validated successfully.",
+    data: validatedPayload,
+  });
 };

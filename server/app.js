@@ -78,6 +78,15 @@ app.use(
 );
 app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT || "5mb" }));
 
+// Keep health checks independent from the database so Render can verify the
+// process is alive even if MongoDB is temporarily unavailable.
+app.get("/health", (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    status: "ok",
+  });
+});
+
 app.use(async (_req, _res, next) => {
   try {
     await connectDB();
@@ -85,14 +94,6 @@ app.use(async (_req, _res, next) => {
   } catch (error) {
     next(error);
   }
-});
-
-app.get("/health", (_req, res) => {
-  return res.status(200).json({
-    success: true,
-    status: "ok",
-    timestamp: new Date().toISOString(),
-  });
 });
 
 app.get("/version", (_req, res) => {
