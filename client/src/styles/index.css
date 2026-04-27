@@ -10,23 +10,22 @@ body,
   overflow-x: hidden;
 }
 
-/* Mobile viewport fix: keep the document height pinned to the available mobile viewport. */
+/* Let the document grow naturally so long marketing and content pages can scroll. */
 html {
-  height: 100%;
+  min-height: 100%;
   height: -webkit-fill-available;
 }
 
-/* Mobile viewport fix: allow the body to fill the available viewport without adding page scroll. */
+/* Preserve full-height layouts without globally disabling page scroll. */
 body {
   min-height: 100%;
   min-height: -webkit-fill-available;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
-/* Mobile viewport fix: let the React tree own the full dynamic viewport and stack route content vertically. */
+/* Keep the app at least viewport tall, but do not trap overflow inside the root node. */
 #root {
-  height: 100dvh;
-  overflow: hidden;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
