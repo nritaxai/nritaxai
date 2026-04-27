@@ -53,6 +53,19 @@ const initialValues: ExpertFormValues = {
   areaOfExpertise: "",
 };
 
+const copOptions = ["Active", "Inactive", "Not Applicable"];
+const qualificationOptions = ["Chartered Accountant (CA)", "CPA", "Tax Advisor", "Lawyer", "Other"];
+const areaOfExpertiseOptions = [
+  "DTAA",
+  "FEMA",
+  "NRI Tax Filing",
+  "Capital Gains",
+  "Property Tax",
+  "TDS Refund",
+  "Compliance",
+  "Other",
+];
+
 const isPdfFile = (file: File | null) => {
   if (!file) return false;
   const normalizedName = file.name.toLowerCase();
@@ -102,7 +115,7 @@ export function JoinAsExpertPage() {
     return () => window.clearInterval(intervalId);
   }, []);
 
-  const handleFieldChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const handleFieldChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
 
     setValues((prev) => ({
@@ -343,40 +356,58 @@ export function JoinAsExpertPage() {
 
               <label className="expert-field">
                 <span>COP</span>
-                <input
-                  type="text"
+                <select
                   name="cop"
                   value={values.cop}
                   onChange={handleFieldChange}
                   disabled={loading}
                   aria-invalid={errors.cop ? "true" : "false"}
-                />
+                >
+                  <option value="">Select COP</option>
+                  {copOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 {errors.cop ? <small>{errors.cop}</small> : null}
               </label>
 
               <label className="expert-field">
                 <span>Qualification</span>
-                <input
-                  type="text"
+                <select
                   name="qualification"
                   value={values.qualification}
                   onChange={handleFieldChange}
                   disabled={loading}
                   aria-invalid={errors.qualification ? "true" : "false"}
-                />
+                >
+                  <option value="">Select qualification</option>
+                  {qualificationOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 {errors.qualification ? <small>{errors.qualification}</small> : null}
               </label>
 
               <label className="expert-field expert-field-full">
                 <span>Area of Expertise</span>
-                <input
-                  type="text"
+                <select
                   name="areaOfExpertise"
                   value={values.areaOfExpertise}
                   onChange={handleFieldChange}
                   disabled={loading}
                   aria-invalid={errors.areaOfExpertise ? "true" : "false"}
-                />
+                >
+                  <option value="">Select area of expertise</option>
+                  {areaOfExpertiseOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
                 {errors.areaOfExpertise ? <small>{errors.areaOfExpertise}</small> : null}
               </label>
 
