@@ -1,11 +1,8 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { AuthGateCard } from "../components/AuthGateCard";
 import { CPAContact } from "../components/CPAContact";
-import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
-import { getMySubscription, getStoredAuthToken } from "../../utils/api";
-import { FEATURE_KEYS, type SubscriptionMe } from "../../utils/subscription";
+import { getStoredAuthToken } from "../../utils/api";
 
 interface ConsultProps {
   onRequireLogin: () => void;
@@ -14,17 +11,6 @@ interface ConsultProps {
 export function Consult({ onRequireLogin }: ConsultProps) {
   const navigate = useNavigate();
   const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
-  const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
-
-  useEffect(() => {
-    if (!isAuthenticated) {
-      setSubscription(null);
-      return;
-    }
-    getMySubscription()
-      .then((data: any) => setSubscription(data || null))
-      .catch(() => setSubscription(null));
-  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return (
@@ -35,8 +21,6 @@ export function Consult({ onRequireLogin }: ConsultProps) {
       />
     );
   }
-
-  const canUseCpa = Boolean(subscription?.features?.[FEATURE_KEYS.UNLIMITED_CPA_CONSULTATIONS]);
 
   return (
     <div className="py-10">
@@ -51,32 +35,10 @@ export function Consult({ onRequireLogin }: ConsultProps) {
         </button>
         <div className="mb-8">
           <h1 className="text-3xl sm:text-4xl text-[#0F172A] mb-2">Connect with Tax Experts</h1>
-          <p className="text-[#0F172A]">
-            {canUseCpa
-              ? "Get personalized tax advice from certified professionals."
-              : "CPA consultations are available only on the Enterprise plan."}
-          </p>
+          <p className="text-[#0F172A]">Get personalized tax advice from certified professionals.</p>
         </div>
         <div className="max-w-3xl">
-          {canUseCpa ? (
-            <CPAContact embedded onClose={() => navigate(-1)} />
-          ) : (
-            <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-[#0F172A]">
-              <p className="text-lg font-semibold">Enterprise Required</p>
-              <p className="mt-2 text-sm">
-                {IOS_EXTERNAL_PURCHASES_DISABLED
-                  ? "Your current plan does not include CPA consultations. Purchases are hidden on iOS until Apple In-App Purchase is implemented."
-                  : "Your current plan does not include CPA consultations. Upgrade to Enterprise to unlock unlimited CPA consultations."}
-              </p>
-              <button
-                type="button"
-                onClick={() => navigate("/pricing")}
-                className="mt-4 inline-flex items-center rounded-md bg-[#2563eb] px-4 py-2 text-sm font-semibold text-white"
-              >
-                {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Access Options" : "Contact Enterprise / Upgrade"}
-              </button>
-            </div>
-          )}
+          <CPAContact embedded onClose={() => navigate(-1)} />
         </div>
       </div>
     </div>
