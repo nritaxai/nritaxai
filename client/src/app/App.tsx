@@ -391,6 +391,7 @@ export default function App() {
     targets.forEach((element) => {
       if (element.classList.contains("reveal-drop") || element.classList.contains("reveal-tile")) return;
       if (element.closest("header, footer, nav")) return;
+      if (element.closest(".no-auto-reveal")) return;
       if (element.hasAttribute("hidden") || element.getAttribute("aria-hidden") === "true") return;
 
       element.classList.add("auto-reveal");
@@ -402,6 +403,7 @@ export default function App() {
       "input, textarea, select, [data-slot='input'], [data-slot='select-trigger'], [data-slot='textarea']"
     );
     fields.forEach((field, index) => {
+      if (field.closest(".no-auto-reveal")) return;
       const distance = 12 + (index % 6) * 2;
       const duration = 420;
       field.style.setProperty("--field-drop-distance", `${distance}px`);

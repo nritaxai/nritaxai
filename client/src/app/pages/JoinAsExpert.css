@@ -75,6 +75,11 @@
   margin-top: 24px;
 }
 
+.expert-form :is(input, select, button) {
+  animation: none !important;
+  transform: none !important;
+}
+
 .expert-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -106,7 +111,9 @@
   color: #10233f;
   background: #fcfdff;
   outline: none;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+  animation: none !important;
+  transform: none !important;
 }
 
 .expert-field input[type="file"] {

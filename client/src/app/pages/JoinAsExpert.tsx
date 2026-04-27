@@ -81,7 +81,6 @@ export function JoinAsExpertPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [values, setValues] = useState<ExpertFormValues>(initialValues);
   const [profileFile, setProfileFile] = useState<File | null>(null);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -98,15 +97,13 @@ export function JoinAsExpertPage() {
       recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
         callback: (token: string) => {
-          setCaptchaToken(token);
+          if (token) {
+            setErrorMessage("");
+          }
           setErrors((prev) => ({ ...prev, captcha: "" }));
         },
-        "expired-callback": () => {
-          setCaptchaToken(null);
-        },
-        "error-callback": () => {
-          setCaptchaToken(null);
-        },
+        "expired-callback": () => undefined,
+        "error-callback": () => undefined,
       });
 
       window.clearInterval(intervalId);
@@ -141,7 +138,7 @@ export function JoinAsExpertPage() {
     setErrorMessage("");
   };
 
-  const validateForm = (): FormErrors => {
+  const validateForm = (captchaResponse: string): FormErrors => {
     const nextErrors: FormErrors = {};
 
     (Object.keys(initialValues) as FieldName[]).forEach((fieldName) => {
@@ -160,10 +157,7 @@ export function JoinAsExpertPage() {
       nextErrors.profile = "Please upload a PDF file.";
     }
 
-    const widgetId = recaptchaWidgetIdRef.current ?? undefined;
-    const token = window.grecaptcha?.getResponse(widgetId) || "";
-
-    if (!token.trim()) {
+    if (!captchaResponse) {
       nextErrors.captcha = "Please complete the CAPTCHA.";
     }
 
@@ -173,7 +167,6 @@ export function JoinAsExpertPage() {
   const resetForm = () => {
     setValues(initialValues);
     setProfileFile(null);
-    setCaptchaToken(null);
     setErrors({});
     setErrorMessage("");
     if (fileInputRef.current) {
@@ -191,23 +184,15 @@ export function JoinAsExpertPage() {
     setSuccessMessage("");
     setErrorMessage("");
 
-    const validationErrors = validateForm();
+    const widgetId = recaptchaWidgetIdRef.current ?? undefined;
+    const captchaResponse = window.grecaptcha?.getResponse(widgetId)?.trim() || "";
+    const validationErrors = validateForm(captchaResponse);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       if (validationErrors.captcha) {
         alert("Please complete CAPTCHA");
       }
       setErrorMessage("Please fix the highlighted fields and try again.");
-      return;
-    }
-
-    const widgetId = recaptchaWidgetIdRef.current ?? undefined;
-    const token = window.grecaptcha?.getResponse(widgetId) || "";
-
-    if (!token.trim()) {
-      setErrors((prev) => ({ ...prev, captcha: "Please complete the CAPTCHA." }));
-      setErrorMessage("Please complete the CAPTCHA.");
-      alert("Please complete CAPTCHA");
       return;
     }
 
@@ -229,7 +214,7 @@ export function JoinAsExpertPage() {
       formData.append("qualification", values.qualification.trim());
       formData.append("areaOfExpertise", values.areaOfExpertise.trim());
       formData.append("profile", profileFile);
-      formData.append("g-recaptcha-response", token);
+      formData.append("g-recaptcha-response", captchaResponse);
 
       const abortController = new AbortController();
       const timeoutId = window.setTimeout(() => abortController.abort(), SUBMISSION_TIMEOUT_MS);
@@ -272,7 +257,7 @@ export function JoinAsExpertPage() {
   };
 
   return (
-    <main className="expert-onboarding-page">
+    <main className="expert-onboarding-page no-auto-reveal">
       <div className="expert-onboarding-shell">
         <button type="button" className="expert-back-link" onClick={() => navigate(-1)}>
           Back
@@ -300,7 +285,7 @@ export function JoinAsExpertPage() {
             </div>
           ) : null}
 
-          <form className="expert-form" onSubmit={handleSubmit} noValidate>
+          <form className="expert-form no-auto-reveal" onSubmit={handleSubmit} noValidate>
             <div className="expert-form-grid">
               <label className="expert-field">
                 <span>Full Name</span>
