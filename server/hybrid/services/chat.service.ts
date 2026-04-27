@@ -1,8 +1,8 @@
 import { HYBRID_DISCLAIMER, HYBRID_SYSTEM_PROMPT, HybridChatClient } from "../llm/chat";
 import type { KnowledgeChunkRecord } from "../db/mongodb";
+import { HybridProviderClient } from "../llm/provider";
 import { buildContext } from "../rag/context-builder";
 import { HybridRetriever } from "../rag/retriever";
-import { OllamaClient } from "../llm/ollama.client";
 import { ClassifierService } from "./classifier.service";
 import { RouterService, type HybridMode } from "./router.service";
 
@@ -71,14 +71,14 @@ export class ChatService {
   private readonly classifierService: ClassifierService;
   private readonly routerService: RouterService;
   private readonly chatClient: HybridChatClient;
-  private readonly ollamaClient: OllamaClient;
+  private readonly providerClient: HybridProviderClient;
   private readonly retriever: HybridRetriever;
 
   constructor() {
     this.classifierService = new ClassifierService();
     this.routerService = new RouterService();
     this.chatClient = new HybridChatClient();
-    this.ollamaClient = new OllamaClient();
+    this.providerClient = new HybridProviderClient();
     this.retriever = new HybridRetriever();
   }
 
@@ -100,7 +100,7 @@ export class ChatService {
 
   private async retrieve(message: string): Promise<RetrievalState> {
     try {
-      const embeddingResult = await this.ollamaClient.embed(message);
+      const embeddingResult = await this.providerClient.embed(message);
       return await this.retriever.search(embeddingResult.embedding);
     } catch {
       return EMPTY_RETRIEVAL_RESULT;
@@ -141,7 +141,7 @@ export class ChatService {
     return {
       answer: improvedAnswer,
       verificationApplied: true,
-      providerTrail: ["gemma", "gemini_verify"],
+      providerTrail: ["openrouter", "gemini_verify"],
     };
   }
 
@@ -182,36 +182,36 @@ export class ChatService {
       } else if (routing.mode === "GEMINI_FALLBACK") {
         execution = await this.runGeminiFallback(message, "", "");
       } else {
-        const gemmaAnswer = await this.chatClient.generateWithGemma(
+        const openRouterAnswer = await this.chatClient.generateWithOpenRouter(
           HYBRID_SYSTEM_PROMPT,
           message,
           builtContext.contextText
         );
 
-        if (routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
+        if (routing.mode === "OPENROUTER_WITH_GEMINI_VERIFY") {
           execution = await this.verifyWithGemini(
             message,
             builtContext.contextText,
             citationsText,
-            gemmaAnswer
+            openRouterAnswer
           );
         } else {
           execution = {
-            answer: gemmaAnswer,
+            answer: openRouterAnswer,
             verificationApplied: false,
-            providerTrail: ["gemma"],
+            providerTrail: ["openrouter"],
           };
         }
       }
     } catch (error) {
-      if (routing.mode === "GEMMA_ONLY" || routing.mode === "GEMMA_WITH_GEMINI_VERIFY") {
+      if (routing.mode === "OPENROUTER_ONLY" || routing.mode === "OPENROUTER_WITH_GEMINI_VERIFY") {
         console.error(`HYBRID_SYSTEM_FALLBACK: ${routing.mode} failed`, {
           error: error instanceof Error ? error.message : "Unknown error",
           query: message.substring(0, 100),
           previousRoute: routing.mode,
         });
 
-        routing = { mode: "GEMINI_FALLBACK", reasons: ["gemma_failed"] };
+        routing = { mode: "GEMINI_FALLBACK", reasons: ["openrouter_failed"] };
         this.logRoute(message, classification.type, routing.mode, retrieval.confidence, retrieval.chunks.length);
 
         try {

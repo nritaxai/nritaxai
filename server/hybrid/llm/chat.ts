@@ -1,6 +1,5 @@
 import type { HybridMode } from "../services/router.service";
-import { GeminiClient } from "./gemini.client";
-import { OllamaClient, type OllamaChatMessage } from "./ollama.client";
+import { HybridProviderClient } from "./provider";
 
 export type ChatExecutionParams = {
   mode: HybridMode;
@@ -19,91 +18,94 @@ export type ChatExecutionResult = {
 export const HYBRID_DISCLAIMER =
   "This response is for general informational purposes only and is not legal or tax advice. Please consult a qualified tax professional for advice on your specific facts.";
 
-export const HYBRID_SYSTEM_PROMPT = `You are a STRICT and RELIABLE NRI TAX EXPERT for Indian taxation.
+export const HYBRID_SYSTEM_PROMPT = `You are an expert AI specializing ONLY in NRI taxation (India + DTAA).
 
-==================================================
-HARD RULES (MUST FOLLOW - NO EXCEPTIONS)
-==================================================
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+STRICT RULES (NON-NEGOTIABLE)
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
-1. NEVER give incorrect or made-up definitions.
-2. NEVER expand abbreviations wrongly.
-3. NEVER generate unrelated concepts (like US policy, real estate models, etc).
-4. If you are NOT 100% sure, respond ONLY:
-"Please consult a tax professional for accurate guidance."
-5. If the question is outside tax domain, respond ONLY:
-"I specialize only in NRI and Indian tax matters. Please ask tax-related questions."
+1. NEVER invent or guess definitions
+2. NEVER hallucinate tax concepts
+3. ALWAYS use correct legal meanings
+4. If unsure -> say "I don't have confirmed information"
+5. Reject non-tax questions
 
-==================================================
-LOCKED DEFINITIONS (USE EXACTLY AS GIVEN)
-==================================================
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+CRITICAL DEFINITIONS (SOURCE OF TRUTH)
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
-NRI:
-NRI stands for Non-Resident Indian.
-As per Section 6 of the Income Tax Act:
-- Stayed outside India >=182 days in a financial year OR
-- >=60 days in current year AND >=365 days in previous 4 years
-- Taxed ONLY on income earned or received in India
+NRI (Non-Resident Indian):
+As per Section 6 of Income Tax Act 1961:
+- Outside India for 182 days OR
+- 60 days + 365 days rule
+
+Tax Rule:
+- NRIs are taxed ONLY on India-sourced income
 
 DTAA:
-DTAA stands for Double Tax Avoidance Agreement
-- Agreement between India and other countries
-- Prevents double taxation
-- Provides tax relief via exemption or credit
+Double Taxation Avoidance Agreement
+- Treaty between countries to avoid double taxation
 
 TDS:
-TDS stands for Tax Deducted at Source
-- Section 195 applies for NRIs
-- Higher rates apply compared to residents
+Tax Deducted at Source
+- Tax collected at the time of payment
 
-==================================================
-DOMAIN RESTRICTION
-==================================================
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+SELF-CHECK (VERY IMPORTANT)
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
-ONLY answer questions related to:
-- NRI taxation
-- Indian Income Tax Act
-- DTAA
-- TDS
-- FEMA
-- ITR
-- Capital gains
-- Repatriation
-- NRE/NRO accounts
+Before giving final answer, internally verify:
 
-If NOT related, reject strictly.
+- Is NRI definition correct? (must match Section 6)
+- Is DTAA meaning correct?
+- Any fake or unrelated concept added? Remove it
+- If anything is incorrect, rewrite the answer
 
-==================================================
-RESPONSE RULES
-==================================================
+Repeat this internally until the answer is correct.
 
-- Always prioritize correctness over completeness
-- Keep answers short (max 150-200 words)
-- Use bullet points
-- Do NOT explain beyond tax scope
-- Do NOT hallucinate
-- If definition exists above, USE EXACTLY THAT
-- Always include this disclaimer at the end: ${HYBRID_DISCLAIMER}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+TASK
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
-==================================================
-SELF-CHECK BEFORE ANSWERING (CRITICAL)
-==================================================
+Answer the user's question using ONLY the definitions above.
 
-Before answering, internally verify:
-- Is the question about tax? If NO, reject
-- Is it about NRI, DTAA, or TDS? USE LOCKED DEFINITIONS
-- Am I fully sure? If NO, say consult message
-- Is any part guessed? If YES, DO NOT answer
+If question is:
+- Definition -> give exact meaning
+- Tax concept -> explain simply
+- Outside scope -> say:
+"I specialize only in NRI tax. Please ask tax-related questions."
 
-==================================================
-FAIL-SAFE BEHAVIOR (VERY IMPORTANT)
-==================================================
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+OUTPUT FORMAT (MANDATORY)
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
 
-If your answer might be incorrect OR unclear:
-- DO NOT attempt explanation
-- Return safe response:
-"Please consult a tax professional for accurate guidance."`;
+Answer:
+[Clear answer]
 
-const GEMMA_UNCERTAINTY_PATTERNS = [
+Legal Basis:
+[Section / DTAA reference]
+
+Key Points:
+- Point 1
+- Point 2
+- Point 3
+
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+FINAL VALIDATION
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+
+If your answer contains:
+- Wrong meaning of NRI
+- Wrong meaning of DTAA
+- Any invented concept
+
+Discard it and regenerate internally.
+
+Only output FINAL CORRECT answer.
+
+Always include this disclaimer at the end: ${HYBRID_DISCLAIMER}`;
+
+const OPENROUTER_UNCERTAINTY_PATTERNS = [
   /i don't know/i,
   /i do not know/i,
   /not enough information/i,
@@ -113,53 +115,34 @@ const GEMMA_UNCERTAINTY_PATTERNS = [
 ];
 
 export const isModelUncertain = (text: string): boolean => {
-  return GEMMA_UNCERTAINTY_PATTERNS.some((pattern) => pattern.test(text));
+  return OPENROUTER_UNCERTAINTY_PATTERNS.some((pattern) => pattern.test(text));
 };
 
 export class HybridChatClient {
-  private readonly ollamaClient: OllamaClient;
-  private readonly geminiClient: GeminiClient;
+  private readonly providerClient: HybridProviderClient;
 
   constructor() {
-    this.ollamaClient = new OllamaClient();
-    this.geminiClient = new GeminiClient();
+    this.providerClient = new HybridProviderClient();
   }
 
-  private buildGemmaMessages(systemPrompt: string, query: string, contextText: string): OllamaChatMessage[] {
-    return [
-      { role: "system", content: systemPrompt },
-      {
-        role: "user",
-        content: `Retrieved context:\n${contextText || "No context retrieved."}\n\nUSER QUESTION:\n${query}\n\nProvide a correct, safe, and domain-restricted answer:`,
-      },
-    ];
-  }
-
-  async generateWithGemma(systemPrompt: string, query: string, contextText: string): Promise<string> {
+  async generateWithOpenRouter(systemPrompt: string, query: string, contextText: string): Promise<string> {
     try {
-      const result = await this.ollamaClient.chat(this.buildGemmaMessages(systemPrompt, query, contextText), {
-        temperature: 0.1,
-        numPredict: 700,
-        topP: 0.9,
-      });
+      const result = await this.providerClient.generateWithOpenRouter(
+        systemPrompt,
+        `Retrieved context:\n${contextText || "No context retrieved."}\n\nUSER QUESTION:\n${query}\n\nProvide a correct, safe, and domain-restricted answer:`
+      );
 
       return result.content;
     } catch (error) {
       throw new Error(
-        `Gemma generation failed: ${error instanceof Error ? error.message : "Unknown Ollama error"}`
+        `OpenRouter generation failed: ${error instanceof Error ? error.message : "Unknown OpenRouter error"}`
       );
     }
   }
 
   async generateWithGemini(systemPrompt: string, prompt: string): Promise<string> {
     try {
-      const result = await this.geminiClient.generate({
-        systemInstruction: systemPrompt,
-        prompt,
-        temperature: 0.1,
-        maxOutputTokens: 900,
-      });
-
+      const result = await this.providerClient.generateWithGemini(systemPrompt, prompt);
       return result.content;
     } catch (error) {
       throw new Error(
@@ -188,7 +171,7 @@ ${contextText}
 References:
 ${citationsText}
 
-Draft answer from Gemma:
+Draft answer from OpenRouter:
 ${answer}`
     );
   }
@@ -220,13 +203,13 @@ ${answer}`
       };
     }
 
-    const answer = await this.generateWithGemma(params.systemPrompt, params.query, params.contextText);
+    const answer = await this.generateWithOpenRouter(params.systemPrompt, params.query, params.contextText);
 
-    if (params.mode === "GEMMA_ONLY") {
+    if (params.mode === "OPENROUTER_ONLY") {
       return {
         answer,
         verificationApplied: false,
-        providerTrail: ["gemma"],
+        providerTrail: ["openrouter"],
       };
     }
 
@@ -241,7 +224,7 @@ ${answer}`
     return {
       answer: verifiedAnswer,
       verificationApplied: true,
-      providerTrail: ["gemma", "gemini_verify"],
+      providerTrail: ["openrouter", "gemini_verify"],
     };
   }
 }

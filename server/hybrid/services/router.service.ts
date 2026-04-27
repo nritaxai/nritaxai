@@ -2,8 +2,8 @@ import type { KnowledgeChunkRecord } from "../db/mongodb";
 import type { QueryType } from "./classifier.service";
 
 export type HybridMode =
-  | "GEMMA_ONLY"
-  | "GEMMA_WITH_GEMINI_VERIFY"
+  | "OPENROUTER_ONLY"
+  | "OPENROUTER_WITH_GEMINI_VERIFY"
   | "GEMINI_FALLBACK"
   | "GEMINI_DIRECT";
 
@@ -29,9 +29,9 @@ export class RouterService {
     }
 
     if (input.type === "COMPLEX") {
-      return { mode: "GEMMA_WITH_GEMINI_VERIFY", reasons: ["complex_query_requires_verification"] };
+      return { mode: "OPENROUTER_WITH_GEMINI_VERIFY", reasons: ["complex_query_requires_verification"] };
     }
 
-    return { mode: "GEMMA_ONLY", reasons: ["routine_query_with_good_context"] };
+    return { mode: "OPENROUTER_ONLY", reasons: ["routine_query_with_good_context"] };
   }
 }

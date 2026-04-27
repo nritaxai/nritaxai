@@ -14,15 +14,13 @@ import {
 } from "../Utils/subscriptionAccess.js";
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
-import { generateChatResponse } from "../Config/openaiService.js";
+import { generateChatResponse, generateGeminiResponse } from "../Config/openaiService.js";
 
-const OLLAMA_API_URL = process.env.OLLAMA_API_URL || "http://localhost:11434/api/generate";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const USE_GEMINI_PRIMARY =
   GEMINI_API_KEY && String(process.env.USE_GEMINI_PRIMARY || "false") === "true";
-const OLLAMA_CHAT_MODEL = process.env.OLLAMA_CHAT_MODEL || "gemma:2b";
-const OLLAMA_TIMEOUT_MS = Math.max(Number(process.env.OLLAMA_TIMEOUT_MS || 45000), 45000);
 const NON_TAX_QUERY_REPLY = "Please ask a tax-related question.";
 const SYSTEM_PROMPT = `
 You are a professional NRI tax assistant.
@@ -45,13 +43,6 @@ Focus Areas:
 - Capital gains, salary, TDS
 - India ↔ other country tax rules
 `.trim();
-const OLLAMA_TEMPERATURE = Number(process.env.OLLAMA_TEMPERATURE || 0.3);
-const OLLAMA_TOP_P = Number(process.env.OLLAMA_TOP_P || 0.9);
-const OLLAMA_TOP_K = Number(process.env.OLLAMA_TOP_K || 40);
-const OLLAMA_REPEAT_PENALTY = Number(process.env.OLLAMA_REPEAT_PENALTY || 1.2);
-const OLLAMA_NUM_PREDICT = Number(process.env.OLLAMA_NUM_PREDICT || 220);
-const OLLAMA_PROMPT_MAX_CHARS = Number(process.env.OLLAMA_PROMPT_MAX_CHARS || 6000);
-
 const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 8), 6);
 const MAX_STORED_MESSAGES = 100;
 const chatSessionMemory = new Map();
@@ -74,7 +65,7 @@ const RESPONSE_CACHE_MAX_ITEMS = Number(process.env.RESPONSE_CACHE_MAX_ITEMS || 
 const CHAT_DISABLE_PDF_DIR_FALLBACK = String(process.env.CHAT_DISABLE_PDF_DIR_FALLBACK || "true").toLowerCase() === "true";
 const responseCache = new Map();
 const GUEST_SESSION_HEADER = "x-guest-session-id";
-const DEFAULT_CHAT_MODEL = OLLAMA_CHAT_MODEL;
+const DEFAULT_CHAT_MODEL = OPENROUTER_MODEL;
 const TAX_TOPIC_KEYWORDS = [
   "nri",
   "non resident",
@@ -149,9 +140,9 @@ const INDEX_PATH = path.join(STORAGE_DIR, "pdf_index.json");
 const ROOT_DIR = path.resolve(".");
 
 const CHAT_MODEL_BY_TIER = {
-  [CHAT_MODEL_KEYS.BASIC]: OLLAMA_CHAT_MODEL,
-  [CHAT_MODEL_KEYS.STANDARD]: OLLAMA_CHAT_MODEL,
-  [CHAT_MODEL_KEYS.PREMIUM]: OLLAMA_CHAT_MODEL,
+  [CHAT_MODEL_KEYS.BASIC]: OPENROUTER_MODEL,
+  [CHAT_MODEL_KEYS.STANDARD]: OPENROUTER_MODEL,
+  [CHAT_MODEL_KEYS.PREMIUM]: OPENROUTER_MODEL,
 };
 
 const tokenize = (text = "") =>
@@ -1042,108 +1033,36 @@ const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext 
     .join("\n\n");
 };
 
-const callOllamaGenerate = async ({ prompt, model = OLLAMA_CHAT_MODEL }) => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
-  const trimmedPrompt = String(prompt || "").slice(0, OLLAMA_PROMPT_MAX_CHARS);
-
-  try {
-    const response = await fetch(OLLAMA_API_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        prompt: trimmedPrompt,
-        stream: false,
-        options: {
-          temperature: OLLAMA_TEMPERATURE,
-          top_p: OLLAMA_TOP_P,
-          top_k: OLLAMA_TOP_K,
-          repeat_penalty: OLLAMA_REPEAT_PENALTY,
-          num_predict: OLLAMA_NUM_PREDICT,
-        },
-      }),
-      signal: controller.signal,
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || `Ollama request failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    const reply = typeof data?.response === "string" ? data.response.trim() : "";
-
-    if (!reply) {
-      throw new Error("Ollama response did not include generated text");
-    }
-
-    return reply;
-  } catch (error) {
-    if (error?.name === "AbortError") {
-      throw new Error(`Ollama request timed out after ${OLLAMA_TIMEOUT_MS}ms`);
-    }
-    throw error;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-};
-
-const askGemma = async ({ model = OLLAMA_CHAT_MODEL, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
+const askOpenRouter = async ({ model = OPENROUTER_MODEL, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
   const prompt = buildGemmaPrompt({ selectedLanguage, contextualMessages, hiddenContext });
 
-  // Try Ollama first
   try {
-    return await callOllamaGenerate({ prompt, model });
-  } catch (ollamaError) {
-    console.warn("Ollama failed, falling back to Gemini:", ollamaError?.message);
-
-    // Fallback to Gemini
-    const geminiKey = process.env.GEMINI_API_KEY;
-    if (!geminiKey) throw ollamaError;
-
-    try {
-      console.log("Gemini key present:", !!process.env.GEMINI_API_KEY);
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": geminiKey,
-          },
-          body: JSON.stringify({
-            contents: [{
-              role: "user",
-              parts: [{ text: prompt.slice(0, 8000) }],
-            }],
-            generationConfig: { temperature: 0.3, maxOutputTokens: 800 }
-          })
-        }
-      );
-
-      const responseText = await response.text();
-      console.log("Gemini full response:", response.status, responseText.slice(0, 500));
-      console.log("Gemini status:", response.status, responseText.slice(0, 200));
-      const data = JSON.parse(responseText);
-      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-
-      if (!reply) throw new Error("Gemini also failed");
-
-      return reply;
-    } catch (geminiError) {
-      console.warn("Gemini failed, falling back to OpenRouter:", geminiError?.message);
-
-      return await generateChatResponse([
+    return await generateChatResponse(
+      [
         {
           role: "user",
           content: prompt,
         },
-      ]);
-    }
+      ],
+      {
+        systemPrompt: SYSTEM_PROMPT,
+        model,
+        temperature: 0.3,
+        maxTokens: 800,
+        fallbackToGemini: true,
+      }
+    );
+  } catch (openRouterError) {
+    console.warn("OpenRouter failed, falling back to Gemini:", openRouterError?.message);
+
+    if (!GEMINI_API_KEY) throw openRouterError;
+
+    return await generateGeminiResponse({
+      prompt,
+      systemInstruction: SYSTEM_PROMPT,
+      temperature: 0.3,
+      maxOutputTokens: 800,
+    });
   }
 };
 
@@ -1200,7 +1119,7 @@ const loadSessionMessages = async ({
 };
 
 const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
-  const replyText = await askGemma({
+  const replyText = await askOpenRouter({
     model,
     selectedLanguage,
     contextualMessages,
@@ -1515,28 +1434,10 @@ export const chatWithAI = async (req, res) => {
     console.error("chatWithAI error:", error);
 
     try {
-      const geminiResponse = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": process.env.GEMINI_API_KEY,
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: `${SYSTEM_PROMPT}\n\nUser: ${message}` }],
-              },
-            ],
-          }),
-        }
-      );
-
-      const geminiData = await geminiResponse.json();
-      const geminiReply =
-        geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      const geminiReply = await generateGeminiResponse({
+        prompt: `User: ${message}`,
+        systemInstruction: SYSTEM_PROMPT,
+      });
 
       return res.status(200).json({
         reply: ensureStructuredSections(geminiReply, requestLanguage),
@@ -1551,7 +1452,7 @@ export const chatWithAI = async (req, res) => {
   }
 };
 
-export { askGemma, buildBasicRagContext, buildGemmaPrompt, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
+export { askOpenRouter, buildBasicRagContext, buildGemmaPrompt, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
 
 
 

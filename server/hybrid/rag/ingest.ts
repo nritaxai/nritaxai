@@ -1,6 +1,6 @@
 import pdf from "pdf-parse";
 import { upsertKnowledgeChunks, type KnowledgeChunkMetadata, type KnowledgeChunkRecord } from "../db/mongodb";
-import { OllamaClient } from "../llm/ollama.client";
+import { HybridProviderClient } from "../llm/provider";
 
 export type IngestDocumentInput = {
   source: string;
@@ -57,10 +57,10 @@ const extractDocumentText = async (input: IngestDocumentInput): Promise<string> 
 };
 
 export class KnowledgeIngestService {
-  private readonly ollamaClient: OllamaClient;
+  private readonly providerClient: HybridProviderClient;
 
   constructor() {
-    this.ollamaClient = new OllamaClient();
+    this.providerClient = new HybridProviderClient();
   }
 
   async ingestDocuments(documents: IngestDocumentInput[]): Promise<IngestResult> {
@@ -73,7 +73,7 @@ export class KnowledgeIngestService {
       const records: KnowledgeChunkRecord[] = [];
       for (let index = 0; index < chunkedText.length; index += 1) {
         const content = chunkedText[index];
-        const embedding = await this.ollamaClient.embed(content);
+        const embedding = await this.providerClient.embed(content);
 
         records.push({
           content,

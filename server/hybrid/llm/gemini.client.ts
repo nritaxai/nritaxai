@@ -10,7 +10,13 @@ type GeminiGenerateResult = {
   raw: unknown;
 };
 
+type GeminiEmbedResult = {
+  embedding: number[];
+  raw: unknown;
+};
+
 const DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
+const DEFAULT_GEMINI_EMBED_MODEL = "text-embedding-004";
 
 const getGeminiApiKey = (): string => {
   const apiKey = String(
@@ -31,9 +37,11 @@ const buildGeminiUrl = (model: string) => {
 
 export class GeminiClient {
   private readonly model: string;
+  private readonly embeddingModel: string;
 
   constructor() {
     this.model = String(process.env.GEMINI_MODEL || DEFAULT_GEMINI_MODEL).trim();
+    this.embeddingModel = String(process.env.GEMINI_EMBED_MODEL || DEFAULT_GEMINI_EMBED_MODEL).trim();
   }
 
   async generate(params: GeminiGenerateParams): Promise<GeminiGenerateResult> {
@@ -86,6 +94,55 @@ export class GeminiClient {
       clearTimeout(timeout);
     }
   }
+
+  async embed(text: string): Promise<GeminiEmbedResult> {
+    const normalizedText = String(text || "").trim();
+    if (!normalizedText) {
+      throw new Error("Gemini embedding input must not be empty");
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(),
+      Number(process.env.HYBRID_GEMINI_EMBED_TIMEOUT_MS || 4000)
+    );
+
+    try {
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${this.embeddingModel}:embedContent?key=${getGeminiApiKey()}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: {
+              parts: [{ text: normalizedText }],
+            },
+          }),
+          signal: controller.signal,
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || `Gemini embedding request failed with status ${response.status}`);
+      }
+
+      const json = await response.json();
+      const embedding = Array.isArray(json?.embedding?.values)
+        ? json.embedding.values.map((value: unknown) => Number(value)).filter((value: number) => Number.isFinite(value))
+        : [];
+
+      if (!embedding.length) {
+        throw new Error("Gemini embedding response did not include values");
+      }
+
+      return { embedding, raw: json };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }
 
-export type { GeminiGenerateParams, GeminiGenerateResult };
+export type { GeminiGenerateParams, GeminiGenerateResult, GeminiEmbedResult };
