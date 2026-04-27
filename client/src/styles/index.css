@@ -316,12 +316,4 @@ form :is(button, [data-slot="button"]):focus-visible {
   animation-play-state: paused;
 }
 
-.g-recaptcha,
-#recaptcha-container {
-  display: block !important;
-  visibility: visible !important;
-}
-
-
-
 

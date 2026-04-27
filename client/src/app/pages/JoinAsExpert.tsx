@@ -1,7 +1,6 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Paperclip, X } from "lucide-react";
-import ReCAPTCHA from "react-google-recaptcha";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -28,6 +27,15 @@ type ExpertOnboardingResponse = {
   message?: string;
 };
 
+declare global {
+  interface Window {
+    grecaptcha?: {
+      ready: (callback: () => void) => void;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+    };
+  }
+}
+
 const initialValues: ExpertFormData = {
   fullName: "",
   email: "",
@@ -43,7 +51,8 @@ const initialValues: ExpertFormData = {
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
-const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
+const RECAPTCHA_SITE_KEY = "6LeYqcwsAAAAADZGXgRz0Bib4gu4__nvPIQjw4Zd";
+const RECAPTCHA_ACTION = "expert_onboarding";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "email",
@@ -70,10 +79,30 @@ const debugLog = (message: string, details?: unknown) => {
 const resolveSelectedValue = (value: string, customValue: string) =>
   value === "Other" ? customValue.trim() : value.trim();
 
+const getRecaptchaToken = () =>
+  new Promise<string>((resolve, reject) => {
+    if (typeof window === "undefined" || !window.grecaptcha) {
+      reject(new Error("Security verification is unavailable. Please refresh and try again."));
+      return;
+    }
+
+    window.grecaptcha.ready(() => {
+      window.grecaptcha
+        ?.execute(RECAPTCHA_SITE_KEY, { action: RECAPTCHA_ACTION })
+        .then((token) => {
+          if (!token) {
+            reject(new Error("Security verification failed. Please try again."));
+            return;
+          }
+          resolve(token);
+        })
+        .catch(() => reject(new Error("Security verification failed. Please try again.")));
+    });
+  });
+
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
-  const recaptchaRef = useRef<ReCAPTCHA | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -81,7 +110,6 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
-  const [captchaToken, setCaptchaToken] = useState("");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -177,10 +205,6 @@ export function JoinAsExpertPage() {
       newErrors.profile = "Please upload your profile.";
     }
 
-    if (!captchaToken) {
-      newErrors.captcha = "Please complete the CAPTCHA.";
-    }
-
     return newErrors;
   };
 
@@ -226,10 +250,10 @@ export function JoinAsExpertPage() {
       if (!normalizedValues.membershipNumber) throw new Error("Please enter membership number.");
       if (!profileFile) throw new Error("Please upload your profile.");
       if (!resolvedQualification) throw new Error("Please select qualification.");
-      if (!captchaToken) throw new Error("Please complete the CAPTCHA.");
       if (!normalizedValues.cop) throw new Error("Please select COP.");
       if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
 
+      const recaptchaToken = await getRecaptchaToken();
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
       formData.append("email", normalizedValues.email || "");
@@ -239,7 +263,7 @@ export function JoinAsExpertPage() {
       formData.append("qualification", resolvedQualification || "");
       formData.append("areaOfExpertise", resolvedAreaOfExpertise || "");
       formData.append("profile", profileFile);
-      formData.append("g-recaptcha-response", captchaToken);
+      formData.append("g-recaptcha-response", recaptchaToken);
 
       console.log("Submitting to:", SUBMIT_URL);
       for (const pair of formData.entries()) {
@@ -250,7 +274,7 @@ export function JoinAsExpertPage() {
         url: SUBMIT_URL,
         requiredFields: REQUIRED_FIELDS,
         hasProfile: true,
-        hasRecaptchaToken: Boolean(captchaToken),
+        hasRecaptchaToken: Boolean(recaptchaToken),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -293,21 +317,21 @@ export function JoinAsExpertPage() {
       setSuccessMessage(data.message || "Application submitted successfully.");
       setValues(initialValues);
       setProfileFile(null);
-      setCaptchaToken("");
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
       if (resumeInputRef.current) {
         resumeInputRef.current.value = "";
       }
-      recaptchaRef.current?.reset();
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
       const message = error instanceof Error ? error.message : "Something went wrong.";
       setErrorMessage(message);
       setShowErrorBanner(true);
-      setCaptchaToken("");
-      recaptchaRef.current?.reset();
+      setErrors((prev) => ({
+        ...prev,
+        captcha: message.toLowerCase().includes("security verification") ? message : prev.captcha,
+      }));
     } finally {
       setLoading(false);
     }
@@ -564,40 +588,8 @@ export function JoinAsExpertPage() {
                   </div>
                 </div>
               </div>
-
               <div className="border-t border-[#E2E8F0] pt-5">
-                <div className="mb-4">
-                  <div className="mt-3 rounded-xl border border-[#CBD5E1] bg-white px-4 py-4">
-                    <div>
-                      <div>
-                        <p className="text-sm font-medium text-[#0F172A]">Security Verification</p>
-                        <p className="mt-1 text-xs text-[#0F172A]/70">Please complete the checkbox below to continue.</p>
-                      </div>
-                    </div>
-                    <div className="mt-4 overflow-x-auto">
-                      <div
-                        className="min-h-[78px]"
-                        aria-invalid={errors.captcha ? true : undefined}
-                      >
-                        <ReCAPTCHA
-                          ref={recaptchaRef}
-                          sitekey={RECAPTCHA_SITE_KEY}
-                          onChange={(token) => {
-                            setCaptchaToken(token || "");
-                            setErrors((prev) => ({
-                              ...prev,
-                              captcha: "",
-                            }));
-                            setShowErrorBanner(false);
-                          }}
-                          onExpired={() => setCaptchaToken("")}
-                          onErrored={() => setCaptchaToken("")}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
-                </div>
+                {errors.captcha ? <p className="mb-4 text-sm text-red-600">{errors.captcha}</p> : null}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <Button type="submit" className="h-11 px-6" disabled={loading}>
                     {loading ? "Submitting..." : "Submit Application"}
