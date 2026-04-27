@@ -42,6 +42,7 @@ const SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 const RECAPTCHA_SITE_KEY = "6LfbPaEsAAAAAIRxHR8s1bZojFeuJoQ0Vgq2wSdo";
 const SUBMISSION_TIMEOUT_MS = 15000;
 const PDF_MIME_TYPE = "application/pdf";
+const EXPERT_ONBOARDING_APPLIED_KEY = "expert_onboarding_applied";
 
 const initialValues: ExpertFormValues = {
   fullName: "",
@@ -85,6 +86,12 @@ export function JoinAsExpertPage() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [hasAlreadyApplied, setHasAlreadyApplied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setHasAlreadyApplied(window.localStorage.getItem(EXPERT_ONBOARDING_APPLIED_KEY) === "true");
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -246,6 +253,10 @@ export function JoinAsExpertPage() {
       }
 
       setSuccessMessage(data.message || "Application submitted successfully.");
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(EXPERT_ONBOARDING_APPLIED_KEY, "true");
+      }
+      setHasAlreadyApplied(true);
       resetForm();
     } catch (error) {
       const message =
@@ -273,6 +284,16 @@ export function JoinAsExpertPage() {
             </p>
           </div>
 
+          {hasAlreadyApplied ? (
+            <div className="expert-applied-state" role="status">
+              <h2>You have already applied</h2>
+              <p>
+                Your expert onboarding application has already been submitted. Our team will review your
+                profile and contact you if any further details are needed.
+              </p>
+            </div>
+          ) : null}
+
           {successMessage ? (
             <div className="expert-alert expert-alert-success" role="status">
               {successMessage}
@@ -285,6 +306,7 @@ export function JoinAsExpertPage() {
             </div>
           ) : null}
 
+          {!hasAlreadyApplied ? (
           <form className="expert-form no-auto-reveal" onSubmit={handleSubmit} noValidate>
             <div className="expert-form-grid">
               <label className="expert-field">
@@ -423,6 +445,7 @@ export function JoinAsExpertPage() {
               {loading ? "Submitting..." : "Submit Application"}
             </button>
           </form>
+          ) : null}
         </section>
       </div>
     </main>

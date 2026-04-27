@@ -71,6 +71,27 @@
   color: #b42318;
 }
 
+.expert-applied-state {
+  margin-top: 24px;
+  padding: 24px;
+  border-radius: 20px;
+  border: 1px solid #b7e7c8;
+  background: linear-gradient(180deg, #f4fbf6 0%, #e8f8ef 100%);
+}
+
+.expert-applied-state h2 {
+  margin: 0 0 10px;
+  font-size: 1.5rem;
+  line-height: 1.2;
+  color: #17663b;
+}
+
+.expert-applied-state p {
+  margin: 0;
+  color: #335c45;
+  line-height: 1.7;
+}
+
 .expert-form {
   margin-top: 24px;
 }
