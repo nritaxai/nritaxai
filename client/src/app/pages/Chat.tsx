@@ -12,7 +12,29 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square, X } from "lucide-react";
+import {
+  Bot,
+  Download,
+  Languages,
+  MoreVertical,
+  Mic,
+  MicOff,
+  Send,
+  Sparkles,
+  Square,
+  Trash2,
+  X,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
@@ -191,6 +213,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const [resizeDirection, setResizeDirection] = useState<ResizeDirection>(null);
   const [isCompactViewport, setIsCompactViewport] = useState(
     typeof window === "undefined" ? false : window.innerWidth < 1024
+  );
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    typeof window === "undefined" ? false : window.innerWidth <= 768
   );
   const chatContentRef = useRef<HTMLDivElement>(null);
   const questionInputRef = useRef<HTMLTextAreaElement>(null);
@@ -670,7 +695,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
     const handleWindowResize = () => {
       if (typeof window === "undefined") return;
       const compact = window.innerWidth < 1024;
+      const mobile = window.innerWidth <= 768;
       setIsCompactViewport(compact);
+      setIsMobileViewport(mobile);
 
       setPopupBounds((current) => {
         if (compact) {
@@ -703,12 +730,13 @@ export function Chat({ onRequireLogin }: ChatProps) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-5 pb-4 lg:pb-0">
+    <div className="mx-auto flex h-[100dvh] w-full max-w-[1320px] flex-col gap-5 overflow-hidden md:h-auto md:max-w-[1320px] md:overflow-visible md:px-0 md:pb-4 lg:pb-0">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+        className="hidden md:block"
       >
       <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82">
         <CardHeader className="pb-3">
@@ -732,46 +760,84 @@ export function Chat({ onRequireLogin }: ChatProps) {
             hidden: {},
             visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
           }}
-          className="grid min-h-0 gap-4 xl:grid-cols-3"
+          className="grid min-h-0 flex-1 gap-4 overflow-hidden md:flex-none md:overflow-visible xl:grid-cols-3"
         >
           <motion.div
-            className="min-h-0 xl:col-span-2"
+            className="min-h-0 flex-1 xl:col-span-2"
             variants={{
               hidden: { opacity: 0, y: 24, scale: 0.98 },
               visible: { opacity: 1, y: 0, scale: 1 },
             }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
-            <Card className="flex h-[100dvh] min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82 md:h-[calc(100dvh-10.5rem)] md:min-h-[560px] md:max-h-[calc(100dvh-8rem)]">
+            <Card className="flex h-full min-h-0 max-h-full flex-col overflow-hidden rounded-none border-0 bg-[#F7FAFC]/82 md:h-[calc(100dvh-10.5rem)] md:min-h-[560px] md:max-h-[calc(100dvh-8rem)] md:rounded-2xl md:border md:border-[#E2E8F0]">
               <CardHeader
-                className="flex-shrink-0 cursor-pointer"
-                onClick={handleOpenPopup}
-                role="button"
-                tabIndex={0}
+                className="flex-shrink-0 cursor-pointer px-3 py-2 md:p-6"
+                onClick={isMobileViewport ? undefined : handleOpenPopup}
+                role={isMobileViewport ? undefined : "button"}
+                tabIndex={isMobileViewport ? undefined : 0}
                 onKeyDown={(e) => {
+                  if (isMobileViewport) return;
                   if (e.key === "Enter" || e.key === " ") {
                     e.preventDefault();
                     handleOpenPopup();
                   }
                 }}
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg border border-[#CBD5E1] bg-[#E2E8F0] p-2">
+                <div className="flex min-h-[2.75rem] items-center justify-between gap-2 md:min-h-0 md:flex-col md:items-stretch md:gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="hidden rounded-lg border border-[#CBD5E1] bg-[#E2E8F0] p-2 md:block">
                       <Bot className="size-6 text-[#0F172A]" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <CardTitle className="break-words text-[#0F172A]">AI Chat Assistant</CardTitle>
-                      <CardDescription className="break-words text-[#0F172A]">
+                      <CardTitle className="truncate text-base text-[#0F172A] md:text-xl">AI Chat Assistant</CardTitle>
+                      <CardDescription className="hidden break-words text-[#0F172A] md:block">
                         {userName ? `Hi ${userName}` : "Hi"} - Ask anything about NRI taxes and DTAA
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="hidden items-center gap-2 md:flex">
                     <Badge className="border border-[#CBD5E1] bg-[#E2E8F0] text-[#0F172A]">
                       <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
                       {isTyping ? "Generating" : "Ready"}
                     </Badge>
+                  </div>
+                  <div className="md:hidden" onClick={(event) => event.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 shrink-0 text-[#0F172A]"
+                          aria-label="Open chat options"
+                        >
+                          <MoreVertical className="size-5" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-60 bg-white">
+                        <DropdownMenuLabel>Chat Options</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuLabel className="pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Language
+                        </DropdownMenuLabel>
+                        <DropdownMenuRadioGroup value={language} onValueChange={setLanguage}>
+                          <DropdownMenuRadioItem value="english">English</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="hindi">Hindi</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="tamil">Tamil</DropdownMenuRadioItem>
+                          <DropdownMenuRadioItem value="indonesian">Bahasa Indonesia</DropdownMenuRadioItem>
+                        </DropdownMenuRadioGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={downloadChatTranscript}>
+                          <Download className="size-4" />
+                          Download Chat
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={clearChat}>
+                          <Trash2 className="size-4" />
+                          Clear Chat
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
                 {providerWarning ? (
@@ -780,7 +846,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </p>
                 ) : null}
                 {subscription ? (
-                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                  <div className="hidden flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center md:flex">
                     <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
                       Current Plan: {subscription.currentPlan?.displayName || "Starter"}
                     </Badge>
@@ -795,7 +861,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </p>
                 ) : null}
                 
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="mt-4 hidden flex-col gap-2 sm:flex-row sm:items-center md:flex">
                   <Languages className="size-4 text-[#0F172A]" />
                   <Select value={language} onValueChange={setLanguage}>
                     <SelectTrigger className="w-full border-[#E2E8F0] bg-[#F7FAFC]/85 sm:w-44">
@@ -828,7 +894,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
               <CardContent
                 ref={chatContentRef}
                 // Keep the transcript as the only scrollable region so the composer remains visible on mobile.
-                className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 pb-6 sm:px-6 [WebkitOverflowScrolling:touch]"
+                className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 pb-2 md:px-6 md:pb-6 [WebkitOverflowScrolling:touch]"
               >
                 {messages.map((message, index) => (
                   <div
@@ -879,9 +945,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
               <CardFooter
                 // Sticky safe-area padding keeps the input docked above Android and iOS system bars.
-                className="sticky bottom-0 z-10 w-full flex-shrink-0 border-t border-[#E2E8F0] bg-[#1d4ed8]/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur sm:px-6 sm:pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+                className="sticky bottom-0 z-10 w-full flex-shrink-0 border-t border-[#E2E8F0] bg-[#1d4ed8]/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-2 backdrop-blur md:px-6 md:pt-3 md:pb-[calc(env(safe-area-inset-bottom)+1rem)]"
               >
-                <form onSubmit={handleSubmit} className="flex w-full items-center gap-2 sm:items-end">
+                <form onSubmit={handleSubmit} className="flex w-full items-center gap-2 md:items-end">
                   <Textarea
                     ref={questionInputRef}
                     placeholder={starterLimitReached ? "Free plan limit reached. Upgrade to Professional." : "Ask me a question"}
@@ -943,7 +1009,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
           </motion.div>
 
           <motion.div
-            className="space-y-4"
+            className="hidden space-y-4 xl:block"
             variants={{
               hidden: { opacity: 0, y: 24, scale: 0.98 },
               visible: { opacity: 1, y: 0, scale: 1 },

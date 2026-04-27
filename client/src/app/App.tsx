@@ -52,10 +52,14 @@ const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions").then(
 const RefundPolicy = lazy(() => import("./pages/RefundPolicy").then((m) => ({ default: m.RefundPolicy })));
 const Disclaimer = lazy(() => import("./pages/Disclaimer").then((m) => ({ default: m.Disclaimer })));
 const ResetPassword = lazy(() => import("./pages/ResetPassword").then((m) => ({ default: m.ResetPassword })));
-function PageScaffold({ children }: { children: ReactNode }) {
+function PageScaffold({ children, compactMobile = false }: { children: ReactNode; compactMobile?: boolean }) {
   return (
-    <div className="min-h-[calc(100dvh-4rem)] bg-gradient-to-b from-gray-50 via-white to-gray-50">
-      <div className="w-full px-4 py-8 md:px-6 md:py-10">{children}</div>
+    <div
+      className={`bg-gradient-to-b from-gray-50 via-white to-gray-50 ${
+        compactMobile ? "min-h-[100dvh] overflow-hidden md:min-h-[calc(100dvh-4rem)]" : "min-h-[calc(100dvh-4rem)]"
+      }`}
+    >
+      <div className={`w-full ${compactMobile ? "px-0 py-0 md:px-6 md:py-10" : "px-4 py-8 md:px-6 md:py-10"}`}>{children}</div>
     </div>
   );
 }
@@ -405,7 +409,9 @@ export default function App() {
     });
   }, [location.pathname]);
 
-  const withPageScaffold = (element: ReactNode) => <PageScaffold>{element}</PageScaffold>;
+  const withPageScaffold = (element: ReactNode, compactMobile = false) => (
+    <PageScaffold compactMobile={compactMobile}>{element}</PageScaffold>
+  );
 
   const handleStagingUnlock = (event: FormEvent) => {
     event.preventDefault();
@@ -465,6 +471,7 @@ export default function App() {
   const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
   const hasSiteHeader = !isStandaloneRoute && isAuthenticated;
   const shouldShowNewsTicker = location.pathname === "/home";
+  const shouldShowYuktiWidget = !isStandaloneRoute && isAuthenticated && location.pathname !== "/chat";
 
   return (
     <div className="app-shell">
@@ -478,7 +485,9 @@ export default function App() {
       )}
       {requiresAuthentication && !isAuthenticated ? <Navigate to="/home" replace /> : null}
       {hasSiteHeader && (
-        <Header onLogin={() => setShowLoginModal(true)} />
+        <div className={location.pathname === "/chat" ? "hidden md:block" : ""}>
+          <Header onLogin={() => setShowLoginModal(true)} />
+        </div>
       )}
       {shouldShowNewsTicker ? <NewsTicker /> : null}
 
@@ -503,7 +512,7 @@ export default function App() {
             <Route path="/login" element={withPageScaffold(<Login />)} />
             <Route path="/reset-password" element={withPageScaffold(<ResetPassword />)} />
             <Route path="/profile" element={withPageScaffold(<Profile />)} />
-            <Route path="/chat" element={withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/chat" element={withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />, true)} />
             <Route path="/dashboard" element={withPageScaffold(<AdminDashboard />)} />
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
@@ -521,9 +530,9 @@ export default function App() {
         </Suspense>
       </div>
 
-      {!isStandaloneRoute && isAuthenticated && <TigerBotAvatar />}
+      {shouldShowYuktiWidget && <TigerBotAvatar />}
 
-      {hasSiteHeader && <Footer />}
+      {hasSiteHeader && <div className={location.pathname === "/chat" ? "hidden md:block" : ""}><Footer /></div>}
 
       {showLoginModal && (
         <Suspense fallback={null}>
