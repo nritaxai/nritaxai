@@ -10,6 +10,23 @@ body,
   overflow-x: hidden;
 }
 
+/* Prevent the browser page itself from rubber-banding under fixed mobile chat layouts. */
+html,
+body {
+  height: 100%;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  inset: 0;
+}
+
+/* Let the React app own vertical scrolling with dynamic viewport sizing on mobile browsers and WebView. */
+#root {
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);

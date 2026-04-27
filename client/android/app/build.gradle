@@ -1,4 +1,5 @@
 apply plugin: 'com.android.application'
+apply plugin: 'com.google.gms.google-services' // Apply Google Services so google-services.json is processed for Google Sign-In on Android.
 
 def keystoreProperties = new Properties()
 def keystorePropertiesFile = rootProject.file('key.properties')
@@ -28,9 +29,9 @@ android {
         // Android API level the app is tested and optimized against.
         targetSdkVersion 36
         // INCREMENT THIS before every Play Store release
-        versionCode 6
+        versionCode 8
         // Human-readable version shown to users and in Play Console.
-        versionName "1.0.0"
+        versionName "1.0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -67,12 +68,3 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
-
-try {
-    def servicesJSON = file('google-services.json')
-    if (servicesJSON.text) {
-        apply plugin: 'com.google.gms.google-services'
-    }
-} catch(Exception e) {
-    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
-}

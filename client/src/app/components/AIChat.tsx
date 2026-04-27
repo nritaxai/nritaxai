@@ -450,12 +450,12 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   };
 
   return (
-    <div className={`mx-auto w-full ${minimal ? "h-full max-w-none" : "max-w-5xl"}`}>
+    <div className={`mx-auto w-full ${minimal ? "h-full min-h-0 max-w-none" : "max-w-5xl"}`}>
       <Card
         className={`glass-panel flex w-full flex-col overflow-hidden ${
           minimal
             ? "h-full rounded-none border-0 shadow-none"
-            : "mt-3 h-[78dvh] max-h-[760px] border border-[#E2E8F0] shadow-xl"
+            : "mt-3 h-[100dvh] min-h-[100dvh] max-h-[100dvh] border border-[#E2E8F0] shadow-xl md:h-[78dvh] md:min-h-0 md:max-h-[760px]"
         }`}
       >
         {!minimal ? (
@@ -572,7 +572,8 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         <>
         <CardContent
           ref={chatContentRef}
-          className={`flex-1 overflow-y-auto space-y-4 p-4 ${
+          // Let only the transcript pane scroll so the composer stays visible as the viewport resizes.
+          className={`min-h-0 flex-1 overflow-y-auto overscroll-contain space-y-4 p-4 [WebkitOverflowScrolling:touch] ${
             minimal
               ? "bg-white"
               : "bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)]"
@@ -641,7 +642,10 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
           )}
         </CardContent>
 
-        <CardFooter className="flex-shrink-0 border-t border-[#E2E8F0]/80 bg-[rgba(255,255,255,0.9)] p-3 sm:p-4">
+        <CardFooter
+          // Safe-area-aware sticky positioning keeps the composer above mobile browser chrome and Android nav bars.
+          className="sticky bottom-0 z-10 w-full flex-shrink-0 border-t border-[#E2E8F0]/80 bg-[rgba(255,255,255,0.9)] p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:p-4 sm:pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+        >
           <form
             onSubmit={handleSubmit}
             className="w-full flex items-end gap-2 sm:gap-3 rounded-xl border border-[#E2E8F0] bg-[#F7FAFC]/80 p-2.5 sm:p-3"

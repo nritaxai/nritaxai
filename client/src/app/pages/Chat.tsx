@@ -703,7 +703,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1320px] space-y-5">
+    <div className="mx-auto flex w-full max-w-[1320px] flex-col gap-5 pb-4 lg:pb-0">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -732,17 +732,17 @@ export function Chat({ onRequireLogin }: ChatProps) {
             hidden: {},
             visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
           }}
-          className="grid gap-4 xl:grid-cols-3"
+          className="grid min-h-0 gap-4 xl:grid-cols-3"
         >
           <motion.div
-            className="xl:col-span-2"
+            className="min-h-0 xl:col-span-2"
             variants={{
               hidden: { opacity: 0, y: 24, scale: 0.98 },
               visible: { opacity: 1, y: 0, scale: 1 },
             }}
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
-            <Card className="flex h-[78dvh] min-h-[460px] max-h-[820px] flex-col rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82">
+            <Card className="flex h-[100dvh] min-h-[100dvh] max-h-[100dvh] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82 md:h-[calc(100dvh-10.5rem)] md:min-h-[560px] md:max-h-[calc(100dvh-8rem)]">
               <CardHeader
                 className="flex-shrink-0 cursor-pointer"
                 onClick={handleOpenPopup}
@@ -760,9 +760,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     <div className="rounded-lg border border-[#CBD5E1] bg-[#E2E8F0] p-2">
                       <Bot className="size-6 text-[#0F172A]" />
                     </div>
-                    <div>
-                      <CardTitle className="text-[#0F172A]">AI Chat Assistant</CardTitle>
-                      <CardDescription className="text-[#0F172A]">
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="break-words text-[#0F172A]">AI Chat Assistant</CardTitle>
+                      <CardDescription className="break-words text-[#0F172A]">
                         {userName ? `Hi ${userName}` : "Hi"} - Ask anything about NRI taxes and DTAA
                       </CardDescription>
                     </div>
@@ -780,7 +780,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </p>
                 ) : null}
                 {subscription ? (
-                  <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-col items-start gap-2 sm:flex-row sm:flex-wrap sm:items-center">
                     <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
                       Current Plan: {subscription.currentPlan?.displayName || "Starter"}
                     </Badge>
@@ -825,7 +825,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 </div>
               </CardHeader>
 
-              <CardContent ref={chatContentRef} className="flex-1 space-y-4 overflow-y-auto px-3 sm:px-6">
+              <CardContent
+                ref={chatContentRef}
+                // Keep the transcript as the only scrollable region so the composer remains visible on mobile.
+                className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 pb-6 sm:px-6 [WebkitOverflowScrolling:touch]"
+              >
                 {messages.map((message, index) => (
                   <div
                     key={index}
@@ -873,8 +877,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
               </CardContent>
 
-              <CardFooter className="sticky bottom-0 flex-shrink-0 border-t border-[#E2E8F0] bg-[#1d4ed8]/92 backdrop-blur">
-                <form onSubmit={handleSubmit} className="w-full flex items-end gap-2">
+              <CardFooter
+                // Sticky safe-area padding keeps the input docked above Android and iOS system bars.
+                className="sticky bottom-0 z-10 w-full flex-shrink-0 border-t border-[#E2E8F0] bg-[#1d4ed8]/92 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur sm:px-6 sm:pb-[calc(env(safe-area-inset-bottom)+1rem)]"
+              >
+                <form onSubmit={handleSubmit} className="flex w-full items-center gap-2 sm:items-end">
                   <Textarea
                     ref={questionInputRef}
                     placeholder={starterLimitReached ? "Free plan limit reached. Upgrade to Professional." : "Ask me a question"}

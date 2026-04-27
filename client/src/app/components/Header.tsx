@@ -188,16 +188,16 @@ export function Header({ onLogin }: HeaderProps) {
   return (
     <header className="relative z-50">
       <div className="border-b border-gray-200 bg-white/95 backdrop-blur-md md:hidden">
-        <div className="flex h-20 items-center justify-between px-4">
-          <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
+        <div className="flex h-[4.5rem] items-center justify-between gap-3 px-4">
+          <Link to="/home" className="inline-flex min-w-0 flex-1 items-center" aria-label="NRITAX home">
             <img
               src="/logo-transparent.png"
               alt="NRITAX logo"
-              className="h-18 w-auto scale-110 object-contain sm:h-20"
+              className="h-14 w-auto max-w-full object-contain sm:h-16"
             />
           </Link>
 
-          <div className="-ml-1 flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={handleGoBack}
@@ -246,7 +246,7 @@ export function Header({ onLogin }: HeaderProps) {
         className="sticky top-0 border-b border-gray-200 backdrop-blur-md"
       >
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="flex h-20 items-center justify-between">
+          <div className="flex h-[4.75rem] items-center justify-between md:h-20">
             <div className="ml-1 flex items-center gap-5">
               <button
                 type="button"
@@ -256,11 +256,11 @@ export function Header({ onLogin }: HeaderProps) {
               >
                 <ChevronLeft className="size-5" />
               </button>
-              <Link to="/home" className="ml-2 inline-flex items-center" aria-label="NRITAX home">
+              <Link to="/home" className="ml-2 inline-flex min-w-0 items-center" aria-label="NRITAX home">
                 <img
                   src="/logo-transparent.png"
                   alt="NRITAX logo"
-                  className="h-22 w-auto scale-[1.18] object-contain sm:h-28"
+                  className="h-16 w-auto max-w-[14.5rem] object-contain sm:h-20 sm:max-w-[18rem] md:h-24 md:max-w-none"
                 />
               </Link>
             </div>
