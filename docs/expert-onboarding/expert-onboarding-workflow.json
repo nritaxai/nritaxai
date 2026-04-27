@@ -82,6 +82,15 @@
                 "operation": "true",
                 "singleValue": true
               }
+            },
+            {
+              "id": "a8a8d0a7-86c4-4382-bccb-f1fddbd3e107",
+              "leftValue": "={{ String($json[\"g-recaptcha-response\"] || '').trim() }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
             }
           ],
           "combinator": "and"
@@ -94,6 +103,69 @@
       "typeVersion": 2.2,
       "position": [
         500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.google.com/recaptcha/api/siteverify",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "secret",
+              "value": "6LfbPaEsAAAAANxtVbLDJXqod-fcyVK8qjdYUmG"
+            },
+            {
+              "name": "response",
+              "value": "={{ $json[\"g-recaptcha-response\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0f3a3a9b-e3b3-4965-9b0e-a0d0ef4d1c89",
+      "name": "HTTP Request (CAPTCHA Validation)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9e6b7ef5-4378-4687-87d2-261328ab8f16",
+              "leftValue": "={{ $json[\"success\"] === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "11f16144-9518-4c41-b411-6ff299a00abc",
+      "name": "If (CAPTCHA Success)",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1020,
         300
       ]
     },
@@ -112,7 +184,7 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        760,
+        1280,
         180
       ],
       "credentials": {
@@ -183,7 +255,7 @@
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1020,
+        1540,
         180
       ]
     },
@@ -297,7 +369,7 @@
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1280,
+        1800,
         180
       ],
       "credentials": {
@@ -320,14 +392,14 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.2,
       "position": [
-        1540,
+        2060,
         180
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields or resume file\"\n}",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields, resume file, or CAPTCHA verification\"\n}",
         "options": {
           "responseCode": 400
         }
@@ -355,6 +427,35 @@
       ]
     },
     "If (Validate)": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request (CAPTCHA Validation)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook (Error)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request (CAPTCHA Validation)": {
+      "main": [
+        [
+          {
+            "node": "If (CAPTCHA Success)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If (CAPTCHA Success)": {
       "main": [
         [
           {

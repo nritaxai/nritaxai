@@ -60,7 +60,7 @@ const initialValues: ExpertFormData = {
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
-const RECAPTCHA_SITE_KEY = "6LeYqcwsAAAAADZGXgRz0Bib4gu4__nvPIQjw4Zd";
+const RECAPTCHA_SITE_KEY = "6LfbPaEsAAAAAIRxHR8s1bZojFeuJoQ0Vgq2wSdo";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "email",
@@ -90,8 +90,7 @@ const resolveSelectedValue = (value: string, customValue: string) =>
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
-  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
-  const recaptchaWidgetIdRef = useRef<number | null>(null);
+  const recaptchaRef = useRef<HTMLDivElement | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -118,26 +117,22 @@ export function JoinAsExpertPage() {
   }, []);
 
   useEffect(() => {
-    // Poll until grecaptcha script loads, then render the v2 checkbox widget
-    const tryRender = () => {
-      if (
-        typeof window === "undefined" ||
-        !window.grecaptcha ||
-        !recaptchaContainerRef.current ||
-        recaptchaWidgetIdRef.current !== null
-      ) return;
+    const interval = setInterval(() => {
+      if (window.grecaptcha && recaptchaRef.current && recaptchaRef.current.childElementCount === 0) {
+        clearInterval(interval);
 
-      recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaContainerRef.current, {
-        sitekey: RECAPTCHA_SITE_KEY,
-        callback: (token: string) => setCaptchaToken(token),
-        "expired-callback": () => setCaptchaToken(null),
-        "error-callback": () => setCaptchaToken(null),
-      });
-    };
+        window.grecaptcha.render(recaptchaRef.current, {
+          sitekey: RECAPTCHA_SITE_KEY,
+          callback: (token: string) => {
+            setCaptchaToken(token);
+          },
+          "expired-callback": () => setCaptchaToken(null),
+          "error-callback": () => setCaptchaToken(null),
+        });
+      }
+    }, 500);
 
-    tryRender();
-    const interval = window.setInterval(tryRender, 300);
-    return () => window.clearInterval(interval);
+    return () => clearInterval(interval);
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -266,6 +261,7 @@ export function JoinAsExpertPage() {
       if (!normalizedValues.cop) throw new Error("Please select COP.");
       if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
       if (!captchaToken) {
+        alert("Please verify you are not a robot");
         setErrorMessage("Please complete the CAPTCHA verification.");
         setShowErrorBanner(true);
         setLoading(false);
@@ -341,9 +337,9 @@ export function JoinAsExpertPage() {
       if (resumeInputRef.current) {
         resumeInputRef.current.value = "";
       }
-      setCaptchaToken(null);
-      if (recaptchaWidgetIdRef.current !== null && window.grecaptcha) {
-        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+      if (window.grecaptcha) {
+        window.grecaptcha.reset();
+        setCaptchaToken(null);
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
@@ -612,7 +608,7 @@ export function JoinAsExpertPage() {
               </div>
               {/* reCAPTCHA v2 checkbox widget */}
               <div className="mb-4">
-                <div ref={recaptchaContainerRef} />
+                <div ref={recaptchaRef}></div>
                 {showErrorBanner && !captchaToken && (
                   <p className="mt-2 text-sm text-red-600">Please complete the CAPTCHA verification.</p>
                 )}
