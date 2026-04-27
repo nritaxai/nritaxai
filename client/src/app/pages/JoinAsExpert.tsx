@@ -30,8 +30,17 @@ type ExpertOnboardingResponse = {
 declare global {
   interface Window {
     grecaptcha?: {
-      ready: (callback: () => void) => void;
-      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+      render: (
+        container: HTMLElement,
+        parameters: {
+          sitekey: string;
+          callback?: (token: string) => void;
+          "expired-callback"?: () => void;
+          "error-callback"?: () => void;
+        }
+      ) => number;
+      reset: (widgetId?: number) => void;
+      getResponse: (widgetId?: number) => string;
     };
   }
 }
@@ -52,7 +61,6 @@ const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
 const SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
 const RECAPTCHA_SITE_KEY = "6LeYqcwsAAAAADZGXgRz0Bib4gu4__nvPIQjw4Zd";
-const RECAPTCHA_ACTION = "expert_onboarding";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
   "email",
@@ -79,24 +87,11 @@ const debugLog = (message: string, details?: unknown) => {
 const resolveSelectedValue = (value: string, customValue: string) =>
   value === "Other" ? customValue.trim() : value.trim();
 
-const getRecaptchaToken = () =>
-  new Promise<string | null>((resolve) => {
-    if (typeof window === "undefined" || !window.grecaptcha) {
-      resolve(null);
-      return;
-    }
-
-    window.grecaptcha.ready(() => {
-      window.grecaptcha
-        ?.execute(RECAPTCHA_SITE_KEY, { action: RECAPTCHA_ACTION })
-        .then((token) => resolve(token || null))
-        .catch(() => resolve(null));
-    });
-  });
-
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
+  const recaptchaContainerRef = useRef<HTMLDivElement | null>(null);
+  const recaptchaWidgetIdRef = useRef<number | null>(null);
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
@@ -104,6 +99,7 @@ export function JoinAsExpertPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -119,6 +115,35 @@ export function JoinAsExpertPage() {
         email: prev.email || trimValue(parsedUser?.email),
       }));
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    const tryRender = () => {
+      if (
+        typeof window === "undefined" ||
+        !window.grecaptcha ||
+        !recaptchaContainerRef.current ||
+        recaptchaWidgetIdRef.current !== null
+      ) {
+        return;
+      }
+
+      recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaContainerRef.current, {
+        sitekey: RECAPTCHA_SITE_KEY,
+        callback: (token: string) => {
+          setCaptchaToken(token);
+          setErrors((prev) => ({ ...prev, captcha: "" }));
+          setErrorMessage("");
+          setShowErrorBanner(false);
+        },
+        "expired-callback": () => setCaptchaToken(null),
+        "error-callback": () => setCaptchaToken(null),
+      });
+    };
+
+    tryRender();
+    const interval = window.setInterval(tryRender, 200);
+    return () => window.clearInterval(interval);
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -246,6 +271,12 @@ export function JoinAsExpertPage() {
       if (!resolvedQualification) throw new Error("Please select qualification.");
       if (!normalizedValues.cop) throw new Error("Please select COP.");
       if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
+      if (!captchaToken) {
+        setErrorMessage("Please complete the CAPTCHA verification.");
+        setShowErrorBanner(true);
+        setLoading(false);
+        return;
+      }
 
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
@@ -256,11 +287,7 @@ export function JoinAsExpertPage() {
       formData.append("qualification", resolvedQualification || "");
       formData.append("areaOfExpertise", resolvedAreaOfExpertise || "");
       formData.append("profile", profileFile);
-
-      const recaptchaToken = await getRecaptchaToken();
-      if (recaptchaToken) {
-        formData.append("g-recaptcha-response", recaptchaToken);
-      }
+      formData.append("g-recaptcha-response", captchaToken);
 
       console.log("Submitting to:", SUBMIT_URL);
       for (const pair of formData.entries()) {
@@ -271,7 +298,7 @@ export function JoinAsExpertPage() {
         url: SUBMIT_URL,
         requiredFields: REQUIRED_FIELDS,
         hasProfile: true,
-        hasRecaptchaToken: Boolean(recaptchaToken),
+        hasRecaptchaToken: Boolean(captchaToken),
         formKeys: Array.from(formData.keys()),
       });
 
@@ -317,6 +344,10 @@ export function JoinAsExpertPage() {
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
+      setCaptchaToken(null);
+      if (recaptchaWidgetIdRef.current !== null && window.grecaptcha) {
+        window.grecaptcha.reset(recaptchaWidgetIdRef.current);
+      }
       if (resumeInputRef.current) {
         resumeInputRef.current.value = "";
       }
@@ -585,6 +616,12 @@ export function JoinAsExpertPage() {
                   </div>
                 </div>
               </div>
+              <div className="flex justify-start">
+                <div ref={recaptchaContainerRef} />
+              </div>
+              {!captchaToken && showErrorBanner ? (
+                <p className="text-sm text-red-600">Please complete the CAPTCHA verification.</p>
+              ) : null}
               <div className="border-t border-[#E2E8F0] pt-5">
                 {errors.captcha ? <p className="mb-4 text-sm text-red-600">{errors.captcha}</p> : null}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
