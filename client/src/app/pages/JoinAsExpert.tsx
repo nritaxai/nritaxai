@@ -80,23 +80,17 @@ const resolveSelectedValue = (value: string, customValue: string) =>
   value === "Other" ? customValue.trim() : value.trim();
 
 const getRecaptchaToken = () =>
-  new Promise<string>((resolve, reject) => {
+  new Promise<string | null>((resolve) => {
     if (typeof window === "undefined" || !window.grecaptcha) {
-      reject(new Error("Security verification is unavailable. Please refresh and try again."));
+      resolve(null);
       return;
     }
 
     window.grecaptcha.ready(() => {
       window.grecaptcha
         ?.execute(RECAPTCHA_SITE_KEY, { action: RECAPTCHA_ACTION })
-        .then((token) => {
-          if (!token) {
-            reject(new Error("Security verification failed. Please try again."));
-            return;
-          }
-          resolve(token);
-        })
-        .catch(() => reject(new Error("Security verification failed. Please try again.")));
+        .then((token) => resolve(token || null))
+        .catch(() => resolve(null));
     });
   });
 
@@ -253,7 +247,6 @@ export function JoinAsExpertPage() {
       if (!normalizedValues.cop) throw new Error("Please select COP.");
       if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
 
-      const recaptchaToken = await getRecaptchaToken();
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
       formData.append("email", normalizedValues.email || "");
@@ -263,7 +256,11 @@ export function JoinAsExpertPage() {
       formData.append("qualification", resolvedQualification || "");
       formData.append("areaOfExpertise", resolvedAreaOfExpertise || "");
       formData.append("profile", profileFile);
-      formData.append("g-recaptcha-response", recaptchaToken);
+
+      const recaptchaToken = await getRecaptchaToken();
+      if (recaptchaToken) {
+        formData.append("g-recaptcha-response", recaptchaToken);
+      }
 
       console.log("Submitting to:", SUBMIT_URL);
       for (const pair of formData.entries()) {
