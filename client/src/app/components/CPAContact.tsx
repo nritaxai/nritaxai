@@ -12,6 +12,8 @@ import { Calendar } from "./ui/calendar";
 import { ScrollArea } from "./ui/scroll-area";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import {
+  CONSULTATION_WEBHOOKS,
+  ConsultationWebhookError,
   CONSULTATION_TIME_ZONES,
   formatConsultationTimeLabel,
   getBrowserTimeZone,
@@ -19,10 +21,10 @@ import {
   normalizeConsultationDate,
   normalizeConsultationTime,
   normalizeConsultationTimeZone,
+  postConsultationWebhook,
   trimValue,
   isValidEmail,
 } from "../utils/consultationWorkflow";
-import { buildApiUrl } from "../../utils/api";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 
 interface CPAContactProps {
@@ -39,7 +41,7 @@ const INITIAL_FORM_DATA = {
   country: "",
   customCountry: "",
   queryDetails: "",
-  service: "",
+  service: "CPA Consultation",
   timeZone: "",
   preferredDate: "",
   preferredTime: "",
@@ -146,7 +148,6 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
     if (!timeZone) nextErrors.timeZone = "Timezone is required.";
     if (!preferredDate) nextErrors.preferredDate = "Consultation date is required.";
     if (!preferredTime) nextErrors.preferredTime = "Time slot is required.";
-    if (!trimValue(formData.service)) nextErrors.service = "Service selection is required.";
     if (!trimValue(formData.queryDetails)) nextErrors.queryDetails = "Please describe your tax situation and concerns.";
 
     if (preferredDate && selectedDate) {
@@ -194,30 +195,22 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
       preferredDate,
       preferredTime,
       timeZone,
-      service: trimValue(formData.service),
+      service: trimValue(formData.service) || "CPA Consultation",
       queryDetails: trimValue(formData.queryDetails),
     };
 
     try {
-      const response = await fetch(buildApiUrl("/api/consultations"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-      const result = (await response.json().catch(() => null)) as { message?: string } | null;
-      if (!response.ok) {
-        throw new Error(result?.message || "Failed to submit consultation request.");
-      }
-      const message = trimValue(result?.message) || "Consultation request submitted successfully.";
-
-      setSuccessMessage(message);
+      await postConsultationWebhook(CONSULTATION_WEBHOOKS.booking, payload);
+      setSuccessMessage("Your consultation has been booked successfully");
       setFormData(INITIAL_FORM_DATA);
       setFieldErrors({});
       setSubmitted(true);
     } catch (error: any) {
-      setErrorMessage(error?.message || "Failed to submit consultation request.");
+      if (error instanceof ConsultationWebhookError && error.status === 409) {
+        setErrorMessage("This slot is already booked, please choose another time");
+      } else {
+        setErrorMessage("Something went wrong, please try again");
+      }
     } finally {
       setLoading(false);
     }
@@ -245,7 +238,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               </div>
               <CardTitle className="text-2xl">Request Submitted!</CardTitle>
               <CardDescription className="mt-2">
-                {successMessage || "Our certified CPA will contact you within 24 hours. We have also emailed your confirmation."}
+                {successMessage || "Your consultation has been booked successfully"}
               </CardDescription>
             </div>
           </CardHeader>
@@ -577,12 +570,13 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="service">Service Required *</Label>
+              <Label htmlFor="service">Service Required</Label>
               <Select value={formData.service} onValueChange={(value) => setFieldValue("service", value)}>
                 <SelectTrigger aria-invalid={Boolean(fieldErrors.service)}>
-                  <SelectValue placeholder="Select service" />
+                  <SelectValue placeholder="CPA Consultation" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="CPA Consultation">CPA Consultation</SelectItem>
                   <SelectItem value="tax-planning">Tax Planning & Strategy</SelectItem>
                   <SelectItem value="dtaa">{renderTextWithShortForms("DTAA Consultation")}</SelectItem>
                   <SelectItem value="itr-filing">{renderTextWithShortForms("ITR Filing Assistance")}</SelectItem>

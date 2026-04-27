@@ -62,6 +62,16 @@ export type ConsultationBookingPayload = {
 
 type JsonRecord = Record<string, unknown>;
 
+export class ConsultationWebhookError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ConsultationWebhookError";
+    this.status = status;
+  }
+}
+
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_PATTERN = /^\d{2}:\d{2}$/;
@@ -317,8 +327,9 @@ export const postConsultationWebhook = async <TResponse extends JsonRecord = Jso
 
   const data = (await safeParseJson(response)) as TResponse | null;
   if (!response.ok) {
-    throw new Error(
-      extractWebhookErrorMessage(data as JsonRecord | null, "Unable to process your consultation request right now.")
+    throw new ConsultationWebhookError(
+      extractWebhookErrorMessage(data as JsonRecord | null, "Unable to process your consultation request right now."),
+      response.status
     );
   }
 
