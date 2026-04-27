@@ -118,31 +118,25 @@ export function JoinAsExpertPage() {
   }, []);
 
   useEffect(() => {
+    // Poll until grecaptcha script loads, then render the v2 checkbox widget
     const tryRender = () => {
       if (
         typeof window === "undefined" ||
         !window.grecaptcha ||
         !recaptchaContainerRef.current ||
         recaptchaWidgetIdRef.current !== null
-      ) {
-        return;
-      }
+      ) return;
 
       recaptchaWidgetIdRef.current = window.grecaptcha.render(recaptchaContainerRef.current, {
         sitekey: RECAPTCHA_SITE_KEY,
-        callback: (token: string) => {
-          setCaptchaToken(token);
-          setErrors((prev) => ({ ...prev, captcha: "" }));
-          setErrorMessage("");
-          setShowErrorBanner(false);
-        },
+        callback: (token: string) => setCaptchaToken(token),
         "expired-callback": () => setCaptchaToken(null),
         "error-callback": () => setCaptchaToken(null),
       });
     };
 
     tryRender();
-    const interval = window.setInterval(tryRender, 200);
+    const interval = window.setInterval(tryRender, 300);
     return () => window.clearInterval(interval);
   }, []);
 
@@ -344,12 +338,12 @@ export function JoinAsExpertPage() {
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
+      if (resumeInputRef.current) {
+        resumeInputRef.current.value = "";
+      }
       setCaptchaToken(null);
       if (recaptchaWidgetIdRef.current !== null && window.grecaptcha) {
         window.grecaptcha.reset(recaptchaWidgetIdRef.current);
-      }
-      if (resumeInputRef.current) {
-        resumeInputRef.current.value = "";
       }
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
@@ -616,12 +610,13 @@ export function JoinAsExpertPage() {
                   </div>
                 </div>
               </div>
-              <div className="flex justify-start">
+              {/* reCAPTCHA v2 checkbox widget */}
+              <div className="mb-4">
                 <div ref={recaptchaContainerRef} />
+                {showErrorBanner && !captchaToken && (
+                  <p className="mt-2 text-sm text-red-600">Please complete the CAPTCHA verification.</p>
+                )}
               </div>
-              {!captchaToken && showErrorBanner ? (
-                <p className="text-sm text-red-600">Please complete the CAPTCHA verification.</p>
-              ) : null}
               <div className="border-t border-[#E2E8F0] pt-5">
                 {errors.captcha ? <p className="mb-4 text-sm text-red-600">{errors.captcha}</p> : null}
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
