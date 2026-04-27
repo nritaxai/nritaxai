@@ -117,22 +117,16 @@ export function JoinAsExpertPage() {
   }, []);
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (window.grecaptcha && recaptchaRef.current && recaptchaRef.current.childElementCount === 0) {
-        clearInterval(interval);
+    if (!window.grecaptcha || !recaptchaRef.current || recaptchaRef.current.childElementCount > 0) return;
 
-        window.grecaptcha.render(recaptchaRef.current, {
-          sitekey: RECAPTCHA_SITE_KEY,
-          callback: (token: string) => {
-            setCaptchaToken(token);
-          },
-          "expired-callback": () => setCaptchaToken(null),
-          "error-callback": () => setCaptchaToken(null),
-        });
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
+    window.grecaptcha.render(recaptchaRef.current, {
+      sitekey: RECAPTCHA_SITE_KEY,
+      callback: (token: string) => {
+        setCaptchaToken(token);
+      },
+      "expired-callback": () => setCaptchaToken(null),
+      "error-callback": () => setCaptchaToken(null),
+    });
   }, []);
 
   const handleChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -261,7 +255,7 @@ export function JoinAsExpertPage() {
       if (!normalizedValues.cop) throw new Error("Please select COP.");
       if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
       if (!captchaToken) {
-        alert("Please verify you are not a robot");
+        alert("Please complete CAPTCHA");
         setErrorMessage("Please complete the CAPTCHA verification.");
         setShowErrorBanner(true);
         setLoading(false);
@@ -339,8 +333,8 @@ export function JoinAsExpertPage() {
       }
       if (window.grecaptcha) {
         window.grecaptcha.reset();
-        setCaptchaToken(null);
       }
+      setCaptchaToken(null);
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
       const message = error instanceof Error ? error.message : "Something went wrong.";
