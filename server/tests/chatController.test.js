@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   buildBasicRagContext,
-  buildGemmaPrompt,
+  buildChatPrompt,
   isTaxRelatedQuery,
   NON_TAX_QUERY_REPLY,
 } from "../Controllers/chatController.js";
@@ -28,7 +28,7 @@ test("isTaxRelatedQuery allows NRI tax questions and blocks unrelated questions"
   assert.equal(isTaxRelatedQuery("Write me an Instagram caption for my vacation"), false);
   assert.equal(
     NON_TAX_QUERY_REPLY,
-    "I specialize only in NRI and Indian tax matters. Please ask tax-related questions."
+    "Please ask a tax-related question."
   );
 });
 
@@ -40,20 +40,17 @@ test("buildBasicRagContext includes DTAA and TDS context when relevant", () => {
   assert.match(context, /NRI Taxation Context:/);
 });
 
-test("buildGemmaPrompt prioritizes retrieved context and preserves tax-only guardrails", () => {
-  const prompt = buildGemmaPrompt({
+test("buildChatPrompt prioritizes retrieved context and preserves tax-only guardrails", () => {
+  const prompt = buildChatPrompt({
     selectedLanguage: { instruction: "Respond only in English." },
     contextualMessages: [{ role: "user", content: "What is DTAA for NRIs?" }],
     hiddenContext: "DTAA stands for Double Tax Avoidance Agreement.",
   });
 
-  assert.match(prompt, /=== RETRIEVED KNOWLEDGE \(HIGHEST PRIORITY\) ===/);
+  assert.match(prompt, /=== RETRIEVED CONTEXT \(HIGHEST PRIORITY\) ===/);
   assert.match(prompt, /DTAA stands for Double Tax Avoidance Agreement\./);
-  assert.match(prompt, /If the answer is present in the above context, you MUST use it\./);
-  assert.match(prompt, /DO NOT create your own definition if context is available\./);
+  assert.match(prompt, /- You MUST use the above context to answer\./);
+  assert.match(prompt, /- DO NOT create your own definitions\./);
   assert.match(prompt, /Section 195 applies to payments made to NRIs\./);
-  assert.match(
-    prompt,
-    /I specialize only in NRI and Indian tax matters\. Please ask tax-related questions\./
-  );
+  assert.match(prompt, /Please ask a tax-related question\./);
 });

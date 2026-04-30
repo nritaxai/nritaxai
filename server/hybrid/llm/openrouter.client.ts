@@ -13,10 +13,10 @@ type OpenRouterChatResult = {
   raw: unknown;
 };
 
-const DEFAULT_OPENROUTER_MODEL = "openai/gpt-4o-mini";
+const DEFAULT_OPENROUTER_MODEL = "anthropic/claude-3.5-sonnet";
 const DEFAULT_OPENROUTER_TIMEOUT_MS = 20000;
-const DEFAULT_REFERER = "https://nritax.ai";
-const DEFAULT_TITLE = "NRITAX AI";
+const DEFAULT_REFERER = "https://www.nritax.ai";
+const DEFAULT_TITLE = "NRI Tax AI";
 
 const env = (globalThis as typeof globalThis & {
   process?: {
@@ -78,8 +78,8 @@ export class OpenRouterClient {
         body: JSON.stringify({
           model: this.model,
           messages: normalizedMessages,
-          temperature: typeof options.temperature === "number" ? options.temperature : 0.1,
-          max_tokens: typeof options.maxTokens === "number" ? options.maxTokens : 900,
+          temperature: typeof options.temperature === "number" ? options.temperature : 0.3,
+          max_tokens: typeof options.maxTokens === "number" ? Math.max(options.maxTokens, 2048) : 2048,
         }),
         signal: controller.signal,
       });

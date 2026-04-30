@@ -33,8 +33,8 @@ export const validateHybridConfig = (): void => {
   validateRequiredEnv("GEMINI_API_KEY");
   validateRequiredEnv("MONGO_URI");
 
-  validateOptionalEnv("OPENROUTER_MODEL", "openai/gpt-4o-mini");
-  validateOptionalEnv("GEMINI_MODEL", "gemini-1.5-flash");
+  validateOptionalEnv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet");
+  validateOptionalEnv("GEMINI_MODEL", "gemini-1.5-pro");
   validateOptionalEnv("GEMINI_EMBED_MODEL", "text-embedding-004");
 
   validateOptionalEnv("OPENROUTER_TIMEOUT_MS", "20000");
@@ -75,8 +75,8 @@ export const printHybridConfig = (): void => {
   console.log(`    - GEMINI_API_KEY: ${process.env.GEMINI_API_KEY ? "Set" : "Missing"}`);
   console.log(`    - MONGO_URI: ${process.env.MONGO_URI ? "Set" : "Missing"}`);
   console.log("  LLM Models:");
-  console.log(`    - OpenRouter Model: ${validateOptionalEnv("OPENROUTER_MODEL", "openai/gpt-4o-mini")}`);
-  console.log(`    - Gemini Model: ${validateOptionalEnv("GEMINI_MODEL", "gemini-1.5-flash")}`);
+  console.log(`    - OpenRouter Model: ${validateOptionalEnv("OPENROUTER_MODEL", "anthropic/claude-3.5-sonnet")}`);
+  console.log(`    - Gemini Model: ${validateOptionalEnv("GEMINI_MODEL", "gemini-1.5-pro")}`);
   console.log(`    - Gemini Embedding Model: ${validateOptionalEnv("GEMINI_EMBED_MODEL", "text-embedding-004")}`);
   console.log("  Timeouts:");
   console.log(`    - OpenRouter: ${validateOptionalEnv("OPENROUTER_TIMEOUT_MS", "20000")}ms`);

@@ -15,7 +15,7 @@ type GeminiEmbedResult = {
   raw: unknown;
 };
 
-const DEFAULT_GEMINI_MODEL = "gemini-1.5-flash";
+const DEFAULT_GEMINI_MODEL = "gemini-1.5-pro";
 const DEFAULT_GEMINI_EMBED_MODEL = "text-embedding-004";
 
 const getGeminiApiKey = (): string => {
@@ -70,8 +70,8 @@ export class GeminiClient {
             },
           ],
           generationConfig: {
-            temperature: params.temperature ?? 0.1,
-            maxOutputTokens: params.maxOutputTokens ?? 900,
+            temperature: params.temperature ?? 0.3,
+            maxOutputTokens: Math.max(params.maxOutputTokens ?? 2048, 2048),
           },
         }),
         signal: controller.signal,

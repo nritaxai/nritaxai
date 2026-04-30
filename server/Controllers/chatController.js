@@ -14,35 +14,11 @@ import {
 } from "../Utils/subscriptionAccess.js";
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
-import { generateChatResponse, generateGeminiResponse } from "../Config/openaiService.js";
+import { AI_DEFAULT_MAX_TOKENS, NRI_TAX_SYSTEM_PROMPT, generateAIResponse } from "../services/aiService.js";
 
-const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-const USE_GEMINI_PRIMARY =
-  GEMINI_API_KEY && String(process.env.USE_GEMINI_PRIMARY || "false") === "true";
+const OPENROUTER_MODEL = process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet";
 const NON_TAX_QUERY_REPLY = "Please ask a tax-related question.";
-const SYSTEM_PROMPT = `
-You are a professional NRI tax assistant.
-
-Rules:
-- Answer ONLY tax-related questions (India, NRI, DTAA, FEMA, income tax)
-- If question is not tax-related, respond: "Please ask a tax-related question."
-- Always give accurate, legally correct answers
-- Keep answers SHORT and CLEAR (3-6 lines max)
-- Prefer bullet points where useful
-- Always expand abbreviations (e.g., DTAA = Double Taxation Avoidance Agreement)
-- Do NOT hallucinate or guess
-- If unsure, say: "This requires professional review."
-
-Focus Areas:
-- DTAA (Double Taxation Avoidance Agreements)
-- NRI taxation
-- Residential status
-- Foreign income taxation
-- Capital gains, salary, TDS
-- India ↔ other country tax rules
-`.trim();
+const SYSTEM_PROMPT = NRI_TAX_SYSTEM_PROMPT;
 const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 8), 6);
 const MAX_STORED_MESSAGES = 100;
 const chatSessionMemory = new Map();
@@ -54,7 +30,7 @@ const RAG_EMBEDDING_MIN_SIMILARITY = 0.12;
 const RAG_EMBEDDING_MODEL = process.env.RAG_EMBEDDING_MODEL || "openai/text-embedding-3-small";
 const RAG_MAX_PER_PAGE = Number(process.env.RAG_MAX_PER_PAGE || 2);
 const RAG_ENABLE_EMBEDDING_RERANK = String(process.env.RAG_ENABLE_EMBEDDING_RERANK || "false").toLowerCase() === "true";
-const CHAT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || 1000), 700);
+const CHAT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || AI_DEFAULT_MAX_TOKENS), AI_DEFAULT_MAX_TOKENS);
 let dtaaChunksCache = null;
 let dtaaTokenIndexCache = null;
 let dtaaIndexMtimeCache = null;
@@ -217,8 +193,6 @@ const getSessionActorId = (req) => {
 
 const sanitizeAiReply = (text = "") =>
   String(text)
-    .replace(/\*\*/g, "")
-    .replace(/__/g, "")
     .replace(/###\s*Note[\s\S]*?uploaded\s*pdfs?[\s\S]*?(?=\n###\s|\s*$)/im, "")
     .replace(/^\s*Note:\s*.*uploaded\s*pdfs?.*$/gim, "")
     .replace(/^\s*.*uploaded\s*pdfs?.*$/gim, "")
@@ -966,7 +940,8 @@ const buildBasicRagContext = (message = "") => {
   return sections.join("\n\n").trim();
 };
 
-const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext = "" }) => {
+// Ollama removed - using OpenRouter prompts with Gemini fallback behind generateAIResponse().
+const buildChatPrompt = ({ selectedLanguage, contextualMessages, hiddenContext = "" }) => {
   const safeHiddenContext = String(hiddenContext || "").trim();
   const conversation = formatMessagesForPrompt(contextualMessages);
 
@@ -1034,36 +1009,24 @@ const buildGemmaPrompt = ({ selectedLanguage, contextualMessages, hiddenContext 
 };
 
 const askOpenRouter = async ({ model = OPENROUTER_MODEL, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
-  const prompt = buildGemmaPrompt({ selectedLanguage, contextualMessages, hiddenContext });
+  const prompt = buildChatPrompt({ selectedLanguage, contextualMessages, hiddenContext });
 
-  try {
-    return await generateChatResponse(
-      [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+  const result = await generateAIResponse(
+    [
       {
-        systemPrompt: SYSTEM_PROMPT,
-        model,
-        temperature: 0.3,
-        maxTokens: 800,
-        fallbackToGemini: true,
-      }
-    );
-  } catch (openRouterError) {
-    console.warn("OpenRouter failed, falling back to Gemini:", openRouterError?.message);
-
-    if (!GEMINI_API_KEY) throw openRouterError;
-
-    return await generateGeminiResponse({
-      prompt,
-      systemInstruction: SYSTEM_PROMPT,
+        role: "user",
+        content: prompt,
+      },
+    ],
+    SYSTEM_PROMPT,
+    {
+      preferredModel: model,
       temperature: 0.3,
-      maxOutputTokens: 800,
-    });
-  }
+      maxTokens: CHAT_MAX_TOKENS,
+    }
+  );
+
+  return result.response;
 };
 
 const syncSessionStores = async ({
@@ -1434,15 +1397,12 @@ export const chatWithAI = async (req, res) => {
     console.error("chatWithAI error:", error);
 
     try {
-      const geminiReply = await generateGeminiResponse({
-        prompt: `User: ${message}`,
-        systemInstruction: SYSTEM_PROMPT,
-      });
-
       return res.status(200).json({
-        reply: ensureStructuredSections(geminiReply, requestLanguage),
+        reply:
+          fallbackReplyByLanguage[requestLanguage] ||
+          fallbackReplyByLanguage.english,
       });
-    } catch (geminiError) {
+    } catch (fallbackError) {
       return res.status(200).json({
         reply:
           fallbackReplyByLanguage[requestLanguage] ||
@@ -1452,7 +1412,7 @@ export const chatWithAI = async (req, res) => {
   }
 };
 
-export { askOpenRouter, buildBasicRagContext, buildGemmaPrompt, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
+export { askOpenRouter, buildBasicRagContext, buildChatPrompt, isTaxRelatedQuery, NON_TAX_QUERY_REPLY };
 
 
 
