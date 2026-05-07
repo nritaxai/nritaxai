@@ -7,7 +7,7 @@ export function HeroPage() {
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
       navigate("/home", { replace: true });
-    }, 10000);
+    }, 1000);
 
     return () => window.clearTimeout(timeoutId);
   }, [navigate]);
@@ -28,25 +28,28 @@ export function HeroPage() {
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#2563eb]/16 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-[#1D4ED8]/18 blur-3xl" />
 
-      <div className="relative -translate-y-16 flex w-full max-w-5xl flex-col items-center px-6 text-center sm:-translate-y-20">
+      <div className="relative -translate-y-10 flex w-full max-w-5xl flex-col items-center px-6 text-center sm:-translate-y-14">
         <img
           src="/logo-transparent.png"
           alt="NRITAX logo"
-          className="-ml-4 -mb-16 h-56 w-auto object-contain sm:-ml-6 sm:-mb-20 sm:h-72 lg:-ml-8 lg:-mb-24 lg:h-80"
+          fetchPriority="high"
+          loading="eager"
+          decoding="async"
+          className="mb-3 w-full max-w-[240px] object-contain sm:mb-4 sm:max-w-[310px] lg:max-w-[360px]"
         />
         <p className="mb-3 rounded-full border border-[#BFDBFE] bg-white/70 px-4 py-1 text-xs tracking-[0.24em] text-[#2563EB]">
           AI TAX PLATFORM FOR NRIS
         </p>
-        <h1 className="text-4xl tracking-tight text-[#0F172A] sm:text-6xl">
+        <h1 className="text-4xl font-semibold tracking-tight text-[#0F172A] sm:text-6xl">
           NRITAX<span className="text-[#2563eb]">.AI</span>
         </h1>
-        <p className="mx-auto mt-4 max-w-2xl text-base text-[#334155] sm:text-lg">
+        <p className="mx-auto mt-4 max-w-2xl text-base leading-relaxed text-[#334155] sm:text-lg">
           Smart NRI tax guidance, instant AI help, and practical next steps in one place.
         </p>
         <div className="mx-auto mt-8 h-1.5 w-40 overflow-hidden rounded-full bg-white/80">
           <div className="h-full w-full rounded-full bg-[#2563EB] animate-pulse" />
         </div>
-        <p className="mt-4 text-sm text-[#475569]">Loading website...</p>
+        <p className="mt-4 text-sm text-[#475569]">Opening website...</p>
       </div>
     </div>
   );

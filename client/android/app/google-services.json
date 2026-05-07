@@ -1,0 +1,55 @@
+{
+  "project_info": {
+    "project_number": "307987125319",
+    "project_id": "nritaxai",
+    "storage_bucket": "nritaxai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:307987125319:android:ead122d9df82ca3a634d62",
+        "android_client_info": {
+          "package_name": "com.nritaxai.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "307987125319-8ioooqfm0iel5c0d4smmg1l204p7dtjm.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nritaxai.app",
+            "certificate_hash": "e29831f7c7434576b18ca92479c0100eb2a88c04"
+          }
+        },
+        {
+          "client_id": "307987125319-97ajiq8oufvv7b3lqroviddau5ev54ch.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.nritaxai.app",
+            "certificate_hash": "360717239752e066c5b474718eaf7fa291586184"
+          }
+        },
+        {
+          "client_id": "307987125319-k7ifrilh3a9f2bb24p263hsj7k6j1fjq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCCMxz8I3Kx3TOSXBs8ia8l-ydr7-wNSD0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "307987125319-k7ifrilh3a9f2bb24p263hsj7k6j1fjq.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
