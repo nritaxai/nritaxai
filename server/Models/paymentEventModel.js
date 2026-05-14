@@ -51,6 +51,10 @@ const paymentEventSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    acknowledgedAt: {
+      type: Date,
+      default: null,
+    },
     firstSeenAt: {
       type: Date,
       default: Date.now,
@@ -62,6 +66,11 @@ const paymentEventSchema = new mongoose.Schema(
     deliveryCount: {
       type: Number,
       default: 1,
+    },
+    duplicateDelivery: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
     lastError: {
       type: String,
@@ -77,6 +86,8 @@ const paymentEventSchema = new mongoose.Schema(
 );
 
 paymentEventSchema.index({ provider: 1, eventKey: 1 }, { unique: true });
+paymentEventSchema.index({ provider: 1, processedAt: 1, createdAt: -1 });
+paymentEventSchema.index({ provider: 1, eventType: 1, createdAt: -1 });
 
 const PaymentEvent = mongoose.model("PaymentEvent", paymentEventSchema);
 export default PaymentEvent;

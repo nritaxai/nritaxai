@@ -22,6 +22,9 @@ export const featureFlags = {
   tracingEnabled: parseBoolean(process.env.OTEL_ENABLED, false),
   errorMonitoringEnabled: parseBoolean(process.env.SENTRY_ENABLED, false),
   paymentReliabilityEnabled: parseBoolean(process.env.PAYMENT_RELIABILITY_ENABLED, true),
+  paymentMonitoringEnabled: parseBoolean(process.env.PAYMENT_MONITORING_ENABLED, true),
+  paymentReconciliationEnabled: parseBoolean(process.env.PAYMENT_RECONCILIATION_ENABLED, true),
+  paymentQueueEnabled: parseBoolean(process.env.PAYMENT_QUEUE_ENABLED, false),
   hybridRetrievalCacheEnabled: parseBoolean(process.env.HYBRID_RETRIEVAL_CACHE_ENABLED, true),
 };
 

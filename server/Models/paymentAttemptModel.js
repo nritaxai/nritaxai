@@ -45,12 +45,48 @@ const paymentAttemptSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["created", "verified", "failed"],
+      enum: ["created", "verified", "failed", "reconciled", "cancelled"],
       default: "created",
+      index: true,
     },
     verifiedAt: {
       type: Date,
       default: null,
+    },
+    lastVerificationAttemptAt: {
+      type: Date,
+      default: null,
+    },
+    retryCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    nextRetryAt: {
+      type: Date,
+      default: null,
+    },
+    recoveryStatus: {
+      type: String,
+      enum: ["none", "pending", "recovered", "manual_review"],
+      default: "none",
+      index: true,
+    },
+    failureCode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    lifecycleStatus: {
+      type: String,
+      trim: true,
+      default: "created",
+    },
+    subscriptionId: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
     },
     signatureHash: {
       type: String,
@@ -66,6 +102,8 @@ const paymentAttemptSchema = new mongoose.Schema(
 );
 
 paymentAttemptSchema.index({ provider: 1, orderId: 1 }, { unique: true });
+paymentAttemptSchema.index({ user: 1, planKey: 1, billing: 1, status: 1, createdAt: -1 });
+paymentAttemptSchema.index({ provider: 1, recoveryStatus: 1, nextRetryAt: 1 });
 
 const PaymentAttempt = mongoose.model("PaymentAttempt", paymentAttemptSchema);
 export default PaymentAttempt;

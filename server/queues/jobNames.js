@@ -3,6 +3,7 @@ export const QUEUE_NAMES = {
   ai: "ai-jobs",
   reports: "report-jobs",
   notifications: "notification-jobs",
+  payments: "payment-jobs",
   deadLetter: "dead-letter-jobs",
 };
 
@@ -13,4 +14,5 @@ export const JOB_NAMES = {
   aiEmbedding: "ai.embedding",
   aiGeneration: "ai.generation",
   reportGeneration: "report.generation",
+  paymentReconcile: "payment.reconcile",
 };

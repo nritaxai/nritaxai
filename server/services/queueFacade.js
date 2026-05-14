@@ -2,6 +2,7 @@ import { featureFlags } from "../Config/featureFlags.js";
 import { dispatchJob } from "../queues/dispatchJob.js";
 import { JOB_NAMES, QUEUE_NAMES } from "../queues/jobNames.js";
 import { indexStoredPdfByName, rebuildPdfIndex } from "./pdfIndexService.js";
+import { processPaymentReconciliation } from "../workers/processors/payment.processor.js";
 import { sendConsultationNotificationsInline } from "./consultationNotificationService.js";
 
 export const enqueuePdfIndexJob = async ({ fileName }) =>
@@ -38,4 +39,22 @@ export const enqueueConsultationNotificationJob = async (payload) =>
     dedupeKey: `consultation-notify:${payload?.requestId || ""}`,
     featureFlagEnabled: featureFlags.backgroundJobsEnabled && featureFlags.consultationQueueEnabled,
     inlineHandler: sendConsultationNotificationsInline,
+  });
+
+export const enqueuePaymentReconciliationJob = async (payload) =>
+  dispatchJob({
+    queueName: QUEUE_NAMES.payments,
+    jobName: JOB_NAMES.paymentReconcile,
+    payload,
+    payloadSummary: {
+      orderId: payload?.orderId || "",
+      paymentId: payload?.paymentId || "",
+      userId: payload?.userId || "",
+    },
+    dedupeKey: `payment-reconcile:${payload?.orderId || payload?.paymentId || ""}`,
+    featureFlagEnabled:
+      featureFlags.backgroundJobsEnabled &&
+      featureFlags.paymentQueueEnabled &&
+      featureFlags.paymentReconciliationEnabled,
+    inlineHandler: processPaymentReconciliation,
   });

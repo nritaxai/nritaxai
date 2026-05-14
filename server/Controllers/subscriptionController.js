@@ -17,12 +17,19 @@ import {
 import { featureFlags } from "../Config/featureFlags.js";
 import {
   getPaymentAttemptByOrderId,
+  appendPaymentAuditLog,
+  findReusablePaymentAttempt,
+  getRecoverablePaymentAttempts,
   markPaymentEventFailed,
   markPaymentEventProcessed,
+  markPaymentAttemptFailed,
   markPaymentVerified,
   recordPaymentEventDelivery,
   recordPaymentOrder,
 } from "../services/paymentReliability.js";
+import { applyPaidSubscriptionState, isDuplicateSuccessfulCharge, PAYMENT_RECOVERY_STATUS } from "../services/paymentStateMachine.js";
+import { enqueuePaymentReconciliationJob } from "../services/queueFacade.js";
+import { getPaymentReliabilitySummary } from "../services/paymentReliabilityMonitor.js";
 
 const PLAN_ALIAS = {
   pro: PLAN_KEYS.PROFESSIONAL,
@@ -149,6 +156,9 @@ const getRazorpayErrorMessage = (error) => {
   const directMessage = error?.message;
   return apiDescription || directMessage || "Unknown Razorpay error";
 };
+
+const buildFailureRetryDate = (retryCount = 0) =>
+  new Date(Date.now() + Math.min(5 * 60 * 1000 * Math.max(retryCount || 1, 1), 24 * 60 * 60 * 1000));
 
 const addMonthsToDate = (startDate, months) => {
   const end = new Date(startDate);
@@ -440,6 +450,53 @@ export const createSubscription = async (req, res) => {
       });
     }
 
+    if (featureFlags.paymentReliabilityEnabled) {
+      const reusableAttempt = await findReusablePaymentAttempt({
+        provider: "razorpay",
+        userId: user._id,
+        planKey: meta.planKey,
+        billing,
+        amount: amountInPaise,
+        currency: "INR",
+      });
+
+      if (reusableAttempt?.orderId) {
+        try {
+          const reusableOrder = await razorpay.orders.fetch(reusableAttempt.orderId);
+          await appendPaymentAuditLog({
+            provider: "razorpay",
+            action: "order_reused",
+            status: "info",
+            orderId: reusableAttempt.orderId,
+            userId: String(user._id),
+            message: "Reused recent unverified payment order to prevent duplicate checkout creation.",
+            metadata: {
+              planKey: meta.planKey,
+              billing,
+            },
+          });
+          return res.status(200).json({
+            success: true,
+            id: reusableOrder.id,
+            orderId: reusableOrder.id,
+            amount: reusableOrder.amount,
+            currency: reusableOrder.currency,
+            razorpayKey: process.env.RAZORPAY_KEY_ID,
+            plan: meta.planName,
+            planKey: meta.planKey,
+            billing,
+            promoCode: promoCode || null,
+            discountPercent,
+            baseAmount: baseAmountInPaise,
+            discountAmount: discountPaise,
+            tax,
+            reused: true,
+          });
+        } catch {
+        }
+      }
+    }
+
     const order = await razorpay.orders.create({
       amount: amountInPaise,
       currency: "INR",
@@ -481,6 +538,20 @@ export const createSubscription = async (req, res) => {
           promoCode: promoCode || null,
           taxType: tax.taxType,
           gstMode: tax.gstMode,
+        },
+      });
+      await appendPaymentAuditLog({
+        provider: "razorpay",
+        action: "order_created",
+        status: "success",
+        orderId: order.id,
+        userId: String(user._id),
+        message: "Payment order created successfully.",
+        metadata: {
+          planKey: meta.planKey,
+          billing,
+          amount: order.amount,
+          currency: order.currency,
         },
       });
     }
@@ -536,6 +607,17 @@ export const verifySubscriptionPayment = async (req, res) => {
     const expectedSignature = hmacSha256(`${orderId}|${paymentId}`, secret);
 
     if (expectedSignature !== signature) {
+      if (featureFlags.paymentReliabilityEnabled) {
+        await appendPaymentAuditLog({
+          provider: "razorpay",
+          action: "payment_verify_signature_failed",
+          status: "error",
+          orderId,
+          paymentId,
+          userId: String(req.user?._id || ""),
+          message: "Payment signature verification failed.",
+        });
+      }
       return res.status(400).json({
         success: false,
         message: "Payment signature verification failed",
@@ -566,6 +648,25 @@ export const verifySubscriptionPayment = async (req, res) => {
           subscriptionDetails: getSubscriptionSummary(user),
         });
       }
+
+      if (isDuplicateSuccessfulCharge({ existingAttempt, paymentId })) {
+        await appendPaymentAuditLog({
+          provider: "razorpay",
+          action: "duplicate_charge_blocked",
+          status: "warning",
+          orderId,
+          paymentId,
+          userId: String(user._id),
+          message: "Blocked a second successful payment verification for the same order.",
+          metadata: {
+            existingPaymentId: existingAttempt.paymentId,
+          },
+        });
+        return res.status(409).json({
+          success: false,
+          message: "This order has already been verified with a different payment. Please contact support.",
+        });
+      }
     }
 
     let orderBilling = String(billing || "monthly").toLowerCase();
@@ -579,24 +680,12 @@ export const verifySubscriptionPayment = async (req, res) => {
       console.warn("verifySubscriptionPayment: unable to fetch order:", fetchError?.message || fetchError);
     }
 
-    const start = new Date();
-    const end = new Date(start);
-    if (orderBilling === "yearly") {
-      end.setFullYear(end.getFullYear() + 1);
-    } else {
-      end.setMonth(end.getMonth() + 1);
-    }
-
-    user.subscription.subscriptionId = orderId;
-    user.subscription.provider = "razorpay";
-    user.subscription.plan = "PRO";
-    user.subscription.status = "active";
-    user.subscription.currentPeriodStart = start;
-    user.subscription.currentPeriodEnd = end;
-    user.plan = PLAN_KEYS.PROFESSIONAL;
-    user.subscriptionStatus = SUBSCRIPTION_STATUSES.ACTIVE;
-    user.subscriptionStartDate = start;
-    user.subscriptionEndDate = end;
+    applyPaidSubscriptionState({
+      user,
+      orderId,
+      billing: orderBilling,
+      provider: "razorpay",
+    });
 
     await user.save();
 
@@ -611,6 +700,19 @@ export const verifySubscriptionPayment = async (req, res) => {
           billing: orderBilling,
         },
       });
+      await appendPaymentAuditLog({
+        provider: "razorpay",
+        action: "payment_verified",
+        status: "success",
+        orderId,
+        paymentId,
+        subscriptionId: orderId,
+        userId: String(user._id),
+        message: "Payment verified and subscription activated.",
+        metadata: {
+          billing: orderBilling,
+        },
+      });
     }
 
     return res.status(200).json({
@@ -621,6 +723,35 @@ export const verifySubscriptionPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("verifySubscriptionPayment error:", error);
+    if (featureFlags.paymentReliabilityEnabled) {
+      const orderId = String(req.body?.razorpay_order_id || "").trim();
+      const paymentId = String(req.body?.razorpay_payment_id || "").trim();
+      const failedAttempt = await markPaymentAttemptFailed({
+        provider: "razorpay",
+        orderId,
+        paymentId,
+        userId: String(req.user?._id || ""),
+        failureCode: "verify_failed",
+        message: error?.message || "Payment verification failed",
+        recoveryStatus: PAYMENT_RECOVERY_STATUS.PENDING,
+        nextRetryAt: buildFailureRetryDate(1),
+        metadata: {
+          source: "verifySubscriptionPayment",
+        },
+      });
+      await appendPaymentAuditLog({
+        provider: "razorpay",
+        action: "payment_verify_failed",
+        status: "error",
+        orderId,
+        paymentId,
+        userId: String(req.user?._id || ""),
+        message: error?.message || "Payment verification failed",
+        metadata: {
+          retryCount: failedAttempt?.retryCount || 0,
+        },
+      });
+    }
     return res.status(500).json({
       success: false,
       message: "Payment verification failed",
@@ -756,6 +887,17 @@ export const razorpayWebhook = async (req, res) => {
     const expected = hmacSha256(rawBody, process.env.RAZORPAY_WEBHOOK_SECRET);
 
     if (!signature || expected !== signature) {
+      if (featureFlags.paymentReliabilityEnabled) {
+        await appendPaymentAuditLog({
+          provider: "razorpay",
+          action: "webhook_signature_invalid",
+          status: "error",
+          message: "Rejected webhook due to invalid signature.",
+          metadata: {
+            event: req.body?.event || "",
+          },
+        });
+      }
       return res.status(400).json({ success: false, message: "Invalid signature" });
     }
 
@@ -782,6 +924,19 @@ export const razorpayWebhook = async (req, res) => {
       });
       paymentEventRecord = delivery.event;
       if (delivery.duplicate) {
+        await appendPaymentAuditLog({
+          provider: "razorpay",
+          action: "webhook_duplicate_delivery",
+          status: "warning",
+          orderId: orderIdFromPayload,
+          paymentId: paymentIdFromPayload,
+          subscriptionId: subscriptionIdFromPayload,
+          userId: paymentEntity?.notes?.userId || subscriptionEntity?.notes?.userId || "",
+          message: "Received duplicate processed webhook delivery.",
+          metadata: {
+            event,
+          },
+        });
         return res.status(200).json({ status: "duplicate", handledEvent: event });
       }
     }
@@ -837,6 +992,19 @@ export const razorpayWebhook = async (req, res) => {
             source: "webhook",
           },
         });
+        await appendPaymentAuditLog({
+          provider: "razorpay",
+          action: "webhook_payment_captured",
+          status: "success",
+          orderId: orderIdFromPayload,
+          paymentId: paymentIdFromPayload,
+          subscriptionId: subscriptionIdFromPayment || "",
+          userId: String(user._id),
+          message: "Processed payment.captured webhook successfully.",
+          metadata: {
+            event,
+          },
+        });
         await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
       }
 
@@ -884,6 +1052,20 @@ export const razorpayWebhook = async (req, res) => {
     await user.save();
 
     if (featureFlags.paymentReliabilityEnabled) {
+      await appendPaymentAuditLog({
+        provider: "razorpay",
+        action: "webhook_subscription_updated",
+        status: "success",
+        orderId: orderIdFromPayload,
+        paymentId: paymentIdFromPayload,
+        subscriptionId: subscriptionEntity.id,
+        userId: String(user._id),
+        message: "Processed subscription lifecycle webhook successfully.",
+        metadata: {
+          event,
+          nextStatus: user.subscription.status,
+        },
+      });
       await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
     }
 
@@ -957,6 +1139,116 @@ export const validatePromoCode = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Unable to validate promo code right now.",
+    });
+  }
+};
+
+export const reconcileSubscriptionPayment = async (req, res) => {
+  try {
+    if (!featureFlags.paymentReconciliationEnabled) {
+      return res.status(503).json({
+        success: false,
+        message: "Payment reconciliation is disabled.",
+      });
+    }
+
+    const orderId = normalizeText(req.body?.orderId || req.query?.orderId);
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: "orderId is required.",
+      });
+    }
+
+    const attempt = await getPaymentAttemptByOrderId({
+      provider: "razorpay",
+      orderId,
+    });
+
+    if (!attempt) {
+      return res.status(404).json({
+        success: false,
+        message: "Payment attempt not found.",
+      });
+    }
+
+    const reconciliationJob = await enqueuePaymentReconciliationJob({
+      orderId,
+      paymentId: attempt.paymentId || "",
+      userId: attempt.user?.toString?.() || "",
+      subscriptionId: attempt.subscriptionId || "",
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: reconciliationJob.queued
+        ? "Payment reconciliation job queued."
+        : "Payment reconciliation completed inline.",
+      queued: reconciliationJob.queued,
+      jobId: reconciliationJob.jobId,
+      data: reconciliationJob.result || null,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to reconcile payment.",
+      error: error.message,
+    });
+  }
+};
+
+export const retryFailedPaymentRecoveries = async (_req, res) => {
+  try {
+    if (!featureFlags.paymentReconciliationEnabled) {
+      return res.status(503).json({
+        success: false,
+        message: "Payment reconciliation is disabled.",
+      });
+    }
+
+    const attempts = await getRecoverablePaymentAttempts({ provider: "razorpay" });
+    const results = [];
+
+    for (const attempt of attempts) {
+      const job = await enqueuePaymentReconciliationJob({
+        orderId: attempt.orderId,
+        paymentId: attempt.paymentId || "",
+        userId: attempt.user?.toString?.() || "",
+        subscriptionId: attempt.subscriptionId || "",
+      });
+      results.push({
+        orderId: attempt.orderId,
+        queued: job.queued,
+        jobId: job.jobId,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: results.length,
+      recoveries: results,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to schedule payment recoveries.",
+      error: error.message,
+    });
+  }
+};
+
+export const getPaymentReliabilityStatus = async (_req, res) => {
+  try {
+    const summary = await getPaymentReliabilitySummary();
+    return res.status(200).json({
+      success: true,
+      paymentReliability: summary,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load payment reliability summary.",
+      error: error.message,
     });
   }
 };

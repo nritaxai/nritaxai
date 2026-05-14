@@ -10,6 +10,7 @@ import {
 import { logger } from "../services/logger.js";
 import { processAiEmbeddingJob, processAiGenerationJob } from "./processors/ai.processor.js";
 import { processConsultationNotifications } from "./processors/consultation.processor.js";
+import { processPaymentReconciliation } from "./processors/payment.processor.js";
 import { processPdfIndexFile, processPdfReindexAll } from "./processors/pdf.processor.js";
 import { processReportGenerationJob } from "./processors/report.processor.js";
 
@@ -20,6 +21,7 @@ const PROCESSOR_BY_JOB = {
   [JOB_NAMES.aiEmbedding]: processAiEmbeddingJob,
   [JOB_NAMES.aiGeneration]: processAiGenerationJob,
   [JOB_NAMES.reportGeneration]: processReportGenerationJob,
+  [JOB_NAMES.paymentReconcile]: processPaymentReconciliation,
 };
 
 const QUEUE_TO_JOB_NAMES = {
@@ -27,6 +29,7 @@ const QUEUE_TO_JOB_NAMES = {
   [QUEUE_NAMES.ai]: [JOB_NAMES.aiEmbedding, JOB_NAMES.aiGeneration],
   [QUEUE_NAMES.reports]: [JOB_NAMES.reportGeneration],
   [QUEUE_NAMES.notifications]: [JOB_NAMES.consultationNotifications],
+  [QUEUE_NAMES.payments]: [JOB_NAMES.paymentReconcile],
 };
 
 export const startWorkerRuntime = async () => {

@@ -5,8 +5,11 @@ import {
   createSubscription,
   getRazorpayDebugConfig,
   getMySubscription,
+  getPaymentReliabilityStatus,
   getSubscriptionStatus,
   razorpayWebhook,
+  reconcileSubscriptionPayment,
+  retryFailedPaymentRecoveries,
   subscribeToPlan,
   validatePromoCode,
   verifySubscriptionPayment,
@@ -23,6 +26,9 @@ router.post("/subscribe", protect, subscribeToPlan);
 router.get("/status", protect, getSubscriptionStatus);
 router.post("/cancel", protect, cancelSubscription);
 router.get("/debug-config", protect, getRazorpayDebugConfig);
+router.get("/reliability-status", protect, getPaymentReliabilityStatus);
+router.post("/reconcile", protect, reconcileSubscriptionPayment);
+router.post("/retry-recoveries", protect, retryFailedPaymentRecoveries);
 
 // Razorpay webhook (public route, called by Razorpay)
 router.post("/razorpay-webhook", razorpayWebhook);
