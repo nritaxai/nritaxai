@@ -14,6 +14,15 @@ import {
   getSubscriptionSummary,
   normalizeUserSubscriptionState,
 } from "../Utils/subscriptionAccess.js";
+import { featureFlags } from "../Config/featureFlags.js";
+import {
+  getPaymentAttemptByOrderId,
+  markPaymentEventFailed,
+  markPaymentEventProcessed,
+  markPaymentVerified,
+  recordPaymentEventDelivery,
+  recordPaymentOrder,
+} from "../services/paymentReliability.js";
 
 const PLAN_ALIAS = {
   pro: PLAN_KEYS.PROFESSIONAL,
@@ -459,6 +468,23 @@ export const createSubscription = async (req, res) => {
       },
     });
 
+    if (featureFlags.paymentReliabilityEnabled) {
+      await recordPaymentOrder({
+        provider: "razorpay",
+        orderId: order.id,
+        userId: user._id,
+        planKey: meta.planKey,
+        billing,
+        amount: order.amount,
+        currency: order.currency,
+        metadata: {
+          promoCode: promoCode || null,
+          taxType: tax.taxType,
+          gstMode: tax.gstMode,
+        },
+      });
+    }
+
     return res.status(200).json({
       success: true,
       id: order.id,
@@ -522,6 +548,26 @@ export const verifySubscriptionPayment = async (req, res) => {
     }
     normalizeUserSubscriptionState(user);
 
+    if (featureFlags.paymentReliabilityEnabled) {
+      const existingAttempt = await getPaymentAttemptByOrderId({
+        provider: "razorpay",
+        orderId,
+      });
+
+      if (
+        existingAttempt?.status === "verified" &&
+        existingAttempt?.paymentId &&
+        existingAttempt.paymentId === paymentId
+      ) {
+        return res.status(200).json({
+          success: true,
+          message: "Payment already verified",
+          subscription: user.subscription,
+          subscriptionDetails: getSubscriptionSummary(user),
+        });
+      }
+    }
+
     let orderBilling = String(billing || "monthly").toLowerCase();
     try {
       const fetchedOrder = await razorpay.orders.fetch(orderId);
@@ -553,6 +599,19 @@ export const verifySubscriptionPayment = async (req, res) => {
     user.subscriptionEndDate = end;
 
     await user.save();
+
+    if (featureFlags.paymentReliabilityEnabled) {
+      await markPaymentVerified({
+        provider: "razorpay",
+        orderId,
+        paymentId,
+        userId: user._id,
+        signature,
+        metadata: {
+          billing: orderBilling,
+        },
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -683,6 +742,7 @@ export const subscribeToPlan = async (req, res) => {
 };
 
 export const razorpayWebhook = async (req, res) => {
+  let paymentEventRecord = null;
   try {
     const envError = ensureRequiredEnv("RAZORPAY_WEBHOOK_SECRET");
     if (envError) {
@@ -702,8 +762,34 @@ export const razorpayWebhook = async (req, res) => {
     const event = req.body?.event;
     const subscriptionEntity = req.body?.payload?.subscription?.entity;
     const paymentEntity = req.body?.payload?.payment?.entity;
+    const orderIdFromPayload = paymentEntity?.order_id || paymentEntity?.orderId || "";
+    const paymentIdFromPayload = paymentEntity?.id || "";
+    const subscriptionIdFromPayload = subscriptionEntity?.id || paymentEntity?.subscription_id || "";
+
+    if (featureFlags.paymentReliabilityEnabled) {
+      const delivery = await recordPaymentEventDelivery({
+        provider: "razorpay",
+        eventType: event,
+        signatureValid: true,
+        rawBody,
+        orderId: orderIdFromPayload,
+        paymentId: paymentIdFromPayload,
+        subscriptionId: subscriptionIdFromPayload,
+        userId: paymentEntity?.notes?.userId || subscriptionEntity?.notes?.userId || "",
+        metadata: {
+          event,
+        },
+      });
+      paymentEventRecord = delivery.event;
+      if (delivery.duplicate) {
+        return res.status(200).json({ status: "duplicate", handledEvent: event });
+      }
+    }
 
     if (!event) {
+      if (featureFlags.paymentReliabilityEnabled) {
+        await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
+      }
       return res.status(200).json({ status: "ignored", reason: "missing_event" });
     }
 
@@ -728,6 +814,9 @@ export const razorpayWebhook = async (req, res) => {
       }
 
       if (!user) {
+        if (featureFlags.paymentReliabilityEnabled) {
+          await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
+        }
         return res.status(200).json({ status: "user_not_found_for_payment" });
       }
 
@@ -737,10 +826,27 @@ export const razorpayWebhook = async (req, res) => {
       }
       await user.save();
 
+      if (featureFlags.paymentReliabilityEnabled) {
+        await markPaymentVerified({
+          provider: "razorpay",
+          orderId: orderIdFromPayload,
+          paymentId: paymentIdFromPayload,
+          userId: user._id,
+          signature,
+          metadata: {
+            source: "webhook",
+          },
+        });
+        await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
+      }
+
       return res.status(200).json({ status: "ok", handledEvent: event });
     }
 
     if (!subscriptionEntity?.id) {
+      if (featureFlags.paymentReliabilityEnabled) {
+        await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
+      }
       return res.status(200).json({ status: "ignored", reason: "missing_subscription_entity" });
     }
 
@@ -756,6 +862,9 @@ export const razorpayWebhook = async (req, res) => {
     }
 
     if (!user) {
+      if (featureFlags.paymentReliabilityEnabled) {
+        await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
+      }
       return res.status(200).json({ status: "user_not_found_for_subscription" });
     }
 
@@ -774,9 +883,19 @@ export const razorpayWebhook = async (req, res) => {
     user.subscription.currentPeriodEnd = toDateOrNull(subscriptionEntity.current_end);
     await user.save();
 
+    if (featureFlags.paymentReliabilityEnabled) {
+      await markPaymentEventProcessed({ eventId: paymentEventRecord?._id });
+    }
+
     return res.status(200).json({ status: "ok", handledEvent: event });
   } catch (error) {
     console.error("razorpayWebhook error:", error);
+    if (featureFlags.paymentReliabilityEnabled) {
+      await markPaymentEventFailed({
+        eventId: paymentEventRecord?._id,
+        lastError: error?.message || "Webhook handling failed",
+      });
+    }
     return res.status(500).json({ success: false, message: "Webhook handling failed" });
   }
 };
