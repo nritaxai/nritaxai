@@ -1,0 +1,11 @@
+namespace: nritax-production
+
+resources:
+  - api-rollout.yaml
+  - api-services.yaml
+  - worker-deployment.yaml
+  - gpu-worker-deployment.yaml
+  - worker-service.yaml
+  - api-hpa.yaml
+  - worker-hpa.yaml
+  - pdb.yaml

@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nritax-gpu-worker
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: nritax-gpu-worker
+  template:
+    metadata:
+      labels:
+        app: nritax-gpu-worker
+        tier: worker
+        workload: gpu
+    spec:
+      nodeSelector:
+        workload-type: gpu
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: gpu-worker
+          image: ghcr.io/nritaxai/worker:latest
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: APP_RUNTIME
+              value: k8s
+            - name: AI_QUEUE_ENABLED
+              value: "true"
+            - name: WORKER_CONCURRENCY
+              value: "1"
+          resources:
+            limits:
+              nvidia.com/gpu: 1
+              cpu: "4"
+              memory: 8Gi
+            requests:
+              cpu: "1"
+              memory: 4Gi

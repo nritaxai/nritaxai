@@ -8,6 +8,7 @@ import {
   markAsyncJobFailed,
 } from "../services/asyncJobAudit.js";
 import { logger } from "../services/logger.js";
+import { recordQueueResultMetric } from "../services/metrics.js";
 import { processAiEmbeddingJob, processAiGenerationJob } from "./processors/ai.processor.js";
 import { processConsultationNotifications } from "./processors/consultation.processor.js";
 import { processPaymentReconciliation } from "./processors/payment.processor.js";
@@ -62,9 +63,23 @@ export const startWorkerRuntime = async () => {
         try {
           const result = await processor(job.data || {});
           await markAsyncJobCompleted(String(job.id), result, job.attemptsMade);
+          recordQueueResultMetric({
+            queueName,
+            jobName: job.name,
+            status: "completed",
+            durationMs: Number(job.processedOn && job.finishedOn ? job.finishedOn - job.processedOn : 0),
+            waitMs: Number(job.processedOn && job.timestamp ? job.processedOn - job.timestamp : 0),
+          });
           return result;
         } catch (error) {
           await markAsyncJobFailed(String(job.id), error?.message || String(error), job.attemptsMade);
+          recordQueueResultMetric({
+            queueName,
+            jobName: job.name,
+            status: "failed",
+            durationMs: Number(job.processedOn ? Date.now() - job.processedOn : 0),
+            waitMs: Number(job.processedOn && job.timestamp ? job.processedOn - job.timestamp : 0),
+          });
           throw error;
         }
       },

@@ -1,0 +1,19 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nritax-api
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: nritax-api
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nritax-worker
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: nritax-worker

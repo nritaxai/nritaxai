@@ -1,0 +1,30 @@
+namespace: nritax-staging
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Rollout
+      name: nritax-api
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 2
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: APP_REGION
+          value: us-staging-1
+  - target:
+      kind: Deployment
+      name: nritax-worker
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: APP_REGION
+          value: us-staging-1

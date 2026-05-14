@@ -1,0 +1,94 @@
+{
+  "title": "nritax.ai Platform Overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "API P95 Latency",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nritax_http_request_duration_ms_bucket[5m])) by (le, route))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI Latency P95",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nritax_ai_latency_ms_bucket[5m])) by (le, provider, route_tier))",
+          "legendFormat": "{{provider}} / {{route_tier}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "API Failure Rate",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_api_failures_total[5m])) / clamp_min(sum(rate(nritax_http_requests_total[5m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Cache Hit Rate",
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_cache_requests_total{result=\"hit\"}[5m])) / clamp_min(sum(rate(nritax_cache_requests_total[5m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Wait P95",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nritax_queue_job_wait_ms_bucket[5m])) by (le, queue, job))",
+          "legendFormat": "{{queue}} / {{job}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DB P95 Latency",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nritax_db_operation_duration_ms_bucket[5m])) by (le, operation, collection))",
+          "legendFormat": "{{collection}} / {{operation}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Payment Success Rate",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_payment_attempts_total{status=~\"verified|reconciled\"}[15m])) / clamp_min(sum(rate(nritax_payment_attempts_total[15m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Depth",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(nritax_queue_depth{state=~\"waiting|active|delayed\"}) by (queue, state)",
+          "legendFormat": "{{queue}} / {{state}}"
+        }
+      ]
+    }
+  ]
+}

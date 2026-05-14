@@ -1,6 +1,7 @@
 import fs from "fs/promises";
 import path from "path";
 import { fileURLToPath } from "url";
+import { recordAiMetric } from "../metrics.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const LOGS_DIR = path.resolve(__dirname, "..", "..", "..", "logs");
@@ -67,6 +68,13 @@ export const recordAiGatewayExecution = async ({
   cacheHit = false,
 } = {}) =>
   enqueueWrite(async () => {
+    recordAiMetric({
+      routeTier,
+      provider,
+      latencyMs,
+      failed,
+    });
+
     const metrics = await readMetrics();
     const nextTotal = Number(metrics.totalRequests || 0) + 1;
     const safeLatency = Number.isFinite(Number(latencyMs)) ? Number(latencyMs) : 0;

@@ -20,6 +20,7 @@ export const featureFlags = {
   reportQueueEnabled: parseBoolean(process.env.REPORT_QUEUE_ENABLED, false),
   structuredLoggingEnabled: parseBoolean(process.env.STRUCTURED_LOGGING_ENABLED, true),
   tracingEnabled: parseBoolean(process.env.OTEL_ENABLED, false),
+  prometheusMetricsEnabled: parseBoolean(process.env.PROMETHEUS_METRICS_ENABLED, true),
   errorMonitoringEnabled: parseBoolean(process.env.SENTRY_ENABLED, false),
   paymentReliabilityEnabled: parseBoolean(process.env.PAYMENT_RELIABILITY_ENABLED, true),
   paymentMonitoringEnabled: parseBoolean(process.env.PAYMENT_MONITORING_ENABLED, true),

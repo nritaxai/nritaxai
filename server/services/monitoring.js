@@ -23,7 +23,14 @@ export const initErrorMonitoring = async () => {
     dsn,
     environment: process.env.NODE_ENV || "development",
     release: process.env.APP_COMMIT || undefined,
+    serverName: process.env.APP_NAME || "nritax-server",
     tracesSampleRate: Number(process.env.SENTRY_TRACES_SAMPLE_RATE || 0),
+    initialScope: {
+      tags: {
+        service: process.env.APP_NAME || "nritax-server",
+        region: process.env.APP_REGION || process.env.RENDER_REGION || "unknown",
+      },
+    },
   });
 
   logger.info({ enabled: true }, "error monitoring initialized");

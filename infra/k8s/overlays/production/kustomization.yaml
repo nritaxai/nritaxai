@@ -1,0 +1,24 @@
+namespace: nritax-production
+
+resources:
+  - ../../base
+
+patches:
+  - target:
+      kind: Rollout
+      name: nritax-api
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: APP_REGION
+          value: us-central1
+  - target:
+      kind: Deployment
+      name: nritax-worker
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: APP_REGION
+          value: us-central1

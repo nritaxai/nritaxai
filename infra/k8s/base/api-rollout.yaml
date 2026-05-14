@@ -1,0 +1,65 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: nritax-api
+spec:
+  replicas: 4
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app: nritax-api
+  template:
+    metadata:
+      labels:
+        app: nritax-api
+        tier: api
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/nritaxai/server:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: APP_RUNTIME
+              value: k8s
+            - name: PROMETHEUS_METRICS_ENABLED
+              value: "true"
+            - name: BACKGROUND_JOBS_ENABLED
+              value: "true"
+            - name: WORKER_CONCURRENCY
+              value: "4"
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+  strategy:
+    canary:
+      stableService: nritax-api-stable
+      canaryService: nritax-api-canary
+      steps:
+        - setWeight: 10
+        - pause:
+            duration: 120s
+        - setWeight: 30
+        - pause:
+            duration: 180s
+        - setWeight: 60
+        - pause:
+            duration: 300s

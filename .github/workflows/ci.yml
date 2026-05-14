@@ -1,0 +1,47 @@
+name: Backend CI
+
+on:
+  pull_request:
+    paths:
+      - "server/**"
+      - "infra/**"
+      - ".github/workflows/ci.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "server/**"
+      - "infra/**"
+      - ".github/workflows/ci.yml"
+
+jobs:
+  test-and-validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm install --no-package-lock
+      - name: Run unit tests
+        run: npm test
+      - name: Build API image
+        run: docker build -t nritax-server-ci -f Dockerfile .
+      - name: Build worker image
+        run: docker build -t nritax-worker-ci -f Dockerfile.worker .
+
+  validate-kustomize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: imranismail/setup-kustomize@v2
+      - name: Render staging manifests
+        run: kustomize build infra/k8s/overlays/staging > /tmp/staging.yaml
+      - name: Render production manifests
+        run: kustomize build infra/k8s/overlays/production > /tmp/production.yaml

@@ -1,4 +1,5 @@
 import { createRequestId, logger } from "../services/logger.js";
+import { recordHttpRequestMetric } from "../services/metrics.js";
 
 export const requestContextMiddleware = (req, res, next) => {
   const startedAt = Date.now();
@@ -15,10 +16,18 @@ export const requestContextMiddleware = (req, res, next) => {
   req.logger = childLogger;
 
   res.on("finish", () => {
+    const durationMs = Date.now() - startedAt;
+    const route = req.route?.path || req.baseUrl || req.path || req.originalUrl || "unknown";
+    recordHttpRequestMetric({
+      method: req.method,
+      route,
+      statusCode: res.statusCode,
+      durationMs,
+    });
     childLogger.info(
       {
         statusCode: res.statusCode,
-        durationMs: Date.now() - startedAt,
+        durationMs,
       },
       "request completed"
     );

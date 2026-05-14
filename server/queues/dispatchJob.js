@@ -5,6 +5,7 @@ import {
   markAsyncJobFailed,
 } from "../services/asyncJobAudit.js";
 import { logger } from "../services/logger.js";
+import { recordQueueDispatchMetric, recordQueueResultMetric } from "../services/metrics.js";
 import { getQueue } from "./queueRegistry.js";
 
 const buildInlineJobId = (queueName, jobName) =>
@@ -20,24 +21,60 @@ export const dispatchJob = async ({
   inlineHandler,
 }) => {
   if (!featureFlagEnabled) {
-    const result = inlineHandler ? await inlineHandler(payload) : null;
-    return {
-      queued: false,
-      inline: true,
-      result,
-      jobId: null,
-    };
+    try {
+      const result = inlineHandler ? await inlineHandler(payload) : null;
+      recordQueueDispatchMetric({ queueName, jobName, queued: false });
+      recordQueueResultMetric({
+        queueName,
+        jobName,
+        status: "completed",
+        durationMs: 0,
+      });
+      return {
+        queued: false,
+        inline: true,
+        result,
+        jobId: null,
+      };
+    } catch (error) {
+      recordQueueDispatchMetric({ queueName, jobName, queued: false });
+      recordQueueResultMetric({
+        queueName,
+        jobName,
+        status: "failed",
+        durationMs: 0,
+      });
+      throw error;
+    }
   }
 
   const queue = await getQueue(queueName);
   if (!queue) {
-    const result = inlineHandler ? await inlineHandler(payload) : null;
-    return {
-      queued: false,
-      inline: true,
-      result,
-      jobId: null,
-    };
+    try {
+      const result = inlineHandler ? await inlineHandler(payload) : null;
+      recordQueueDispatchMetric({ queueName, jobName, queued: false });
+      recordQueueResultMetric({
+        queueName,
+        jobName,
+        status: "completed",
+        durationMs: 0,
+      });
+      return {
+        queued: false,
+        inline: true,
+        result,
+        jobId: null,
+      };
+    } catch (error) {
+      recordQueueDispatchMetric({ queueName, jobName, queued: false });
+      recordQueueResultMetric({
+        queueName,
+        jobName,
+        status: "failed",
+        durationMs: 0,
+      });
+      throw error;
+    }
   }
 
   const job = await queue.add(jobName, payload, {
@@ -53,6 +90,7 @@ export const dispatchJob = async ({
   });
 
   logger.info({ queueName, jobName, jobId: job.id }, "job queued");
+  recordQueueDispatchMetric({ queueName, jobName, queued: true });
 
   return {
     queued: true,
@@ -81,9 +119,23 @@ export const runInlineAuditedJob = async ({
   try {
     const result = await handler(payload);
     await markAsyncJobCompleted(jobId, result, 1);
+    recordQueueDispatchMetric({ queueName, jobName, queued: false });
+    recordQueueResultMetric({
+      queueName,
+      jobName,
+      status: "completed",
+      durationMs: 0,
+    });
     return { jobId, result };
   } catch (error) {
     await markAsyncJobFailed(jobId, error?.message || String(error), 1);
+    recordQueueDispatchMetric({ queueName, jobName, queued: false });
+    recordQueueResultMetric({
+      queueName,
+      jobName,
+      status: "failed",
+      durationMs: 0,
+    });
     throw error;
   }
 };

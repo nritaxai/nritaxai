@@ -1,0 +1,36 @@
+name: Rollback Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      rollback_target:
+        description: "Optional Argo revision number"
+        required: false
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: azure/setup-kubectl@v4
+      - name: Install Argo Rollouts plugin
+        run: |
+          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x ./kubectl-argo-rollouts-linux-amd64
+          sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+      - name: Configure kubectl
+        env:
+          KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+        run: |
+          mkdir -p "$HOME/.kube"
+          echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
+      - name: Abort or undo API rollout
+        run: |
+          if [ -n "${{ inputs.rollback_target }}" ]; then
+            kubectl argo rollouts undo nritax-api --to-revision=${{ inputs.rollback_target }} -n nritax-production
+          else
+            kubectl argo rollouts abort nritax-api -n nritax-production || true
+            kubectl argo rollouts undo nritax-api -n nritax-production
+          fi
+      - name: Undo worker deployment
+        run: kubectl rollout undo deployment/nritax-worker -n nritax-production

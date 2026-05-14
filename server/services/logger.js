@@ -58,6 +58,9 @@ const getPinoLogger = async () => {
       base: {
         service: process.env.APP_NAME || "nritax-server",
         env: process.env.NODE_ENV || "development",
+        version: process.env.APP_VERSION || "dev",
+        commit: process.env.APP_COMMIT || "unknown",
+        region: process.env.APP_REGION || process.env.RENDER_REGION || "unknown",
       },
       timestamp: pino.stdTimeFunctions.isoTime,
     });

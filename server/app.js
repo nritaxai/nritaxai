@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import connectDB from "./Config/db.js";
+import connectDB, { getDbReadiness } from "./Config/db.js";
 import { createRateLimiter } from "./Middlewares/rateLimit.js";
 import authRoute from "./Routes/authRoutes.js";
 import chatRoute from "./Routes/chatRoutes.js";
@@ -17,6 +17,8 @@ import analyticsRoute from "./Routes/analyticsRoutes.js";
 import { requestContextMiddleware } from "./Middlewares/requestContext.js";
 import { captureException, initErrorMonitoring } from "./services/monitoring.js";
 import { logger } from "./services/logger.js";
+import { metricsHandler, recordApiFailureMetric } from "./services/metrics.js";
+import { getRedisConnection, isQueueingConfigured } from "./queues/redis.js";
 
 dotenv.config();
 
@@ -95,6 +97,15 @@ app.get("/health", (_req, res) => {
   });
 });
 
+app.get("/livez", (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    status: "alive",
+  });
+});
+
+app.get("/metrics", metricsHandler);
+
 app.use(async (_req, _res, next) => {
   try {
     await connectDB();
@@ -115,9 +126,40 @@ app.get("/version", (_req, res) => {
 });
 
 app.get("/ready", (_req, res) => {
+  const db = getDbReadiness();
+  const queueingConfigured = isQueueingConfigured();
   return res.status(200).json({
     success: true,
-    status: "ready",
+    status: db.ready ? "ready" : "degraded",
+    dependencies: {
+      database: db,
+      queueing: {
+        configured: queueingConfigured,
+      },
+    },
+  });
+});
+
+app.get("/readyz", async (_req, res) => {
+  const db = getDbReadiness();
+  const queueingConfigured = isQueueingConfigured();
+  let queueReady = true;
+
+  if (queueingConfigured) {
+    queueReady = Boolean(await getRedisConnection());
+  }
+
+  const ready = db.ready && queueReady;
+  return res.status(ready ? 200 : 503).json({
+    success: ready,
+    status: ready ? "ready" : "not_ready",
+    dependencies: {
+      database: db,
+      queueing: {
+        configured: queueingConfigured,
+        ready: queueReady,
+      },
+    },
   });
 });
 
@@ -143,6 +185,12 @@ app.use((req, res) => {
 
 app.use((err, req, res, _next) => {
   if (String(err?.message || "").startsWith("CORS blocked:")) {
+    recordApiFailureMetric({
+      method: req.method,
+      route: req.originalUrl,
+      statusCode: 403,
+      errorType: "cors_blocked",
+    });
     return res.status(403).json({
       success: false,
       message: "Origin not allowed by CORS policy.",
@@ -150,6 +198,12 @@ app.use((err, req, res, _next) => {
   }
 
   if (err?.type === "entity.parse.failed") {
+    recordApiFailureMetric({
+      method: req.method,
+      route: req.originalUrl,
+      statusCode: 400,
+      errorType: "json_parse_failed",
+    });
     return res.status(400).json({
       success: false,
       message: "Invalid JSON payload.",
@@ -157,6 +211,12 @@ app.use((err, req, res, _next) => {
   }
 
   if (err?.name === "MulterError") {
+    recordApiFailureMetric({
+      method: req.method,
+      route: req.originalUrl,
+      statusCode: 400,
+      errorType: err.code || "multer_error",
+    });
     const message =
       err.code === "LIMIT_FILE_SIZE"
         ? "Uploaded file is too large."
@@ -170,6 +230,12 @@ app.use((err, req, res, _next) => {
     });
   }
 
+  recordApiFailureMetric({
+    method: req.method,
+    route: req.originalUrl,
+    statusCode: 500,
+    errorType: err?.name || "unhandled_server_error",
+  });
   req?.logger?.error?.({ error: err?.message || String(err) }, "unhandled server error");
   void captureException(err, {
     requestId: req?.requestId,

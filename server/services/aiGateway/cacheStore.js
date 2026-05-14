@@ -1,3 +1,5 @@
+import { recordCacheMetric } from "../metrics.js";
+
 const DEFAULT_TTL_MS = Math.max(Number(process.env.AI_GATEWAY_CACHE_TTL_MS || 120000), 1000);
 const DEFAULT_MAX_ITEMS = Math.max(Number(process.env.AI_GATEWAY_CACHE_MAX_ITEMS || 300), 25);
 
@@ -52,11 +54,16 @@ export const buildAiGatewayCacheKey = ({
 export const getCachedGatewayResponse = (cacheKey) => {
   if (!cacheKey) return null;
   const entry = responseCache.get(cacheKey);
-  if (!entry) return null;
-  if (Date.now() - entry.createdAt > DEFAULT_TTL_MS) {
-    responseCache.delete(cacheKey);
+  if (!entry) {
+    recordCacheMetric({ layer: "ai_gateway_response", hit: false });
     return null;
   }
+  if (Date.now() - entry.createdAt > DEFAULT_TTL_MS) {
+    responseCache.delete(cacheKey);
+    recordCacheMetric({ layer: "ai_gateway_response", hit: false });
+    return null;
+  }
+  recordCacheMetric({ layer: "ai_gateway_response", hit: true });
   return entry.value;
 };
 

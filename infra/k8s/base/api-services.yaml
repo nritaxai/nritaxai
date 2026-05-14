@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: nritax-api-stable
+spec:
+  selector:
+    app: nritax-api
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nritax-api-canary
+spec:
+  selector:
+    app: nritax-api
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000

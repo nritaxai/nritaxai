@@ -3,6 +3,7 @@ import PaymentAttempt from "../Models/paymentAttemptModel.js";
 import PaymentAuditLog from "../Models/paymentAuditLogModel.js";
 import PaymentEvent from "../Models/paymentEventModel.js";
 import { PAYMENT_LIFECYCLE_STATE, PAYMENT_RECOVERY_STATUS } from "./paymentStateMachine.js";
+import { recordPaymentMetric } from "./metrics.js";
 
 const sha256 = (value) => crypto.createHash("sha256").update(String(value || "")).digest("hex");
 
@@ -114,7 +115,7 @@ export const markPaymentVerified = async ({
 }) => {
   if (!orderId) return null;
 
-  return PaymentAttempt.findOneAndUpdate(
+  const result = await PaymentAttempt.findOneAndUpdate(
     { provider, orderId },
     {
       $setOnInsert: {
@@ -135,6 +136,8 @@ export const markPaymentVerified = async ({
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+  recordPaymentMetric({ provider, status: "verified" });
+  return result;
 };
 
 export const markPaymentAttemptFailed = async ({
@@ -150,7 +153,7 @@ export const markPaymentAttemptFailed = async ({
 }) => {
   if (!orderId) return null;
 
-  return PaymentAttempt.findOneAndUpdate(
+  const result = await PaymentAttempt.findOneAndUpdate(
     { provider, orderId },
     {
       $setOnInsert: {
@@ -176,6 +179,8 @@ export const markPaymentAttemptFailed = async ({
     },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
+  recordPaymentMetric({ provider, status: "failed" });
+  return result;
 };
 
 export const markPaymentAttemptReconciled = async ({
@@ -187,7 +192,7 @@ export const markPaymentAttemptReconciled = async ({
 }) => {
   if (!orderId) return null;
 
-  return PaymentAttempt.findOneAndUpdate(
+  const result = await PaymentAttempt.findOneAndUpdate(
     { provider, orderId },
     {
       $set: {
@@ -200,6 +205,8 @@ export const markPaymentAttemptReconciled = async ({
     },
     { new: true }
   );
+  recordPaymentMetric({ provider, status: "reconciled" });
+  return result;
 };
 
 export const getRecoverablePaymentAttempts = async ({
