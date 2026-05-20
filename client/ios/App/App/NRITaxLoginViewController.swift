@@ -1,6 +1,5 @@
 import AuthenticationServices
 import GoogleSignIn
-import SafariServices
 import UIKit
 import WebKit
 
@@ -11,7 +10,6 @@ final class NRITaxLoginViewController: UIViewController {
     private let googleIOSClientID = "307987125319-mq3d5tpu3pfc8l32ncgddjr0sh68i83k.apps.googleusercontent.com"
     private let emailLoginEndpoint = URL(string: "https://api.nritax.ai/api/auth/login")!
     private let emailSignupEndpoint = URL(string: "https://api.nritax.ai/api/auth/register")!
-    private let linkedinAuthURL = URL(string: "https://api.nritax.ai/auth/linkedin?origin=https://nritax.ai&mode=login")!
     #if DEBUG
     private lazy var homeURL = bundledWebAppURL(path: "/home")
     private lazy var loginURL = bundledWebAppURL(path: "/login?mode=login")
@@ -38,14 +36,7 @@ final class NRITaxLoginViewController: UIViewController {
     private var orbViews: [UIView] = []
     private var rupeeLabels: [UILabel] = []
     private var animatedViews: [UIView] = []
-    private var authSession: ASWebAuthenticationSession?
-    private var pendingSafariAuth: SafariAuthProvider?
     private var appleFailureCount = 0
-
-    private enum SafariAuthProvider {
-        case google
-        case linkedin
-    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -242,15 +233,6 @@ final class NRITaxLoginViewController: UIViewController {
         )
         googleButton.addTarget(self, action: #selector(startGoogleSignIn), for: .touchUpInside)
 
-        let linkedinButton = pillButton(
-            title: "LinkedIn sign in →",
-            foregroundColor: .white,
-            backgroundColor: .clear,
-            customIcon: LinkedInIconView(),
-            bordered: true
-        )
-        linkedinButton.addTarget(self, action: #selector(startLinkedInSignIn), for: .touchUpInside)
-
         let emailButton = pillButton(
             title: "Log in with email →",
             foregroundColor: .white,
@@ -271,7 +253,7 @@ final class NRITaxLoginViewController: UIViewController {
         )
         signupButton.addTarget(self, action: #selector(openSignup), for: .touchUpInside)
 
-        [appleButton, googleButton, linkedinButton, emailButton, signupButton].forEach { button in
+        [appleButton, googleButton, emailButton, signupButton].forEach { button in
             button.alpha = 0
             button.transform = CGAffineTransform(translationX: 0, y: 34)
             buttonsStack.addArrangedSubview(button)
@@ -497,14 +479,6 @@ final class NRITaxLoginViewController: UIViewController {
         present(alert, animated: true)
     }
 
-    @objc private func startLinkedInSignIn() {
-        pendingSafariAuth = .linkedin
-        let safariController = SFSafariViewController(url: linkedinAuthURL)
-        safariController.delegate = self
-        safariController.preferredControlTintColor = UIColor(hex: "2563EB")
-        present(safariController, animated: true)
-    }
-
     @objc private func startGoogleSignIn() {
         guard let rootVC = view.window?.rootViewController ?? UIApplication.shared.activeKeyWindow?.rootViewController else {
             return
@@ -659,48 +633,6 @@ final class NRITaxLoginViewController: UIViewController {
         return components?.url ?? indexURL
     }
     #endif
-
-    private func startLinkedInBackupSession() {
-        authSession = ASWebAuthenticationSession(url: linkedinAuthURL, callbackURLScheme: nil) { [weak self] callbackURL, error in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                if let callbackURL, self.handleAuthRedirect(callbackURL) {
-                    return
-                }
-
-                if let error {
-                    self.showAlert(title: "LinkedIn Sign-In", message: "LinkedIn sign-in was not completed: \(error.localizedDescription)")
-                }
-            }
-        }
-        authSession?.presentationContextProvider = self
-        authSession?.prefersEphemeralWebBrowserSession = false
-        authSession?.start()
-    }
-
-    private func handleAuthRedirect(_ url: URL) -> Bool {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return false
-        }
-
-        let queryItems = components.queryItems ?? []
-        if let authError = queryItems.first(where: { $0.name == "auth_error" })?.value, !authError.isEmpty {
-            showAlert(title: "LinkedIn Sign-In Failed", message: authError.removingPercentEncoding ?? authError)
-            return true
-        }
-
-        let tokenNames = ["token", "auth_token"]
-        for name in tokenNames {
-            if let token = queryItems.first(where: { $0.name == name })?.value?.removingPercentEncoding,
-               !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                persistSessionCookie(token: token)
-                transitionToMainApp(token: token)
-                return true
-            }
-        }
-
-        return false
-    }
 
     @objc private func startAppleSignIn() {
         logAppleSignIn("Starting native Apple sign-in flow.")
@@ -939,12 +871,8 @@ final class NRITaxLoginViewController: UIViewController {
     }
 }
 
-extension NRITaxLoginViewController: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding, ASWebAuthenticationPresentationContextProviding {
+extension NRITaxLoginViewController: ASAuthorizationControllerDelegate, ASAuthorizationControllerPresentationContextProviding {
     func presentationAnchor(for controller: ASAuthorizationController) -> ASPresentationAnchor {
-        view.window ?? ASPresentationAnchor()
-    }
-
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
         view.window ?? ASPresentationAnchor()
     }
 
@@ -997,23 +925,6 @@ extension NRITaxLoginViewController: ASAuthorizationControllerDelegate, ASAuthor
         }
 
         handleAppleFailure(message: message)
-    }
-}
-
-extension NRITaxLoginViewController: SFSafariViewControllerDelegate {
-    func safariViewController(_ controller: SFSafariViewController, initialLoadDidRedirectTo URL: URL) {
-        if handleAuthRedirect(URL) {
-            pendingSafariAuth = nil
-            controller.dismiss(animated: true)
-        }
-    }
-
-    func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
-        let provider = pendingSafariAuth
-        pendingSafariAuth = nil
-        if provider == .linkedin {
-            startLinkedInBackupSession()
-        }
     }
 }
 
@@ -1546,32 +1457,6 @@ private final class GoogleIconView: UIView {
         innerBlue.lineCapStyle = .butt
         UIColor(hex: "4285F4").setStroke()
         innerBlue.stroke()
-    }
-}
-
-private final class LinkedInIconView: UIView {
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        backgroundColor = UIColor(hex: "0077B5")
-        layer.cornerRadius = 5
-        clipsToBounds = true
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func draw(_ rect: CGRect) {
-        let text = "in" as NSString
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: UIFont.systemFont(ofSize: 12, weight: .bold),
-            .foregroundColor: UIColor.white
-        ]
-        let size = text.size(withAttributes: attributes)
-        text.draw(
-            at: CGPoint(x: (rect.width - size.width) / 2, y: (rect.height - size.height) / 2 - 0.5),
-            withAttributes: attributes
-        )
     }
 }
 
