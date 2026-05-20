@@ -31,6 +31,7 @@ import { AuthPopup } from "./AuthPopup";
 interface LoginModalProps {
   onClose: () => void;
   disableClose?: boolean;
+  initialMode?: "login" | "signup";
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -39,7 +40,7 @@ const linkedInUrlPattern = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
 const getApiErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.message || fallback;
 
-export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
+export function LoginModal({ onClose, disableClose = false, initialMode = "login" }: LoginModalProps) {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
     name: "",
@@ -54,7 +55,7 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [activeTab, setActiveTab] = useState<"login" | "signup">(initialMode);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [popup, setPopup] = useState<{
@@ -62,9 +63,9 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
     type: "success" | "error";
   } | null>(null);
 
-  const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId) && !IS_IOS_NATIVE_APP;
+  const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
   const canUseLinkedInAuth =
-    Boolean(LINKEDIN_AUTH_CONFIG.clientId && LINKEDIN_AUTH_CONFIG.authBaseUrl) && !IS_IOS_NATIVE_APP;
+    Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
   const canUseAppleAuth = APPLE_AUTH_CONFIG.isConfigured;
 
   const resolveAuthUser = (response: any) =>
@@ -77,7 +78,7 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
 
   const handleLinkedInAuth = (mode: "login" | "signup") => {
     try {
-      if (!LINKEDIN_AUTH_CONFIG.clientId || !LINKEDIN_AUTH_CONFIG.authBaseUrl) {
+      if (!LINKEDIN_AUTH_CONFIG.authBaseUrl) {
         throw new Error("LinkedIn Sign-In configuration is missing.");
       }
 
@@ -302,7 +303,7 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
 
         <CardContent>
           <Tabs
-            defaultValue="login"
+            defaultValue={initialMode}
             value={activeTab}
             onValueChange={(value) => {
               setActiveTab(value as "login" | "signup");
@@ -457,12 +458,6 @@ export function LoginModal({ onClose, disableClose = false }: LoginModalProps) {
                   ) : null}
                 </div>
 
-                {IS_IOS_NATIVE_APP ? (
-                  <p className="text-xs text-slate-600">
-                    Google and LinkedIn sign-in are hidden in the iOS app build to keep authentication inside the app
-                    during App Review. Use email/password or Sign in with Apple.
-                  </p>
-                ) : null}
               </form>
             </TabsContent>
 

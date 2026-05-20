@@ -1,0 +1,34 @@
+PODS:
+  - AdplorgCapacitorInAppPurchase (2.0.64):
+    - Capacitor
+  - Capacitor (7.6.1):
+    - CapacitorCordova
+  - CapacitorCommunityAppleSignIn (7.1.0):
+    - Capacitor
+  - CapacitorCordova (7.6.1)
+
+DEPENDENCIES:
+  - "AdplorgCapacitorInAppPurchase (from `../../node_modules/@adplorg/capacitor-in-app-purchase`)"
+  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
+  - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
+  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
+
+EXTERNAL SOURCES:
+  AdplorgCapacitorInAppPurchase:
+    :path: "../../node_modules/@adplorg/capacitor-in-app-purchase"
+  Capacitor:
+    :path: "../../node_modules/@capacitor/ios"
+  CapacitorCommunityAppleSignIn:
+    :path: "../../node_modules/@capacitor-community/apple-sign-in"
+  CapacitorCordova:
+    :path: "../../node_modules/@capacitor/ios"
+
+SPEC CHECKSUMS:
+  AdplorgCapacitorInAppPurchase: b61f44a429309ffd0b8f49c155d3057609c6e262
+  Capacitor: b8dd0e1151c953171b0e02d04aa57f3389edcd97
+  CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
+  CapacitorCordova: 6ab7337f25a2c9ce7a3fdc2f249c480f447853e0
+
+PODFILE CHECKSUM: b0a616f73a2ccce07c937e695d7a6ea93ea2f361
+
+COCOAPODS: 1.16.2

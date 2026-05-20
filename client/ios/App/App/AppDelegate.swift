@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import GoogleSignIn
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -7,8 +8,32 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        window.rootViewController = NRITaxLoginViewController()
+        window.makeKeyAndVisible()
+        self.window = window
+        routeForCurrentSession()
         return true
+    }
+
+    private func routeForCurrentSession() {
+        guard let window else {
+            return
+        }
+
+        #if DEBUG
+        UserDefaults.standard.removeObject(forKey: "pendingInitialURL")
+        UserDefaults.standard.removeObject(forKey: "pendingAuthToken")
+        UserDefaults.standard.removeObject(forKey: "pendingAuthUser")
+        window.rootViewController = NRITaxLoginViewController()
+        #else
+        if UserDefaults.standard.string(forKey: "pendingAuthToken")?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false {
+            window.rootViewController = ViewController()
+            return
+        }
+
+        window.rootViewController = NRITaxLoginViewController()
+        #endif
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
@@ -34,8 +59,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // Called when the app was launched with a url. Feel free to add additional processing here,
-        // but if you want the App API to support tracking app url opens, make sure to keep this call
+        if GIDSignIn.sharedInstance.handle(url) {
+            return true
+        }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 

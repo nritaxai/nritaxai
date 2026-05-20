@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Bot, Briefcase, Calculator, CreditCard, MessageSquareText, Send, ShieldCheck, X } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { getStoredAuthToken, submitYuktiGrievance } from "../../utils/api";
+import { IS_IOS_NATIVE_APP } from "../../config/appConfig";
 
 type ServiceOption = {
   label: string;
@@ -212,6 +213,17 @@ export function TigerBotAvatar() {
   }, [location.pathname]);
 
   useEffect(() => {
+    const handleOpenYuktiWidget = () => {
+      setIsOpen(true);
+    };
+
+    window.addEventListener("nritax:open-yukti-widget", handleOpenYuktiWidget);
+    return () => {
+      window.removeEventListener("nritax:open-yukti-widget", handleOpenYuktiWidget);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!messagesRef.current) return;
     messagesRef.current.scrollTo({
       top: messagesRef.current.scrollHeight,
@@ -305,9 +317,9 @@ export function TigerBotAvatar() {
   };
 
   return (
-    <div ref={widgetRef} className="fixed bottom-20 right-4 z-[80] sm:bottom-6 sm:right-6">
+    <div ref={widgetRef} className={IS_IOS_NATIVE_APP ? "fixed bottom-20 right-3 z-[10000]" : "fixed bottom-20 right-4 z-[80] sm:bottom-6 sm:right-6"}>
       {isOpen ? (
-        <div className="mb-3 w-[min(84vw,290px)] overflow-hidden rounded-[22px] border border-[#BBF7D0] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]">
+        <div className={IS_IOS_NATIVE_APP ? "mb-3 w-[calc(100vw-24px)] max-w-[360px] overflow-hidden rounded-[22px] border border-[#BBF7D0] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]" : "mb-3 w-[min(84vw,290px)] overflow-hidden rounded-[22px] border border-[#BBF7D0] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.22)]"}>
           <div className="flex items-start justify-between bg-[#86D39B] px-4 py-4 text-[#0F172A]">
             <div className="flex items-center gap-3">
               <span className="relative flex h-11 w-11 items-center justify-center rounded-full border-2 border-white/70 bg-white text-[#4C9A63]">

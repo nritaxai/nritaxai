@@ -1,16 +1,17 @@
 import { LoginModal } from "../components/LoginModal";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
 
   return (
-    <div className="flex items-center justify-center py-16 px-4">
-      <LoginModal onClose={() => navigate('/')} />
+    <div className="min-h-dvh">
+      <LoginModal initialMode={mode} onClose={() => navigate('/home')} />
     </div>
   );
 }
-
 
 
 

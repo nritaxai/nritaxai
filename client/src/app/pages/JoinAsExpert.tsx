@@ -7,6 +7,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { trimValue } from "../utils/consultationWorkflow";
+import { IS_IOS_NATIVE_APP } from "../../config/appConfig";
 
 type ExpertFormData = {
   fullName: string;
@@ -314,8 +315,48 @@ export function JoinAsExpertPage() {
   };
 
   return (
-    <div className="py-10 font-sans text-[#0F172A]">
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+    <div className={IS_IOS_NATIVE_APP ? "nritax-ios-join-page font-sans text-[#0F172A]" : "py-10 font-sans text-[#0F172A]"}>
+      {IS_IOS_NATIVE_APP ? (
+        <style>
+          {`
+            .nritax-ios-join-page {
+              width: 100%;
+              max-width: 100vw;
+              overflow-x: hidden;
+              padding: calc(8px + env(safe-area-inset-top)) 0 calc(84px + env(safe-area-inset-bottom));
+              box-sizing: border-box;
+            }
+            .nritax-ios-join-page * {
+              box-sizing: border-box;
+              max-width: 100%;
+            }
+            .nritax-ios-join-page input,
+            .nritax-ios-join-page select,
+            .nritax-ios-join-page button {
+              min-width: 0;
+            }
+            .nritax-ios-join-page input,
+            .nritax-ios-join-page select {
+              width: 100% !important;
+              height: 44px !important;
+              font-size: 16px !important;
+            }
+            .nritax-ios-join-page .grid,
+            .nritax-ios-join-page form,
+            .nritax-ios-join-page [data-slot="card"],
+            .nritax-ios-join-page [data-slot="card-content"] {
+              width: 100% !important;
+              max-width: 100% !important;
+              overflow-x: hidden !important;
+            }
+            .nritax-ios-join-page iframe {
+              max-width: calc(100vw - 56px) !important;
+              transform-origin: left top;
+            }
+          `}
+        </style>
+      ) : null}
+      <div className={IS_IOS_NATIVE_APP ? "mx-auto w-full max-w-full px-3" : "mx-auto max-w-5xl px-4 sm:px-6 lg:px-8"}>
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -325,22 +366,22 @@ export function JoinAsExpertPage() {
           Back
         </button>
 
-        <div className="mb-8 max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#2563eb]">Expert Onboarding</p>
-          <h1 className="mt-2 text-3xl text-[#0F172A] sm:text-4xl">Join Our Expert Team</h1>
-          <p className="mt-3 text-base leading-7 text-[#0F172A]">
+        <div className={IS_IOS_NATIVE_APP ? "mb-5 w-full max-w-full" : "mb-8 max-w-3xl"}>
+          <p className={IS_IOS_NATIVE_APP ? "text-xs font-semibold uppercase tracking-[0.14em] text-[#2563eb]" : "text-sm font-semibold uppercase tracking-[0.18em] text-[#2563eb]"}>Expert Onboarding</p>
+          <h1 className={IS_IOS_NATIVE_APP ? "mt-2 text-2xl text-[#0F172A]" : "mt-2 text-3xl text-[#0F172A] sm:text-4xl"}>Join Our Expert Team</h1>
+          <p className={IS_IOS_NATIVE_APP ? "mt-2 text-sm leading-6 text-[#0F172A]" : "mt-3 text-base leading-7 text-[#0F172A]"}>
             Join NRITAX as a Chartered Accountant or expert and help NRI users with tax and compliance services.
           </p>
         </div>
 
-        <Card className="border border-[#E2E8F0] bg-[#F7FAFC] font-sans shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-2xl text-[#0F172A]">Expert Registration Form</CardTitle>
+        <Card className={IS_IOS_NATIVE_APP ? "w-full max-w-full overflow-hidden border border-[#E2E8F0] bg-[#F7FAFC] font-sans shadow-none" : "border border-[#E2E8F0] bg-[#F7FAFC] font-sans shadow-xl"}>
+          <CardHeader className={IS_IOS_NATIVE_APP ? "px-4 py-5" : undefined}>
+            <CardTitle className={IS_IOS_NATIVE_APP ? "text-xl text-[#0F172A]" : "text-2xl text-[#0F172A]"}>Expert Registration Form</CardTitle>
             <CardDescription className="text-[#0F172A]">
               Share your profile so our team can evaluate your fit for NRITAX expert onboarding.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className={IS_IOS_NATIVE_APP ? "px-4 pb-5" : undefined}>
             {successMessage ? (
               <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-800">
                 <div className="flex items-start gap-3">
@@ -361,8 +402,8 @@ export function JoinAsExpertPage() {
                   </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-              <div className="grid gap-5 md:grid-cols-2">
+                <form onSubmit={handleSubmit} className={IS_IOS_NATIVE_APP ? "w-full max-w-full space-y-5" : "space-y-6"} noValidate>
+              <div className={IS_IOS_NATIVE_APP ? "grid w-full max-w-full grid-cols-1 gap-4" : "grid gap-5 md:grid-cols-2"}>
                 <div className="space-y-2">
                   <Label htmlFor="fullName" className="text-sm font-medium text-[#0F172A]">Full Name *</Label>
                   <Input

@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import connectDB from "./Config/db.js";
 import { createRateLimiter } from "./Middlewares/rateLimit.js";
+import { googleNativeLogin } from "./Controllers/authController.js";
 import authRoute from "./Routes/authRoutes.js";
 import chatRoute from "./Routes/chatRoutes.js";
 import subscriptionRoute from "./Routes/subscriptionRoutes.js";
@@ -108,6 +109,7 @@ app.get("/ready", (_req, res) => {
   });
 });
 
+app.post("/api/auth/google-native", authRateLimiter, googleNativeLogin);
 app.use("/api/auth", authRoute);
 app.use("/auth", authRoute);
 app.use("/api/chat", chatRoute);

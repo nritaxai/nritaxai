@@ -11,9 +11,19 @@ const envDevApiUrl = String(import.meta.env.VITE_API_URL_DEV || "").trim();
 const envBannerApiUrl = String(import.meta.env.VITE_BANNER_API_URL || "").trim();
 const envLinkedInAuthBaseUrl = String(import.meta.env.VITE_LINKEDIN_AUTH_BASE_URL || "").trim();
 
-export const IS_NATIVE_APP = Capacitor.isNativePlatform();
+const isIosWrapperWebView = () => {
+  if (typeof window === "undefined") return false;
+  const wrappedWindow = window as Window & { __NRITAX_IOS_WRAPPER__?: boolean };
+  return (
+    Boolean(wrappedWindow.__NRITAX_IOS_WRAPPER__) ||
+    window.localStorage.getItem("nritax_ios_wrapper") === "true" ||
+    /NRITAXIOSWrapper/i.test(window.navigator.userAgent)
+  );
+};
+
+export const IS_NATIVE_APP = Capacitor.isNativePlatform() || isIosWrapperWebView();
 export const PLATFORM = Capacitor.getPlatform();
-export const IS_IOS_NATIVE_APP = IS_NATIVE_APP && PLATFORM === "ios";
+export const IS_IOS_NATIVE_APP = (IS_NATIVE_APP && PLATFORM === "ios") || isIosWrapperWebView();
 export const IOS_EXTERNAL_PURCHASES_DISABLED = IS_IOS_NATIVE_APP;
 
 const resolvedProdApiUrl = normalizeUrl(envProdApiUrl || PROD_API_URL_DEFAULT);

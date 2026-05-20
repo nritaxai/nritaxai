@@ -1,19 +1,25 @@
 import { lazy, Suspense, useState, useEffect, useRef, useLayoutEffect, type FormEvent, type ReactNode } from "react";
 import { Routes, Route, useLocation, Navigate, useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { WifiOff } from "lucide-react";
 
 import { Header } from "./components/Header";
+import { iOSHeader as IOSHeader } from "./components/iOSHeader";
 import NewsTicker from "./components/NewsTicker";
 import { ComplianceStandards } from "./components/ComplianceStandards";
 import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
 import { TigerBotAvatar } from "./components/TigerBotAvatar";
 import { Button } from "./components/ui/button";
+import { iOSBottomNav as IOSBottomNav } from "../components/iOSBottomNav";
+import { iOSHomePage as IOSHomePage } from "../components/iOSHomePage";
+import { iOSYuktiPage as IOSYuktiPage } from "../pages/iOSYuktiPage";
 import { Chat } from "./pages/Chat";
 import { Home } from "./pages/Home";
 import { HeroPage } from "./pages/HeroPage";
 import { Pricing } from "./pages/Pricing";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
+import { IS_IOS_NATIVE_APP } from "../config/appConfig";
 import { buildApiUrl, getStoredAuthToken } from "../utils/api";
 const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
@@ -39,7 +45,17 @@ function PageScaffold({ children }: { children: ReactNode }) {
   );
 }
 
+type NativeWrapperWindow = Window & {
+  __NRITAX_IOS_WRAPPER__?: boolean;
+};
+
 export default function App() {
+  const isIosNativeWrapper =
+    typeof window !== "undefined" &&
+    (Boolean((window as NativeWrapperWindow).__NRITAX_IOS_WRAPPER__) ||
+      window.localStorage.getItem("nritax_ios_wrapper") === "true" ||
+      /NRITAXIOSWrapper/i.test(window.navigator.userAgent));
+  const isIosNativeApp = Capacitor.getPlatform() === "ios" || IS_IOS_NATIVE_APP || isIosNativeWrapper;
   const stagingModeEnabled = import.meta.env.VITE_STAGING_MODE === "true";
   const stagingPassword = String(import.meta.env.VITE_STAGING_ACCESS_PASSWORD || "");
   const promoUpgradePromptSessionKey = "promo_upgrade_prompt_seen";
@@ -63,6 +79,14 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const routeContentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isIosNativeApp) return;
+
+    if (location.pathname === "/" || location.pathname === "/dashboard") {
+      navigate("/home", { replace: true });
+    }
+  }, [isIosNativeApp, location.pathname, navigate]);
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -339,7 +363,14 @@ export default function App() {
     });
   }, [location.pathname]);
 
-  const withPageScaffold = (element: ReactNode) => <PageScaffold>{element}</PageScaffold>;
+  const withPageScaffold = (element: ReactNode) =>
+    isIosNativeApp ? (
+      <div className="min-h-screen bg-white px-4 py-4 pb-[calc(88px+env(safe-area-inset-bottom))]">
+        {element}
+      </div>
+    ) : (
+      <PageScaffold>{element}</PageScaffold>
+    );
 
   const handleStagingUnlock = (event: FormEvent) => {
     event.preventDefault();
@@ -380,6 +411,11 @@ export default function App() {
 
   const isHeroRoute = location.pathname === "/" || location.pathname === "/hero" || location.pathname === "/Hero";
   const isStandaloneRoute = isHeroRoute || location.pathname === "/reset-password";
+  const isYuktiRoute =
+    location.pathname === "/yukti" ||
+    location.pathname === "/ios-yukti" ||
+    location.pathname === "/tigerbot-avatar" ||
+    location.pathname === "/tigerbot-avator";
   const protectedPaths = new Set([
     "/calculators",
     "/profile",
@@ -398,8 +434,13 @@ export default function App() {
   ]);
   const requiresAuthentication = protectedPaths.has(location.pathname);
   const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
-  const hasSiteHeader = !isStandaloneRoute && isAuthenticated;
-  const shouldShowNewsTicker = location.pathname === "/home";
+  const isAuthRoute = location.pathname === "/login";
+  const hasSiteHeader = !isIosNativeApp && !isStandaloneRoute && isAuthenticated;
+  const shouldShowNewsTicker = !isIosNativeApp && location.pathname === "/home";
+  const nativeHomeRoute = isIosNativeApp ? <IOSHomePage /> : <HeroPage />;
+  const nativeHomeScreen = isIosNativeApp
+    ? <IOSHomePage />
+    : withPageScaffold(<Home onRequireLogin={() => setShowLoginModal(true)} />);
 
   return (
     <div className="app-shell">
@@ -415,15 +456,29 @@ export default function App() {
       {hasSiteHeader && (
         <Header onLogin={() => setShowLoginModal(true)} />
       )}
+      {isIosNativeApp && !isYuktiRoute && !isAuthRoute && <IOSHeader onLogin={() => setShowLoginModal(true)} />}
       {shouldShowNewsTicker ? <NewsTicker /> : null}
 
       <div ref={routeContentRef}>
         <Suspense fallback={<div className="p-6 text-sm text-[#0F172A]">Loading...</div>}>
           <Routes location={location}>
-            <Route path="/" element={<HeroPage />} />
-            <Route path="/Hero" element={<HeroPage />} />
-            <Route path="/hero" element={<HeroPage />} />
-            <Route path="/home" element={withPageScaffold(<Home onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route
+              path="/"
+              element={isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
+            />
+            <Route
+              path="/Hero"
+              element={isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
+            />
+            <Route
+              path="/hero"
+              element={isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
+            />
+            <Route path="/home" element={nativeHomeScreen} />
+            <Route path="/ios-yukti" element={<IOSYuktiPage />} />
+            <Route path="/yukti" element={<IOSYuktiPage />} />
+            <Route path="/tigerbot-avatar" element={<IOSYuktiPage />} />
+            <Route path="/tigerbot-avator" element={<IOSYuktiPage />} />
 
             <Route
               path="/calculators"
@@ -435,11 +490,11 @@ export default function App() {
               path="/checkout"
               element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
             />
-            <Route path="/login" element={withPageScaffold(<Login />)} />
+            <Route path="/login" element={isIosNativeApp ? <Login /> : withPageScaffold(<Login />)} />
             <Route path="/reset-password" element={withPageScaffold(<ResetPassword />)} />
             <Route path="/profile" element={withPageScaffold(<Profile />)} />
-            <Route path="/chat" element={withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
-            <Route path="/dashboard" element={withPageScaffold(<AdminDashboard />)} />
+            <Route path="/chat" element={isIosNativeApp ? <Chat onRequireLogin={() => setShowLoginModal(true)} /> : withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/dashboard" element={isIosNativeApp ? <Navigate to="/home" replace /> : withPageScaffold(<AdminDashboard />)} />
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
             <Route path="/consult" element={withPageScaffold(<Consult onRequireLogin={() => setShowLoginModal(true)} />)} />
@@ -451,13 +506,15 @@ export default function App() {
             <Route path="/terms-and-conditions" element={withPageScaffold(<TermsAndConditions />)} />
             <Route path="/refund-policy" element={withPageScaffold(<RefundPolicy />)} />
             <Route path="/disclaimer" element={withPageScaffold(<Disclaimer />)} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </div>
 
-      {!isStandaloneRoute && isAuthenticated && <TigerBotAvatar />}
+      {!isStandaloneRoute && !isYuktiRoute && isAuthenticated && <TigerBotAvatar />}
 
       {hasSiteHeader && <Footer />}
+      {isIosNativeApp && !isAuthRoute && <IOSBottomNav />}
 
       {showLoginModal && (
         <Suspense fallback={null}>
@@ -503,13 +560,6 @@ export default function App() {
     </div>
   );
 }
-
-
-
-
-
-
-
 
 
 
