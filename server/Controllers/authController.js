@@ -623,6 +623,87 @@ export const googleLogin = async (req, res) => {
   }
 };
 
+export const googleNativeLogin = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      return res.status(400).json({
+        success: false,
+        message: "No Google ID token provided",
+      });
+    }
+
+    const client = new OAuth2Client();
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: [
+        process.env.GOOGLE_CLIENT_ID,
+        process.env.GOOGLE_IOS_CLIENT_ID,
+      ].filter(Boolean),
+    });
+
+    const payload = ticket.getPayload();
+    const { sub, email, name, picture } = payload || {};
+    const normalizedEmail = sanitizeEmail(email);
+
+    if (!sub || !normalizedEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Google account missing verified email.",
+      });
+    }
+
+    let user = await User.findOne({
+      email: normalizedEmail
+    });
+    const isNewUser = !user;
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email: normalizedEmail,
+        googleId: sub,
+        profileImage: picture,
+        provider: "google",
+      });
+    } else {
+      let changed = false;
+
+      if (!user.googleId) {
+        user.googleId = sub;
+        changed = true;
+      }
+      if (!user.profileImage && picture) {
+        user.profileImage = picture;
+        changed = true;
+      }
+      if (changed) await user.save();
+    }
+
+    if (isNewUser) {
+      await ensureWelcomeEmailSent(user);
+    }
+
+    const token = generateToken(user._id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Google login successful",
+      user: toSafeUser(user),
+      token,
+    });
+
+  } catch (error) {
+    logAuthError("google-native-login", error);
+    return res.status(401).json({
+      success: false,
+      message: "Google authentication failed",
+      error: error?.message,
+    });
+  }
+};
+
 // -------------------------------- Apple Login --------------------------------------------------------------
 export const appleLogin = async (req, res) => {
   try {
