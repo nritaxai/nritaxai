@@ -30,6 +30,8 @@ import {
 import { applyPaidSubscriptionState, isDuplicateSuccessfulCharge, PAYMENT_RECOVERY_STATUS } from "../services/paymentStateMachine.js";
 import { enqueuePaymentReconciliationJob } from "../services/queueFacade.js";
 import { getPaymentReliabilitySummary } from "../services/paymentReliabilityMonitor.js";
+import { timingSafeEqualHex } from "../services/webhookSecurity.js";
+import { buildPaymentReadinessReport } from "../services/paymentReadinessService.js";
 
 const PLAN_ALIAS = {
   pro: PLAN_KEYS.PROFESSIONAL,
@@ -378,11 +380,13 @@ export const createSubscription = async (req, res) => {
     }
     const billingCountry = normalizeText(req.body?.billingCountry);
     const billingState = normalizeText(req.body?.billingState);
+    const displayCurrency = normalizeText(req.body?.displayCurrency || "INR").toUpperCase();
     const countryCode = normalizeText(req.body?.countryCode);
     const organization = normalizeText(req.body?.organization);
     const gstVatNumber = normalizeUpper(req.body?.gstVatNumber);
     const referralUserCode = normalizeUpper(req.body?.referralUserCode);
     const tax = resolveTaxClassification({ billingCountry, billingState });
+    const internationalPayment = !INDIA_COUNTRY_KEYS.has(normalizeCountryKey(billingCountry));
 
     if (countryCode && !/^\+\d{1,4}$/.test(countryCode)) {
       return res.status(400).json({
@@ -473,6 +477,7 @@ export const createSubscription = async (req, res) => {
             metadata: {
               planKey: meta.planKey,
               billing,
+              displayCurrency,
             },
           });
           return res.status(200).json({
@@ -490,6 +495,7 @@ export const createSubscription = async (req, res) => {
             baseAmount: baseAmountInPaise,
             discountAmount: discountPaise,
             tax,
+            displayCurrency,
             reused: true,
           });
         } catch {
@@ -538,6 +544,9 @@ export const createSubscription = async (req, res) => {
           promoCode: promoCode || null,
           taxType: tax.taxType,
           gstMode: tax.gstMode,
+          displayCurrency,
+          settlementCurrency: "INR",
+          internationalPayment,
         },
       });
       await appendPaymentAuditLog({
@@ -552,6 +561,8 @@ export const createSubscription = async (req, res) => {
           billing,
           amount: order.amount,
           currency: order.currency,
+          displayCurrency,
+          internationalPayment,
         },
       });
     }
@@ -566,6 +577,7 @@ export const createSubscription = async (req, res) => {
       plan: meta.planName,
       planKey: meta.planKey,
       billing,
+      displayCurrency,
       promoCode: promoCode || null,
       discountPercent,
       baseAmount: baseAmountInPaise,
@@ -606,7 +618,7 @@ export const verifySubscriptionPayment = async (req, res) => {
     const secret = process.env.RAZORPAY_KEY_SECRET;
     const expectedSignature = hmacSha256(`${orderId}|${paymentId}`, secret);
 
-    if (expectedSignature !== signature) {
+    if (!timingSafeEqualHex(expectedSignature, signature)) {
       if (featureFlags.paymentReliabilityEnabled) {
         await appendPaymentAuditLog({
           provider: "razorpay",
@@ -886,7 +898,7 @@ export const razorpayWebhook = async (req, res) => {
     const rawBody = req.rawBody || JSON.stringify(req.body);
     const expected = hmacSha256(rawBody, process.env.RAZORPAY_WEBHOOK_SECRET);
 
-    if (!signature || expected !== signature) {
+    if (!signature || !timingSafeEqualHex(expected, signature)) {
       if (featureFlags.paymentReliabilityEnabled) {
         await appendPaymentAuditLog({
           provider: "razorpay",
@@ -1248,6 +1260,21 @@ export const getPaymentReliabilityStatus = async (_req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to load payment reliability summary.",
+      error: error.message,
+    });
+  }
+};
+
+export const getPaymentReadinessReport = async (_req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      readiness: buildPaymentReadinessReport(),
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to build payment readiness report.",
       error: error.message,
     });
   }

@@ -6,9 +6,22 @@ import { YuktiWidget } from "../app/components/YuktiWidget";
 
 export function AndroidYuktiPage() {
   const isNative = Capacitor.isNativePlatform(); // Android only
+  let storedUser: Record<string, unknown> | null = null;
+  if (typeof window !== "undefined") {
+    try {
+      storedUser = JSON.parse(localStorage.getItem("user") || "null");
+    } catch {
+      storedUser = null;
+    }
+  }
+  const hasAcceptedTerms = Boolean(storedUser?.termsAccepted);
 
   if (!isNative) {
     return <Navigate to="/home" replace />; // Android only
+  }
+
+  if (!hasAcceptedTerms) {
+    return <Navigate to="/profile" replace />;
   }
 
   return (
@@ -16,9 +29,8 @@ export function AndroidYuktiPage() {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100dvh",
+        minHeight: "100%",
         backgroundColor: "#1a3cff",
-        paddingBottom: "calc(60px + env(safe-area-inset-bottom))",
       }}
     >
       <div

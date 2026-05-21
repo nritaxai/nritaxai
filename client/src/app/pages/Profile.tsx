@@ -19,7 +19,15 @@ import {
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
 import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
-import { changePassword, deleteAccount, getMySubscription, getUserProfile, updateUserProfile } from "../../utils/api";
+import {
+  changePassword,
+  clearStoredAuth,
+  deleteAccount,
+  getMySubscription,
+  getUserProfile,
+  requestCountryChange,
+  updateUserProfile,
+} from "../../utils/api";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 import { getPlanLabel, type SubscriptionMe } from "../../utils/subscription";
 
@@ -29,6 +37,10 @@ type ProfileData = {
   profileImage?: string;
   phone?: string;
   countryOfResidence?: string;
+  countryCode?: string;
+  countryLocked?: boolean;
+  countryChangeStatus?: "none" | "pending" | "approved" | "rejected";
+  termsAccepted?: boolean;
   preferredLanguage?: "english" | "hindi" | "tamil" | "indonesian";
   bio?: string;
   linkedinProfile?: string;
@@ -153,6 +165,7 @@ export function Profile() {
   const [loading, setLoading] = useState(true);
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [requestingCountryChange, setRequestingCountryChange] = useState(false);
   const [retryingProfile, setRetryingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -170,6 +183,8 @@ export function Profile() {
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+  const [requestedCountryCode, setRequestedCountryCode] = useState("");
+  const [countryChangeReason, setCountryChangeReason] = useState("");
   const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
   const [deleteAccountStep, setDeleteAccountStep] = useState<"phrase" | "confirm">("phrase");
   const [deleteAccountConfirmationInput, setDeleteAccountConfirmationInput] = useState("");
@@ -203,6 +218,7 @@ export function Profile() {
       setProfileImage(data.profileImage || "");
       setPhone(data.phone || "");
       setCountryOfResidence(data.countryOfResidence || detectUserCountry());
+      setRequestedCountryCode(data.countryCode || "");
       setPreferredLanguage(data.preferredLanguage || "english");
       setBio(data.bio || "");
       setLinkedinProfile(data.linkedinProfile || "");
@@ -256,10 +272,8 @@ export function Profile() {
       if (profileResponse.status === "rejected") {
         const status = profileResponse.reason?.response?.status;
         if (status === 401) {
-          localStorage.removeItem("token");
-          localStorage.removeItem("user");
-          window.dispatchEvent(new Event("storage"));
-          window.dispatchEvent(new Event("auth-changed"));
+          // Android only
+          clearStoredAuth();
           navigate("/login");
           return;
         }
@@ -338,6 +352,7 @@ export function Profile() {
         profileImage: profileImage.trim(),
         phone: phone.trim(),
         countryOfResidence: countryOfResidence.trim(),
+        countryCode: requestedCountryCode || profile?.countryCode || "",
         preferredLanguage,
         bio: bio.trim(),
         linkedinProfile: linkedinProfile.trim(),
@@ -369,6 +384,36 @@ export function Profile() {
       setError(err?.response?.data?.message || "Failed to update profile.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleCountryChangeRequest = async () => {
+    if (!requestedCountryCode || requestedCountryCode === profile?.countryCode) {
+      setError("Please choose a different country before submitting the request.");
+      return;
+    }
+
+    setRequestingCountryChange(true);
+    setError("");
+    setSuccessMessage("");
+    try {
+      await requestCountryChange({
+        countryCode: requestedCountryCode,
+        reason: countryChangeReason.trim(),
+      });
+      setSuccessMessage("Country change request submitted for admin approval.");
+      setProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              countryChangeStatus: "pending",
+            }
+          : prev
+      );
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Unable to submit country change request.");
+    } finally {
+      setRequestingCountryChange(false);
     }
   };
 
@@ -471,10 +516,8 @@ export function Profile() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
-    window.dispatchEvent(new Event("storage"));
-    window.dispatchEvent(new Event("auth-changed"));
+    // Android only
+    clearStoredAuth();
     navigate("/", { replace: true });
   };
 
@@ -485,10 +528,8 @@ export function Profile() {
 
     try {
       await deleteAccount();
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("auth-changed"));
+      // Android only
+      clearStoredAuth();
       navigate("/", { replace: true });
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to delete account.");
@@ -758,6 +799,7 @@ export function Profile() {
                       <Select
                         value={countryOfResidence}
                         onValueChange={setCountryOfResidence}
+                        disabled={Boolean(profile?.countryLocked)}
                       >
                         <SelectTrigger id="countryOfResidence">
                           <SelectValue placeholder="Select country" />
@@ -771,7 +813,9 @@ export function Profile() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-[#0F172A]">
-                        {countryOfResidence
+                        {profile?.countryLocked
+                          ? `Locked to ${profile.countryOfResidence || "your signup country"}. Changes now require support or admin approval.`
+                          : countryOfResidence
                           ? `Selected: ${countryOfResidence}`
                           : "Auto-detect will be used when available, with manual selection as fallback."}
                       </p>
@@ -867,8 +911,51 @@ export function Profile() {
                     <div className="space-y-2">
                       <Label htmlFor="country-readonly">Country of Residence</Label>
                       <Input id="country-readonly" value={profile?.countryOfResidence || "Not set"} className="bg-[#F7FAFC]" disabled />
+                      <p className="text-xs text-[#475569]">
+                        {profile?.countryLocked ? `Country locked at signup (${profile.countryCode || "N/A"}).` : "Country can still be updated directly."}
+                      </p>
                     </div>
                   </div>
+                  {profile?.countryLocked ? (
+                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium text-[#0F172A]">Request country change</p>
+                          <p className="text-xs text-[#475569]">
+                            Pricing, tax workflow, and AI compliance behavior are tied to your signup country.
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="capitalize">
+                          {profile.countryChangeStatus || "none"}
+                        </Badge>
+                      </div>
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <select
+                          value={requestedCountryCode}
+                          onChange={(e) => setRequestedCountryCode(e.target.value)}
+                          className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        >
+                          <option value="">Select requested country</option>
+                          {COUNTRY_OPTIONS.map((country) => (
+                            <option key={country.code} value={country.code}>
+                              {country.name}
+                            </option>
+                          ))}
+                        </select>
+                        <Button type="button" onClick={() => void handleCountryChangeRequest()} disabled={requestingCountryChange}>
+                          {requestingCountryChange ? "Submitting..." : "Submit Request"}
+                        </Button>
+                      </div>
+                      <textarea
+                        value={countryChangeReason}
+                        onChange={(e) => setCountryChangeReason(e.target.value)}
+                        rows={3}
+                        maxLength={500}
+                        className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        placeholder="Reason for changing your locked country"
+                      />
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     <Label htmlFor="language-readonly">Preferred Language</Label>
                     <Input id="language-readonly" value={profile?.preferredLanguage || "english"} className="bg-[#F7FAFC] capitalize" disabled />

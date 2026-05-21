@@ -38,7 +38,7 @@ export const processConsultationNotifications = async (payload) => {
         <p><strong>Timezone:</strong> ${timezone}</p>
         <p>We will contact you shortly.</p>
         <br/>
-        <p>Regards,<br/>NRITAX Team</p>
+        <p>Regards,<br/>Billion Dollar Technologies Private Limited</p>
       `,
     }),
     sendEmail({

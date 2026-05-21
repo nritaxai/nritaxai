@@ -1,5 +1,8 @@
 import YuktiGrievance from "../Models/yuktiGrievanceModel.js";
 import { sendEmail } from "../src/utils/emailService.js";
+import { logControllerError, respondError, respondOk } from "../services/controllerResponses.js";
+import { createWebhookSignatureHeaders } from "../services/webhookSecurity.js";
+import { retrieveKnowledgeContext } from "../services/knowledgeBaseService.js";
 
 const DEFAULT_YUKTI_WEBHOOK_URL =
   "https://n8n.caloganathan.com/webhook/yukti-tax-agent";
@@ -88,15 +91,11 @@ export const askYukti = async (req, res) => {
   const userId = requestedUserId || req.user?._id?.toString?.() || "";
 
   if (!question) {
-    return res.status(400).json({
-      ok: false,
-      agent: "Yukti",
-      answer: "Question is required.",
-    });
+    return respondError(res, 400, "Question is required.", { ok: false, agent: "Yukti", answer: "Question is required." });
   }
 
   if (question.length < 3 || question.length > 1500) {
-    return res.status(400).json({
+    return respondError(res, 400, "Question must be between 3 and 1500 characters.", {
       ok: false,
       agent: "Yukti",
       answer: "Question must be between 3 and 1500 characters.",
@@ -109,7 +108,7 @@ export const askYukti = async (req, res) => {
     !isValidOptionalField(residentialStatus, 80) ||
     !isValidOptionalField(userId, 120)
   ) {
-    return res.status(400).json({
+    return respondError(res, 400, "One or more optional fields are invalid.", {
       ok: false,
       agent: "Yukti",
       answer: "One or more optional fields are invalid.",
@@ -117,7 +116,7 @@ export const askYukti = async (req, res) => {
   }
 
   if (!isTaxQuestion(question)) {
-    return res.status(400).json({
+    return respondError(res, 400, "Yukti answers only tax-related questions, especially Indian tax and NRI tax.", {
       ok: false,
       agent: "Yukti",
       answer: "Yukti answers only tax-related questions, especially Indian tax and NRI tax.",
@@ -128,21 +127,33 @@ export const askYukti = async (req, res) => {
   const timeout = setTimeout(() => controller.abort(), YUKTI_TIMEOUT_MS);
 
   try {
+    const knowledge = await retrieveKnowledgeContext(question, {
+      sourceTypes: ["dtaa_pdf", "tax_law", "fema_doc", "tds_rule", "capital_gains", "nri_compliance", "other_pdf"],
+    }).catch(() => ({ context: "", sources: [] }));
+
     const payload = {
       question,
       ...(country ? { country } : {}),
       ...(taxYear ? { taxYear } : {}),
       ...(residentialStatus ? { residentialStatus } : {}),
       ...(userId ? { userId } : {}),
+      ...(knowledge?.context ? { knowledgeContext: knowledge.context } : {}),
+      ...(Array.isArray(knowledge?.sources) && knowledge.sources.length ? { knowledgeSources: knowledge.sources } : {}),
     };
+    const serializedPayload = JSON.stringify(payload);
 
     const webhookResponse = await fetch(YUKTI_WEBHOOK_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+        ...createWebhookSignatureHeaders({
+          payload: serializedPayload,
+          secret: process.env.YUKTI_WEBHOOK_SIGNING_SECRET,
+          source: "nritax-yukti",
+        }),
       },
-      body: JSON.stringify(payload),
+      body: serializedPayload,
       signal: controller.signal,
     });
 
@@ -150,38 +161,38 @@ export const askYukti = async (req, res) => {
     const answer = extractAnswer(webhookResult.data, webhookResult.rawText);
 
     if (!webhookResponse.ok) {
-      return res.status(502).json({
+      return respondError(res, 502, answer || `Yukti webhook failed with status ${webhookResponse.status}.`, {
         ok: false,
         agent: "Yukti",
-        answer:
-          answer || `Yukti webhook failed with status ${webhookResponse.status}.`,
+        answer: answer || `Yukti webhook failed with status ${webhookResponse.status}.`,
       });
     }
 
     if (!answer) {
-      return res.status(502).json({
+      return respondError(res, 502, "Yukti did not return a usable answer.", {
         ok: false,
         agent: "Yukti",
         answer: "Yukti did not return a usable answer.",
       });
     }
 
-    return res.status(200).json({
+    return respondOk(res, {
       ok: true,
       agent: "Yukti",
       answer,
+      sources: knowledge?.sources || [],
     });
   } catch (error) {
     if (error?.name === "AbortError") {
-      return res.status(504).json({
+      return respondError(res, 504, "Yukti request timed out. Please try again.", {
         ok: false,
         agent: "Yukti",
         answer: "Yukti request timed out. Please try again.",
       });
     }
 
-    console.error("[yukti] request failed", error);
-    return res.status(500).json({
+    logControllerError("yukti.ask", error);
+    return respondError(res, 500, "Unable to reach Yukti right now. Please try again.", {
       ok: false,
       agent: "Yukti",
       answer: "Unable to reach Yukti right now. Please try again.",
@@ -200,31 +211,19 @@ export const submitYuktiGrievance = async (req, res) => {
     const source = sanitizeText(req.body?.source) || "Yukti Chat Widget";
 
     if (!userName || !userEmail) {
-      return res.status(401).json({
-        success: false,
-        message: "Please sign in again to submit a grievance through Yukti.",
-      });
+      return respondError(res, 401, "Please sign in again to submit a grievance through Yukti.", { success: false });
     }
 
     if (!message || message.length < 10) {
-      return res.status(400).json({
-        success: false,
-        message: "Please describe your grievance in a little more detail.",
-      });
+      return respondError(res, 400, "Please describe your grievance in a little more detail.", { success: false });
     }
 
     if (message.length > 3000) {
-      return res.status(400).json({
-        success: false,
-        message: "Grievance message is too long. Please keep it under 3000 characters.",
-      });
+      return respondError(res, 400, "Grievance message is too long. Please keep it under 3000 characters.", { success: false });
     }
 
     if (!isValidEmail(userEmail)) {
-      return res.status(400).json({
-        success: false,
-        message: "Your account email is invalid. Please update your profile and try again.",
-      });
+      return respondError(res, 400, "Your account email is invalid. Please update your profile and try again.", { success: false });
     }
 
     const adminEmail = getAdminEmail();
@@ -252,7 +251,7 @@ export const submitYuktiGrievance = async (req, res) => {
             <p><strong>Your message:</strong> ${message}</p>
             <p>Our team will review it and contact you using your registered email if needed.</p>
             <br/>
-            <p>Regards,<br/>NRITAX Team</p>
+            <p>Regards,<br/>Billion Dollar Technologies Private Limited</p>
           `,
         }),
         sendEmail({
@@ -290,17 +289,14 @@ export const submitYuktiGrievance = async (req, res) => {
       }
     });
 
-    return res.status(200).json({
+    return respondOk(res, {
       success: true,
       message: "Your grievance has been submitted successfully.",
       ticketNumber: grievance.ticketNumber,
       grievanceId: grievance._id,
     });
   } catch (error) {
-    console.error("[yukti-grievance] request failed", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to submit your grievance right now. Please try again.",
-    });
+    logControllerError("yukti.grievance", error);
+    return respondError(res, 500, "Unable to submit your grievance right now. Please try again.", { success: false });
   }
 };
