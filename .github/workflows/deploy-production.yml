@@ -6,10 +6,28 @@ on:
       image_tag:
         description: "Image tag to promote"
         required: true
-      region:
-        description: "Primary region"
+      auto_promote:
+        description: "Automatically promote canary after checks"
         required: true
-        default: "us-central1"
+        type: boolean
+        default: false
+      run_migrations:
+        description: "Run production migrations"
+        required: true
+        type: boolean
+        default: false
+      migration_safety_ack:
+        description: "Required only when migrations are requested"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -17,23 +35,85 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - uses: azure/setup-kubectl@v4
+
+      - name: Preflight deployment inputs
+        env:
+          DEPLOY_ENVIRONMENT: production
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          REQUIRE_APPROVAL: "true"
+          RUN_MIGRATIONS: ${{ inputs.run_migrations }}
+          MIGRATION_SAFETY_ACK: ${{ inputs.migration_safety_ack }}
+          HEALTHCHECK_URL: ${{ vars.PRODUCTION_HEALTHCHECK_URL }}
+          CANARY_STEP_TIMEOUT_SECONDS: "300"
+        run: node scripts/deployment-preflight.mjs
+
       - name: Install Argo Rollouts plugin
         run: |
-          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-          chmod +x ./kubectl-argo-rollouts-linux-amd64
-          sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+          curl -sSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
       - name: Configure kubectl
         env:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
         run: |
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
-      - name: Set API canary image
+
+      - name: Start API canary
         run: kubectl argo rollouts set image rollout/nritax-api api=${{ secrets.REGISTRY }}/${{ secrets.IMAGE_REPOSITORY }}:${{ inputs.image_tag }} -n nritax-production
-      - name: Pause for canary analysis
+
+      - name: Wait for canary steps
         run: kubectl argo rollouts get rollout nritax-api -n nritax-production --watch --timeout 300s
-      - name: Promote rollout after SLO checks
+
+      - name: Verify production health endpoint
+        run: curl --fail --silent --show-error "${{ vars.PRODUCTION_HEALTHCHECK_URL }}"
+
+      - name: Optional migration hook
+        if: ${{ inputs.run_migrations }}
+        run: echo "Migration stage reserved. No destructive migration automation is enabled in this repo."
+
+      - name: Promote production canary
+        if: ${{ inputs.auto_promote }}
         run: kubectl argo rollouts promote nritax-api -n nritax-production
-      - name: Roll out worker image
+
+      - name: Wait for rollout completion
+        if: ${{ inputs.auto_promote }}
+        run: kubectl argo rollouts get rollout nritax-api -n nritax-production --watch --timeout 300s
+
+      - name: Roll out worker image after API promotion
+        if: ${{ inputs.auto_promote }}
         run: kubectl set image deployment/nritax-worker worker=${{ secrets.REGISTRY }}/${{ secrets.WORKER_IMAGE_REPOSITORY }}:${{ inputs.image_tag }} -n nritax-production
+
+      - name: Wait for worker rollout
+        if: ${{ inputs.auto_promote }}
+        run: kubectl rollout status deployment/nritax-worker -n nritax-production --timeout=300s
+
+      - name: Release tracking summary
+        run: |
+          {
+            echo "## Production Deployment"
+            echo ""
+            echo "- Image tag: \`${{ inputs.image_tag }}\`"
+            echo "- Auto promote: \`${{ inputs.auto_promote }}\`"
+            echo "- Migrations requested: \`${{ inputs.run_migrations }}\`"
+            echo "- Health check: \`${{ vars.PRODUCTION_HEALTHCHECK_URL }}\`"
+            if [ "${{ inputs.auto_promote }}" = "true" ]; then
+              echo "- Result: promoted"
+            else
+              echo "- Result: canary started and held for manual promotion"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Optional incident alert webhook
+        if: ${{ failure() && secrets.ALERT_WEBHOOK_URL != '' }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            -d "{\"service\":\"nritax-api\",\"environment\":\"production\",\"status\":\"failed\",\"image_tag\":\"${{ inputs.image_tag }}\",\"workflow\":\"${{ github.workflow }}\",\"run_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "${{ secrets.ALERT_WEBHOOK_URL }}"

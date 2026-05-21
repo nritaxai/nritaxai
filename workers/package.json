@@ -1,0 +1,10 @@
+{
+  "name": "@nritax/workers",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "npm --prefix ../server run worker"
+  },
+  "main": "./index.js"
+}

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { User, Mail, Image as ImageIcon, Save, Pencil, Crown, CalendarDays, Sparkles, LockKeyhole, LogOut, Trash2, Eye, EyeOff } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Badge } from "../components/ui/badge";
+import { LegalAcceptanceGate } from "../components/LegalAcceptanceGate";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import {
@@ -24,10 +25,13 @@ import {
   clearStoredAuth,
   deleteAccount,
   getMySubscription,
+  getUserPrivacyStatus,
   getUserProfile,
   requestCountryChange,
+  updatePrivacyConsent,
   updateUserProfile,
 } from "../../utils/api";
+import { CURRENT_POLICY_VERSION } from "../../config/legal";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 import { getPlanLabel, type SubscriptionMe } from "../../utils/subscription";
 
@@ -41,6 +45,11 @@ type ProfileData = {
   countryLocked?: boolean;
   countryChangeStatus?: "none" | "pending" | "approved" | "rejected";
   termsAccepted?: boolean;
+  termsAcceptedAt?: string | null;
+  acceptedAt?: string | null;
+  acceptedIp?: string;
+  initialCountry?: string;
+  initialCountryName?: string;
   preferredLanguage?: "english" | "hindi" | "tamil" | "indonesian";
   bio?: string;
   linkedinProfile?: string;
@@ -140,6 +149,8 @@ const normalizeProfileImage = async (dataUrl: string) => {
 
 export function Profile() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const routeState = (location.state || null) as { returnTo?: string } | null;
   const token = localStorage.getItem("token");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const storedUser = useMemo<ProfileData | null>(() => {
@@ -166,6 +177,7 @@ export function Profile() {
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [requestingCountryChange, setRequestingCountryChange] = useState(false);
+  const [acceptingLegal, setAcceptingLegal] = useState(false);
   const [retryingProfile, setRetryingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
@@ -417,6 +429,43 @@ export function Profile() {
     }
   };
 
+  const handleAcceptLegal = async () => {
+    setAcceptingLegal(true);
+    setError("");
+    setSuccessMessage("");
+
+    try {
+      await updatePrivacyConsent({
+        acceptTerms: true,
+        acceptPrivacyPolicy: true,
+        policyVersion: CURRENT_POLICY_VERSION,
+        consentSource: "profile_gate",
+      });
+
+      const refreshed = await getUserPrivacyStatus();
+      const nextUser = refreshed?.data?.user;
+      if (nextUser) {
+        setProfile(nextUser);
+        const storedUserRaw = localStorage.getItem("user");
+        const storedUser = storedUserRaw ? JSON.parse(storedUserRaw) : {};
+        localStorage.setItem("user", JSON.stringify({ ...storedUser, ...nextUser }));
+        window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new Event("auth-changed"));
+        window.dispatchEvent(new Event("user-updated"));
+      }
+
+      setSuccessMessage("Terms and Privacy Policy accepted successfully.");
+      const returnTo = typeof routeState?.returnTo === "string" ? routeState.returnTo : "";
+      if (returnTo) {
+        window.setTimeout(() => navigate(returnTo, { replace: true }), 350);
+      }
+    } catch (err: any) {
+      setError(err?.response?.data?.message || "Unable to save legal acceptance right now.");
+    } finally {
+      setAcceptingLegal(false);
+    }
+  };
+
   const handleProfileImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -568,7 +617,7 @@ export function Profile() {
   };
 
   return (
-    <div className="py-16">
+    <div className="py-16 text-white">
       {isProfileImagePreviewOpen && profileImage ? (
         <button
           type="button"
@@ -595,14 +644,14 @@ export function Profile() {
         onChange={handleProfileImageFileChange}
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <Card className="rounded-2xl border border-[#E2E8F0] shadow-sm bg-[#F7FAFC]/90">
+        <Card className="rounded-2xl border border-white/10 shadow-sm bg-[#132040]/88">
           <CardContent className="p-6 sm:p-8">
             {loading ? (
-              <p className="text-[#0F172A]">Loading profile...</p>
+              <p className="text-white/70">Loading profile...</p>
             ) : profileLoadFailed && !profile ? (
               <div className="space-y-3">
-                <p className="text-[#0F172A]">We could not load your profile details.</p>
-                <p className="text-sm text-[#0F172A]">
+                <p className="text-white">We could not load your profile details.</p>
+                <p className="text-sm text-white/70">
                   This usually means the profile API failed, auth state expired, or local session data is stale.
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -645,7 +694,7 @@ export function Profile() {
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="absolute -right-1 -bottom-1 inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#E2E8F0] bg-white text-[#0F172A] shadow-sm transition hover:border-[#2563eb] hover:text-[#2563eb]"
+                          className="absolute -right-1 -bottom-1 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-[#0f1e35] text-white shadow-sm transition hover:border-[#2563eb] hover:text-[#60a5fa]"
                           aria-label="Edit profile photo"
                           title="Edit profile photo"
                         >
@@ -671,16 +720,16 @@ export function Profile() {
                     </DropdownMenu>
                   </div>
                   <div>
-                    <p className="text-sm text-[#0F172A]">WELCOME</p>
-                    <h1 className="text-2xl sm:text-3xl text-[#0F172A]">{profile?.name}</h1>
-                    <p className="text-[#0F172A]">{profile?.email}</p>
-                    <p className="mt-1 text-xs text-[#475569]">
+                    <p className="text-sm text-white/55">WELCOME</p>
+                    <h1 className="text-2xl text-white sm:text-3xl">{profile?.name}</h1>
+                    <p className="text-white/80">{profile?.email}</p>
+                    <p className="mt-1 text-xs text-white/55">
                       Click the photo to preview it. Use the pencil button to change it.
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="bg-[#2563eb]/12 text-[#0F172A] border-[#2563eb]/40">
+                  <Badge className="border-[#2563eb]/40 bg-[#2563eb]/12 text-white">
                     <Crown className="size-3 mr-1" />
                     {getPlanLabel(subscription?.plan)} Plan
                   </Badge>
@@ -691,7 +740,7 @@ export function Profile() {
         </Card>
 
         {error && (
-          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-3 text-sm text-red-700">
+          <div className="rounded-md border border-red-400/30 bg-red-500/10 px-3 py-3 text-sm text-red-300">
             <p>{error}</p>
             {profileLoadFailed ? (
               <Button
@@ -708,16 +757,24 @@ export function Profile() {
           </div>
         )}
         {successMessage && (
-          <p className="rounded-md border border-[#2563eb]/40 bg-[#2563eb]/12 px-3 py-2 text-sm text-[#2563eb]">
+          <p className="rounded-md border border-[#2563eb]/40 bg-[#2563eb]/12 px-3 py-2 text-sm text-white">
             {successMessage}
           </p>
         )}
+        {!profile?.termsAccepted ? (
+          <LegalAcceptanceGate
+            onAccept={handleAcceptLegal}
+            loading={acceptingLegal}
+            title="Finish legal acceptance before using chat and Yukti"
+            description="Your account needs a one-time acceptance of the current Terms & Conditions and Privacy Policy before protected AI workflows can continue."
+          />
+        ) : null}
 
         <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 rounded-2xl border border-[#E2E8F0] shadow-sm">
+          <Card className="lg:col-span-2 rounded-2xl border border-white/10 shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-[#0F172A]">User Details</CardTitle>
+                <CardTitle className="text-white">User Details</CardTitle>
                 <CardDescription>Basic identity and account details</CardDescription>
               </div>
               {!isEditingProfile && (
@@ -733,7 +790,7 @@ export function Profile() {
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/55" />
                       <Input
                         id="name"
                         value={name}
@@ -753,7 +810,7 @@ export function Profile() {
                       placeholder="https://www.linkedin.com/in/your-profile"
                       required
                     />
-                    <p className="text-xs text-[#475569]">
+                    <p className="text-xs text-white/55">
                       This is required and must be a valid LinkedIn profile URL.
                     </p>
                   </div>
@@ -761,7 +818,7 @@ export function Profile() {
                   <div className="space-y-2">
                     <Label htmlFor="profileImage">Profile Image</Label>
                     <div className="relative">
-                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
+                      <ImageIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/55" />
                       <Input
                         id="profileImage"
                         value={profileImage}
@@ -778,7 +835,7 @@ export function Profile() {
                         Use Default Picture
                       </Button>
                     </div>
-                    <p className="text-xs text-[#475569]">
+                    <p className="text-xs text-white/55">
                       Upload PNG, JPG, WEBP, or GIF up to 2 MB, or paste a public image URL.
                     </p>
                   </div>
@@ -812,7 +869,7 @@ export function Profile() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-[#0F172A]">
+                      <p className="text-xs text-white/60">
                         {profile?.countryLocked
                           ? `Locked to ${profile.countryOfResidence || "your signup country"}. Changes now require support or admin approval.`
                           : countryOfResidence
@@ -828,7 +885,7 @@ export function Profile() {
                       id="preferredLanguage"
                       value={preferredLanguage}
                       onChange={(e) => setPreferredLanguage(e.target.value as "english" | "hindi" | "tamil" | "indonesian")}
-                      className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                      className="h-12 w-full rounded-xl border border-white/15 bg-white/8 px-4 py-2 text-sm text-white ring-offset-background"
                     >
                       <option value="english">English</option>
                       <option value="hindi">Hindi</option>
@@ -848,7 +905,7 @@ export function Profile() {
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
                       placeholder="Tell us a bit about your tax profile goals."
                     />
-                    <p className="text-xs text-[#0F172A] text-right">{bio.length}/240</p>
+                    <p className="text-right text-xs text-white/55">{bio.length}/240</p>
                   </div>
 
                   <div className="flex gap-2 justify-end">
@@ -879,15 +936,15 @@ export function Profile() {
                   <div className="space-y-2">
                     <Label htmlFor="name-readonly">Full Name</Label>
                     <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
-                      <Input id="name-readonly" value={profile?.name || ""} className="pl-9 bg-[#F7FAFC]" disabled />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/55" />
+                      <Input id="name-readonly" value={profile?.name || ""} className="pl-9" disabled />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="email">Email Address</Label>
                     <div className="relative">
-                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
-                      <Input id="email" value={profile?.email || ""} className="pl-9 bg-[#F7FAFC]" disabled />
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-white/55" />
+                      <Input id="email" value={profile?.email || ""} className="pl-9" disabled />
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -895,18 +952,30 @@ export function Profile() {
                     <Input
                       id="linkedin-readonly"
                       value={profile?.linkedinProfile || "Not set"}
-                      className="bg-[#F7FAFC]"
+                      className=""
                       disabled
                     />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="provider">Sign-in Provider</Label>
-                    <Input id="provider" value={profile?.provider || "local"} className="bg-[#F7FAFC] capitalize" disabled />
+                    <Input id="provider" value={profile?.provider || "local"} className="capitalize" disabled />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="legal-readonly">Legal Acceptance</Label>
+                    <Input
+                      id="legal-readonly"
+                      value={
+                        profile?.termsAccepted
+                          ? `Accepted on ${formatDate(profile?.termsAcceptedAt || profile?.acceptedAt || null)}`
+                          : "Pending acceptance"
+                      }
+                      disabled
+                    />
                   </div>
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="phone-readonly">Phone</Label>
-                      <Input id="phone-readonly" value={profile?.phone || "Not set"} className="bg-[#F7FAFC]" disabled />
+                      <Input id="phone-readonly" value={profile?.phone || "Not set"} disabled />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="country-readonly">Country of Residence</Label>

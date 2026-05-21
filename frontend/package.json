@@ -1,0 +1,12 @@
+{
+  "name": "@nritax/frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix ../client run dev",
+    "build": "npm --prefix ../client run build",
+    "android:build": "npm --prefix ../client run android:build",
+    "android:sync": "npm --prefix ../client run android:sync"
+  }
+}

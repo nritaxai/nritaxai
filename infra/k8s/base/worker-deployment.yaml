@@ -12,15 +12,28 @@ spec:
       labels:
         app: nritax-worker
         tier: worker
+        worker-group: default
     spec:
+      terminationGracePeriodSeconds: 60
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: nritax-worker
       containers:
         - name: worker
           image: ghcr.io/nritaxai/worker:latest
           env:
             - name: NODE_ENV
               value: production
+            - name: APP_NAME
+              value: nritax-worker
             - name: APP_RUNTIME
               value: k8s
+            - name: WORKER_GROUP
+              value: default
             - name: BACKGROUND_JOBS_ENABLED
               value: "true"
             - name: PROMETHEUS_METRICS_ENABLED
@@ -29,9 +42,25 @@ spec:
               value: "6"
           ports:
             - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 15"]
           resources:
             requests:
-              cpu: 250m
+              cpu: 500m
               memory: 512Mi
             limits:
               cpu: "2"

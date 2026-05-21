@@ -1,4 +1,5 @@
 import { useNavigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Briefcase, Calculator as CalcIcon, Globe, Home as HomeIcon, MessageSquare, TrendingUp } from "lucide-react";
 import { motion, useInView, useReducedMotion } from "motion/react";
@@ -8,6 +9,7 @@ import { PrivacyTrustBanner } from "../components/PrivacyTrustBanner";
 import { getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { fadeUp, fadeUpSoft, PREMIUM_EASE, staggerContainer } from "../utils/motion";
+import AndroidHomePage from "../../components/AndroidHomePage";
 
 const heroContent = {
   badge: "Trusted NRITAX Platform",
@@ -145,7 +147,7 @@ function AnimatedStatValue({ label, fallback }: { label: string; fallback: strin
   }, [config, fallback, isInView, shouldReduceMotion]);
 
   return (
-    <div ref={containerRef} className="mb-2 text-3xl font-bold tracking-tight text-blue-700">
+    <div ref={containerRef} className="mb-2 text-3xl font-bold tracking-tight text-[#60a5fa]">
       {displayValue}
     </div>
   );
@@ -156,6 +158,7 @@ interface HomeProps {
 }
 
 export function Home({ onRequireLogin }: HomeProps) {
+  const isNative = Capacitor.isNativePlatform(); // Android only
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
   const shouldReduceMotion = useReducedMotion();
@@ -185,6 +188,10 @@ export function Home({ onRequireLogin }: HomeProps) {
     };
   }, []);
 
+  if (isNative) {
+    return <AndroidHomePage onRequireLogin={onRequireLogin} />; // Android only
+  }
+
   const requireAuthFor = (path: string, state?: Record<string, unknown>) => {
     if (!getStoredAuthToken()) {
       onRequireLogin();
@@ -195,40 +202,97 @@ export function Home({ onRequireLogin }: HomeProps) {
 
   return (
     <main className="min-h-screen">
-      <section className="bg-gradient-to-b from-gray-50 to-white pt-4 pb-16 md:pt-6 md:pb-24">
+      <section className="bg-transparent pt-4 pb-16 md:pt-6 md:pb-24">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={heroVariants}
-            className="mb-12 text-center"
-          >
-            {userName ? (
-              <motion.p variants={fadeUp} className="mb-4 text-xs font-semibold uppercase tracking-wide text-blue-600">
-                WELCOME! {renderTextWithShortForms(userName)}
-              </motion.p>
-            ) : null}
-            <motion.span
-              variants={fadeUp}
-              className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-600 [word-spacing:0.2rem]"
+          {!isNative && (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={heroVariants}
+              className="mb-12 text-center"
             >
-              {renderTextWithShortForms(heroContent.badge)}
-            </motion.span>
-            <motion.h1 variants={fadeUp} className="mb-4 mt-6 text-5xl font-bold tracking-tight text-gray-900 md:text-6xl">
-              {heroContent.headline}
-            </motion.h1>
-            <motion.p variants={fadeUp} className="mb-4 text-lg font-normal text-slate-600">
-              {renderTextWithShortForms(heroContent.subheadline)}
+              {userName ? (
+                <motion.p variants={fadeUp} className="mb-4 text-xs font-semibold uppercase tracking-wide text-[#60a5fa]">
+                  WELCOME! {renderTextWithShortForms(userName)}
+                </motion.p>
+              ) : null}
+              <motion.span
+                variants={fadeUp}
+                className="inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-[#60a5fa] [word-spacing:0.2rem]"
+              >
+                {renderTextWithShortForms(heroContent.badge)}
+              </motion.span>
+              <motion.h1 variants={fadeUp} className="mb-4 mt-6 text-5xl font-bold tracking-tight text-white md:text-6xl">
+                {heroContent.headline}
+              </motion.h1>
+              <motion.p variants={fadeUp} className="mb-4 text-lg font-normal text-white/70">
+                {renderTextWithShortForms(heroContent.subheadline)}
+              </motion.p>
+              <motion.p variants={fadeUp} className="mx-auto mb-8 max-w-2xl text-lg font-normal text-white/70">
+                {renderTextWithShortForms(heroContent.description)}
+              </motion.p>
+              <motion.div variants={fadeUp} className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+                <motion.button
+                  type="button"
+                  aria-label="Ask AI instantly"
+                  onClick={() => requireAuthFor("/chat")}
+                  className="inline-flex items-center justify-center rounded-[28px] bg-[#2563eb] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-[#1d4ed8]"
+                  whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 18px 36px rgba(37, 99, 235, 0.24)" }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
+                  transition={{ duration: 0.25, ease: PREMIUM_EASE }}
+                >
+                  <MessageSquare className="mr-2 size-5" />
+                  Ask AI Instantly
+                </motion.button>
+                <motion.button
+                  type="button"
+                  aria-label="Consult a CPA"
+                  onClick={() => requireAuthFor("/consult")}
+                  className="inline-flex items-center justify-center rounded-[28px] border border-white/40 bg-transparent px-8 py-4 text-base font-semibold text-white shadow-sm transition-all hover:bg-white/10"
+                  whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 16px 32px rgba(15, 23, 42, 0.08)" }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
+                  transition={{ duration: 0.25, ease: PREMIUM_EASE }}
+                >
+                  Consult a CPA
+                </motion.button>
+                <motion.button
+                  type="button"
+                  aria-label="View pricing"
+                  onClick={() => navigate("/pricing")}
+                  className="inline-flex items-center justify-center rounded-[28px] border border-white/40 bg-transparent px-8 py-4 text-base font-semibold text-white shadow-sm transition-all hover:bg-white/10"
+                  whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 16px 32px rgba(15, 23, 42, 0.08)" }}
+                  whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
+                  transition={{ duration: 0.25, ease: PREMIUM_EASE }}
+                >
+                  View Pricing
+                </motion.button>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {isNative && userName ? (
+            <motion.p
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              className="mb-6 text-center text-xs font-semibold uppercase tracking-wide text-[#60a5fa]"
+            >
+              WELCOME! {renderTextWithShortForms(userName)}
             </motion.p>
-            <motion.p variants={fadeUp} className="mx-auto mb-8 max-w-2xl text-lg font-normal text-slate-600">
-              {renderTextWithShortForms(heroContent.description)}
-            </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+          ) : null}
+
+          {isNative ? (
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={fadeUp}
+              className="mb-8 flex flex-col items-center justify-center gap-3 text-center sm:flex-row"
+            >
               <motion.button
                 type="button"
                 aria-label="Ask AI instantly"
                 onClick={() => requireAuthFor("/chat")}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-blue-700"
+                className="inline-flex items-center justify-center rounded-[28px] bg-[#2563eb] px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-[#1d4ed8]"
                 whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 18px 36px rgba(37, 99, 235, 0.24)" }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
                 transition={{ duration: 0.25, ease: PREMIUM_EASE }}
@@ -240,7 +304,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 type="button"
                 aria-label="Consult a CPA"
                 onClick={() => requireAuthFor("/consult")}
-                className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-8 py-4 text-base font-semibold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
+                className="inline-flex items-center justify-center rounded-[28px] border border-white/40 bg-transparent px-8 py-4 text-base font-semibold text-white shadow-sm transition-all hover:bg-white/10"
                 whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 16px 32px rgba(15, 23, 42, 0.08)" }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
                 transition={{ duration: 0.25, ease: PREMIUM_EASE }}
@@ -251,7 +315,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 type="button"
                 aria-label="View pricing"
                 onClick={() => navigate("/pricing")}
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100"
+                className="inline-flex items-center justify-center rounded-[28px] border border-white/40 bg-transparent px-8 py-4 text-base font-semibold text-white shadow-sm transition-all hover:bg-white/10"
                 whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 16px 32px rgba(15, 23, 42, 0.08)" }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
                 transition={{ duration: 0.25, ease: PREMIUM_EASE }}
@@ -259,7 +323,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 View Pricing
               </motion.button>
             </motion.div>
-          </motion.div>
+          ) : null}
 
           <motion.div
             initial="hidden"
@@ -278,10 +342,10 @@ export function Home({ onRequireLogin }: HomeProps) {
                     : { y: -4, boxShadow: "0 18px 34px rgba(15, 23, 42, 0.08)" }
                 }
                 transition={{ duration: 0.3, ease: PREMIUM_EASE }}
-                className="rounded-xl border bg-white p-6 text-center shadow-sm"
+                className="rounded-2xl border border-white/10 bg-[#132040]/88 p-6 text-center shadow-[0_18px_40px_rgba(0,0,0,0.25)] backdrop-blur-xl"
               >
                 <AnimatedStatValue label={stat.label} fallback={stat.value} />
-                <div className="text-sm font-normal text-slate-600">{stat.label}</div>
+                <div className="text-sm font-normal text-white/65">{stat.label}</div>
               </motion.div>
             ))}
           </motion.div>
@@ -291,7 +355,7 @@ export function Home({ onRequireLogin }: HomeProps) {
         <Features />
       </section>
 
-      <section className="bg-gradient-to-b from-gray-50 to-white pt-10 pb-5 md:pt-14 md:pb-8">
+      <section className="bg-transparent pt-10 pb-5 md:pt-14 md:pb-8">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <section id="tax-updates">
             <motion.div
@@ -301,10 +365,10 @@ export function Home({ onRequireLogin }: HomeProps) {
               variants={fadeUp}
               className="mb-4 text-center"
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[#60a5fa]">
                 Regulatory Intelligence
               </p>
-              <h3 className="mt-3 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Tax Updates</h3>
+              <h3 className="mt-3 text-3xl font-bold tracking-tight text-white md:text-4xl">Tax Updates</h3>
             </motion.div>
             <motion.div
               initial="hidden"
@@ -323,31 +387,31 @@ export function Home({ onRequireLogin }: HomeProps) {
                       : { y: -5, boxShadow: "0 24px 42px rgba(15, 23, 42, 0.10)" }
                   }
                   transition={{ duration: 0.28, ease: PREMIUM_EASE }}
-                  className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,250,0.98))] p-5 text-left shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
+                  className="rounded-2xl border border-white/10 bg-[#132040]/90 p-5 text-left shadow-[0_18px_36px_rgba(0,0,0,0.28)] backdrop-blur-xl"
                 >
                   <div className="mb-4 flex flex-wrap items-center gap-2">
-                    <span className="rounded-sm border border-slate-800 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
+                    <span className="rounded-sm border border-[#2563eb]/50 bg-[#2563eb]/18 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[#93c5fd]">
                       {item.label}
                     </span>
-                    <span className="rounded-sm bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                    <span className="rounded-sm bg-white/8 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/75">
                       {item.country}
                     </span>
-                    <span className="rounded-sm border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                    <span className="rounded-sm border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/60">
                       {item.type}
                     </span>
                   </div>
-                  <p className="text-lg font-semibold text-slate-900">
+                  <p className="text-lg font-semibold text-white">
                     {renderTextWithShortForms(item.title)}
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 font-normal text-slate-500">
+                    <span className="inline-flex items-center gap-1 font-normal text-white/55">
                       <Globe className="size-3.5" />
                       {item.date}
                     </span>
-                    <span className="rounded-sm bg-slate-100 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-slate-700">
+                    <span className="rounded-sm bg-white/8 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-white/70">
                       Source: {item.source}
                     </span>
-                    <span className="rounded-sm border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                    <span className="rounded-sm border border-emerald-400/30 bg-emerald-500/10 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-emerald-300">
                       {item.confidence}
                     </span>
                   </div>
@@ -362,7 +426,7 @@ export function Home({ onRequireLogin }: HomeProps) {
               whileInView="visible"
               viewport={{ once: true, amount: 0.5 }}
               variants={fadeUp}
-              className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-blue-600"
+              className="mb-2 text-center text-xs font-semibold uppercase tracking-wide text-[#60a5fa]"
             >
               Smart Shortcuts
             </motion.p>
@@ -371,7 +435,7 @@ export function Home({ onRequireLogin }: HomeProps) {
               whileInView="visible"
               viewport={{ once: true, amount: 0.5 }}
               variants={fadeUp}
-              className="mb-8 text-center text-3xl font-bold tracking-tight text-gray-900 md:text-4xl"
+              className="mb-8 text-center text-3xl font-bold tracking-tight text-white md:text-4xl"
             >
               Quick Access by Scenario
             </motion.h3>
@@ -397,14 +461,14 @@ export function Home({ onRequireLogin }: HomeProps) {
                     }
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
                     transition={{ duration: 0.25, ease: PREMIUM_EASE }}
-                    className={`${scenario.color} rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg`}
+                    className="rounded-2xl border border-white/10 bg-[#132040]/88 p-6 text-white transition-all hover:-translate-y-1 hover:shadow-lg"
                     aria-label={scenario.title}
                   >
                     <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.06 }} transition={{ duration: 0.2 }}>
                       <Icon className="mb-3 size-8" />
                     </motion.div>
                     <h4 className="mb-1 text-lg font-semibold">{scenario.title}</h4>
-                    <p className="text-sm font-normal leading-7 opacity-80">{renderTextWithShortForms(scenario.subtitle)}</p>
+                    <p className="text-sm font-normal leading-7 text-white/70">{renderTextWithShortForms(scenario.subtitle)}</p>
                   </motion.button>
                 );
               })}

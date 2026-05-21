@@ -1,0 +1,16 @@
+{
+  "name": "@nritax/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js",
+    "./config/env": "./config/env.js",
+    "./config/platform": "./config/platform.js",
+    "./contracts": "./contracts/index.js",
+    "./subscription-config": "./subscriptionConfig.js",
+    "./types": "./types/index.d.ts",
+    "./utils/object": "./utils/object.js"
+  }
+}

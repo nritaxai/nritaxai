@@ -4,6 +4,9 @@ resources:
   - api-rollout.yaml
   - api-services.yaml
   - worker-deployment.yaml
+  - priority-worker-deployment.yaml
+  - batch-worker-deployment.yaml
+  - ai-worker-deployment.yaml
   - gpu-worker-deployment.yaml
   - worker-service.yaml
   - api-hpa.yaml

@@ -5,7 +5,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { clearStoredAuth, getStoredAuthToken } from "../../utils/api";
+import { getStoredAuthToken, logoutCurrentSession } from "../../utils/api";
+import { getAuthToken } from "../../services/authStorage";
 
 interface AndroidHeaderProps {
   onLogin: () => void;
@@ -15,6 +16,9 @@ interface StoredUser {
   name?: string;
   profileImage?: string;
 }
+
+const NATIVE_CURRENT_ROUTE_KEY = "nritax:native-current-route";
+const NATIVE_PREVIOUS_ROUTE_KEY = "nritax:native-previous-route";
 
 const sanitizeProfileImage = (value?: string) => {
   const normalized = String(value || "").trim();
@@ -38,6 +42,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
   const isNative = Capacitor.isNativePlatform(); // Android only
   const location = useLocation();
   const navigate = useNavigate();
+  const isHome = location.pathname === "/" || location.pathname === "/home"; // Android only
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(() => Boolean(getStoredAuthToken()));
@@ -101,9 +106,25 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
     return null; // Android only
   }
 
-  const handleLogout = () => {
-    // Android only
-    clearStoredAuth();
+  const handleBackNavigation = () => {
+    const previousRoute = sessionStorage.getItem(NATIVE_PREVIOUS_ROUTE_KEY);
+    const currentRoute = sessionStorage.getItem(NATIVE_CURRENT_ROUTE_KEY);
+
+    if (previousRoute && previousRoute !== currentRoute && previousRoute !== location.pathname) {
+      navigate(previousRoute, { replace: true });
+      return;
+    }
+
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/home", { replace: true });
+  };
+
+  const handleLogout = async () => {
+    await logoutCurrentSession();
     setDrawerOpen(false);
     navigate("/", { replace: true });
   };
@@ -112,13 +133,13 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
 
   if (location.pathname === "/chat") {
     return (
-      <header className="android-header fixed inset-x-0 top-0 z-[70] border-b border-gray-200 bg-white/95 backdrop-blur-md">
+      <header className="android-header fixed inset-x-0 top-0 z-[70] border-b border-white/10 bg-[#0a1628]/95 backdrop-blur-xl">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
           <button
             type="button"
-            onClick={() => navigate("/home")}
-            className="inline-flex min-w-0 items-center gap-2 text-slate-900"
-            aria-label="Back to home"
+            onClick={handleBackNavigation}
+            className="inline-flex min-w-0 items-center gap-2 text-white"
+            aria-label="Go back"
           >
             <ArrowLeft className="size-5" />
             <span className="truncate text-base font-semibold">AI Tax Chat</span>
@@ -129,15 +150,15 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
               type="button"
               aria-label="Open chat options"
               onClick={() => setChatMenuOpen((prev) => !prev)}
-              className="inline-flex size-10 items-center justify-center rounded-md text-slate-900 transition-colors hover:bg-slate-100"
+              className="inline-flex size-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10"
             >
               <MoreVertical className="size-5" />
             </button>
             {chatMenuOpen ? (
-              <div className="absolute right-0 top-11 w-44 rounded-xl border border-gray-200 bg-white p-2 shadow-lg">
+              <div className="absolute right-0 top-11 w-44 rounded-2xl border border-white/10 bg-[#132040] p-2 shadow-lg">
                 <button
                   type="button"
-                  className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 transition hover:bg-slate-100"
+                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-white transition hover:bg-white/10"
                   onClick={() => {
                     setChatMenuOpen(false);
                     window.dispatchEvent(new Event("nritax:download-chat"));
@@ -147,7 +168,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
                 </button>
                 <button
                   type="button"
-                  className="flex w-full rounded-lg px-3 py-2 text-left text-sm text-slate-900 transition hover:bg-slate-100"
+                  className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-white transition hover:bg-white/10"
                   onClick={() => {
                     setChatMenuOpen(false);
                     window.dispatchEvent(new Event("nritax:clear-chat"));
@@ -164,14 +185,25 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
   }
 
   return (
-    <header className="android-header fixed inset-x-0 top-0 z-[70] border-b border-gray-200 bg-white/95 backdrop-blur-md">
+    <header className="android-header fixed inset-x-0 top-0 z-[70] border-b border-white/10 bg-[#0a1628]/95 backdrop-blur-xl">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
         <div className="flex min-w-0 items-center gap-3">
+          {!isHome ? (
+            <button
+              type="button"
+              onClick={handleBackNavigation}
+              className="inline-flex size-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="size-5" />
+            </button>
+          ) : null}
           <button
             type="button"
             aria-label="Open profile"
-            onClick={() => {
-              if (!getStoredAuthToken()) {
+            onClick={async () => {
+              const token = getStoredAuthToken() || (await getAuthToken());
+              if (!token) {
                 onLogin();
                 return;
               }
@@ -190,7 +222,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
 
           <Link
             to="/home"
-            className="truncate text-lg font-bold tracking-tight text-slate-900"
+            className="truncate text-lg font-bold tracking-tight text-white"
             onClick={() => setDrawerOpen(false)}
           >
             NRITAX.AI
@@ -202,17 +234,17 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
             <button
               type="button"
               aria-label="Open navigation menu"
-              className="inline-flex size-10 items-center justify-center rounded-md text-slate-900 transition-colors hover:bg-slate-100"
+              className="inline-flex size-10 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10"
             >
               <Menu className="size-6" />
             </button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[84vw] max-w-sm border-l border-gray-200 bg-white pt-6">
-            <SheetHeader className="border-b border-gray-200 pb-4">
-              <SheetTitle className="text-left text-lg font-bold tracking-tight text-slate-900">
+          <SheetContent side="right" className="w-[84vw] max-w-sm border-l border-white/10 bg-[#0f1e35] pt-6 text-white">
+            <SheetHeader className="border-b border-white/10 pb-4">
+              <SheetTitle className="text-left text-lg font-bold tracking-tight text-white">
                 NRITAX.AI
               </SheetTitle>
-              {userName ? <p className="text-left text-sm text-slate-600">{userName}</p> : null}
+              {userName ? <p className="text-left text-sm text-white/60">{userName}</p> : null}
             </SheetHeader>
 
             <nav className="flex flex-1 flex-col gap-2 px-4 py-4">
@@ -224,7 +256,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
                     to={item.to}
                     onClick={() => setDrawerOpen(false)}
                     className={`rounded-md px-3 py-3 text-sm font-medium transition-colors ${
-                      isActive ? "bg-blue-50 text-blue-700" : "text-slate-800 hover:bg-slate-100 hover:text-blue-700"
+                      isActive ? "bg-[#2563eb]/15 text-[#60a5fa]" : "text-white/75 hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {item.label}
@@ -233,12 +265,12 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
               })}
             </nav>
 
-            <div className="border-t border-gray-200 p-4">
+            <div className="border-t border-white/10 p-4">
               {isAuthenticated ? (
                 <Button
                   variant="outline"
                   onClick={handleLogout}
-                  className="w-full justify-start border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+                  className="w-full justify-start"
                 >
                   <LogOut className="size-4" />
                   Logout
@@ -250,7 +282,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
                     setDrawerOpen(false);
                     onLogin();
                   }}
-                  className="w-full justify-start text-slate-800 hover:bg-slate-100 hover:text-slate-900"
+                  className="w-full justify-start"
                 >
                   <LogIn className="size-4" />
                   Login / Sign Up

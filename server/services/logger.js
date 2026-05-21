@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { featureFlags } from "../Config/featureFlags.js";
+import { redactObject } from "./dataProtection.js";
 
 let pinoLogger = null;
 
@@ -8,7 +9,7 @@ const createFallbackLogger = () => {
     const record = {
       level,
       time: new Date().toISOString(),
-      ...payload,
+      ...redactObject(payload),
     };
     const line = JSON.stringify(record);
     if (level === "error") {

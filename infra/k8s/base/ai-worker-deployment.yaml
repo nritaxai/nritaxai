@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nritax-worker-ai
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: nritax-worker-ai
+  template:
+    metadata:
+      labels:
+        app: nritax-worker-ai
+        tier: worker
+        worker-group: ai
+        workload: ai
+    spec:
+      terminationGracePeriodSeconds: 90
+      containers:
+        - name: worker
+          image: ghcr.io/nritaxai/worker:latest
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: APP_NAME
+              value: nritax-worker-ai
+            - name: APP_RUNTIME
+              value: k8s
+            - name: WORKER_GROUP
+              value: ai
+            - name: WORKER_QUEUES
+              value: ai-jobs
+            - name: BACKGROUND_JOBS_ENABLED
+              value: "true"
+            - name: AI_QUEUE_ENABLED
+              value: "true"
+            - name: PROMETHEUS_METRICS_ENABLED
+              value: "true"
+            - name: WORKER_CONCURRENCY__AI_JOBS
+              value: "2"
+            - name: WORKER_CONCURRENCY
+              value: "2"
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 20"]
+          resources:
+            requests:
+              cpu: "1"
+              memory: 2Gi
+            limits:
+              cpu: "4"
+              memory: 6Gi

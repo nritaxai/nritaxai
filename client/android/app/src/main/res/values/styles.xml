@@ -17,6 +17,13 @@
 
 
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
-        <item name="android:background">@drawable/splash</item>
+        <!-- Use a drawable wrapper so Android can center the splash artwork on a solid launch background. -->
+        <item name="android:windowBackground">@drawable/launch_splash</item>
+        <!-- Match the splash plugin background color during native launch. -->
+        <item name="windowSplashScreenBackground">#ffffff</item>
+        <!-- Use a square mark here because Android 12+ masks the splash icon into a fixed-size slot. -->
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_mark</item>
+        <!-- Continue into the normal no-action-bar theme once the launch screen finishes. -->
+        <item name="postSplashScreenTheme">@style/AppTheme.NoActionBar</item>
     </style>
 </resources>

@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: nritax-worker-ai
+spec:
+  scaleTargetRef:
+    name: nritax-worker-ai
+  pollingInterval: 15
+  cooldownPeriod: 300
+  minReplicaCount: 0
+  maxReplicaCount: 6
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.nritax-observability.svc.cluster.local:9090
+        metricName: nritax_worker_ai_queue_pressure
+        threshold: "2"
+        query: |
+          sum(nritax_queue_depth{queue="ai-jobs",state=~"waiting|active|delayed"})

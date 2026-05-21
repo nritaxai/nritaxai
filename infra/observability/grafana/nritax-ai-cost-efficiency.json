@@ -1,0 +1,114 @@
+{
+  "title": "nritax.ai AI Cost Efficiency",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Estimated AI Spend / 5m",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_estimated_cost_usd_total[5m])) by (provider, strategy)",
+          "legendFormat": "{{provider}} / {{strategy}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Token Volume / 5m",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_tokens_total[5m])) by (direction, model_family)",
+          "legendFormat": "{{direction}} / {{model_family}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Lightweight Routing Share",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_route_strategy_total{strategy=\"lightweight\"}[15m])) / clamp_min(sum(rate(nritax_ai_route_strategy_total[15m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "RAG + Small Routing Share",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_route_strategy_total{strategy=\"rag-small\"}[15m])) / clamp_min(sum(rate(nritax_ai_route_strategy_total[15m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Advanced Routing Share",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_route_strategy_total{strategy=\"advanced\"}[15m])) / clamp_min(sum(rate(nritax_ai_route_strategy_total[15m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "AI P95 Latency By Strategy",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nritax_ai_latency_ms_bucket[5m])) by (le, provider, route_tier))",
+          "legendFormat": "{{provider}} / {{route_tier}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Estimated Cost Per 1K Requests",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "(sum(rate(nritax_ai_estimated_cost_usd_total[15m])) / clamp_min(sum(rate(nritax_ai_requests_total[15m])), 0.001)) * 1000",
+          "legendFormat": "USD / 1K requests"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Gateway Cache Hit Rate",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_cache_requests_total{layer=\"ai_gateway_response\",result=\"hit\"}[15m])) / clamp_min(sum(rate(nritax_cache_requests_total{layer=\"ai_gateway_response\"}[15m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Premium Model Share",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_tokens_total{model_family=\"premium\",direction=\"input\"}[15m])) / clamp_min(sum(rate(nritax_ai_tokens_total{direction=\"input\"}[15m])), 1)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Workflow Mix",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_ai_workflow_requests_total[15m])) by (workflow, strategy)",
+          "legendFormat": "{{workflow}} / {{strategy}}"
+        }
+      ]
+    }
+  ]
+}

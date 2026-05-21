@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Match the Capacitor splash plugin background color so launch feels seamless. -->
+    <item android:drawable="@android:color/white" />
+    <!-- Center the generated splash asset inside the native launch drawable. -->
+    <item>
+        <bitmap
+            android:gravity="center"
+            android:src="@drawable/splash" />
+    </item>
+</layer-list>

@@ -12,10 +12,10 @@ export const getOrCreateUserConsent = async (userId) => {
   if (!userId) return null;
   const existing = await UserConsent.findOne({ user: userId });
   if (existing) return existing;
-  const user = await User.findById(userId).select("termsAccepted acceptedAt policyVersion");
+  const user = await User.findById(userId).select("termsAccepted termsAcceptedAt acceptedAt policyVersion");
   return UserConsent.create({
     user: userId,
-    termsAcceptedAt: user?.termsAccepted ? user?.acceptedAt || new Date() : null,
+    termsAcceptedAt: user?.termsAccepted ? user?.termsAcceptedAt || user?.acceptedAt || new Date() : null,
     privacyPolicyAcceptedAt: null,
     consentVersion: user?.policyVersion || "2026-05",
   });

@@ -1,47 +1,82 @@
-name: Backend CI
+name: CI
 
 on:
   pull_request:
-    paths:
-      - "server/**"
-      - "infra/**"
-      - ".github/workflows/ci.yml"
   push:
     branches:
       - main
-    paths:
-      - "server/**"
-      - "infra/**"
-      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test-and-validate:
+  quality-gates:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: server
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
-          cache-dependency-path: server/package-lock.json
-      - name: Install server dependencies
-        run: npm install --no-package-lock
-      - name: Run unit tests
-        run: npm test
-      - name: Build API image
-        run: docker build -t nritax-server-ci -f Dockerfile .
-      - name: Build worker image
-        run: docker build -t nritax-worker-ci -f Dockerfile.worker .
+          cache-dependency-path: |
+            package-lock.json
+            client/package-lock.json
+            server/package-lock.json
 
-  validate-kustomize:
+      - name: Install root dependencies
+        run: npm install --no-package-lock
+
+      - name: Install client dependencies
+        run: npm --prefix client install --no-package-lock
+
+      - name: Install server dependencies
+        run: npm --prefix server install --no-package-lock
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Server tests
+        run: npm run test:server
+
+      - name: Client build
+        run: npm --prefix client run build
+
+      - name: Build API image
+        run: docker build -t nritax-server-ci -f server/Dockerfile server
+
+      - name: Build worker image
+        run: docker build -t nritax-worker-ci -f server/Dockerfile.worker server
+
+  validate-manifests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - uses: imranismail/setup-kustomize@v2
+
+      - name: Validate deployment safety rules
+        run: node scripts/validate-k8s-safety.mjs
+
       - name: Render staging manifests
         run: kustomize build infra/k8s/overlays/staging > /tmp/staging.yaml
+
       - name: Render production manifests
         run: kustomize build infra/k8s/overlays/production > /tmp/production.yaml
+
+      - name: Upload rendered manifests
+        uses: actions/upload-artifact@v4
+        with:
+          name: rendered-manifests
+          path: |
+            /tmp/staging.yaml
+            /tmp/production.yaml

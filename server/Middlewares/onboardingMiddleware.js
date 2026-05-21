@@ -25,3 +25,11 @@ export const requireAcceptedTerms = (featureName = "this feature") => async (req
     });
   }
 };
+
+export const requireAcceptedTermsIfAuthenticated = (featureName = "this feature") => async (req, res, next) => {
+  if (!req.user) {
+    return next();
+  }
+
+  return requireAcceptedTerms(featureName)(req, res, next);
+};

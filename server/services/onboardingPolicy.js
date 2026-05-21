@@ -2,6 +2,11 @@ import { CURRENT_POLICY_VERSION } from "./legalConfig.js";
 import { buildCountryProfile, normalizeCountryCode, resolveCountryRule } from "./countryPolicyService.js";
 
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
+const normalizeIp = (value = "") =>
+  String(value || "")
+    .split(",")[0]
+    .trim()
+    .slice(0, 120);
 
 export const normalizeBoolean = (value) => {
   if (typeof value === "boolean") return value;
@@ -16,7 +21,7 @@ export const normalizeBoolean = (value) => {
 export const resolveRequestedPolicyVersion = (value = "") =>
   sanitizeString(value) || CURRENT_POLICY_VERSION;
 
-export const validateTermsAcceptance = (body = {}) => {
+export const validateTermsAcceptance = (body = {}, context = {}) => {
   const termsAccepted = normalizeBoolean(body?.termsAccepted);
   const policyVersion = resolveRequestedPolicyVersion(body?.policyVersion);
 
@@ -29,6 +34,7 @@ export const validateTermsAcceptance = (body = {}) => {
   return {
     termsAccepted: true,
     acceptedAt: new Date(),
+    acceptedIp: normalizeIp(context?.acceptedIp || context?.ip),
     policyVersion,
   };
 };
@@ -56,10 +62,14 @@ export const validateCountrySelection = (body = {}) => {
 
 export const applySignupComplianceState = ({ user, termsAcceptance, countrySelection, source = "web" }) => {
   user.termsAccepted = Boolean(termsAcceptance?.termsAccepted);
+  user.termsAcceptedAt = termsAcceptance?.acceptedAt || null;
   user.acceptedAt = termsAcceptance?.acceptedAt || null;
+  user.acceptedIp = sanitizeString(termsAcceptance?.acceptedIp) || user.acceptedIp || "";
   user.policyVersion = sanitizeString(termsAcceptance?.policyVersion) || CURRENT_POLICY_VERSION;
   user.countryCode = countrySelection?.countryCode || "";
   user.countryOfResidence = countrySelection?.countryName || user.countryOfResidence || "";
+  user.initialCountry = user.initialCountry || countrySelection?.countryCode || "";
+  user.initialCountryName = user.initialCountryName || countrySelection?.countryName || "";
   user.countryLocked = Boolean(countrySelection?.countryCode);
   user.countryLockedAt = countrySelection?.countryCode ? new Date() : user.countryLockedAt || null;
   user.countrySelectionSource = sanitizeString(source) || "web";
@@ -69,7 +79,8 @@ export const applySignupComplianceState = ({ user, termsAcceptance, countrySelec
   return user;
 };
 
-export const ensureUserAcceptedTerms = (user = null) => Boolean(user?.termsAccepted && user?.acceptedAt);
+export const ensureUserAcceptedTerms = (user = null) =>
+  Boolean(user?.termsAccepted && (user?.termsAcceptedAt || user?.acceptedAt));
 
 export const ensureTermsAcceptedForFeature = (user = null, featureName = "this feature") => {
   if (ensureUserAcceptedTerms(user)) return;

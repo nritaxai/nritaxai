@@ -4,6 +4,7 @@ import { sendEmail } from "../src/utils/emailService.js";
 import User from "../Models/userModel.js";
 import { incrementCpaUsage } from "../Utils/subscriptionAccess.js";
 import { enqueueConsultationNotificationJob } from "../services/queueFacade.js";
+import { createWebhookSignatureHeaders } from "../services/webhookSecurity.js";
 
 const sanitize = (value) => (typeof value === "string" ? value.trim() : "");
 const DEFAULT_ADMIN_EMAIL = "admin@nritax.ai";
@@ -57,13 +58,19 @@ const forwardConsultationToWebhook = async (payload) => {
       `[consultation] Forwarding submission to webhook: ${CONSULTATION_WEBHOOK_URL}`
     );
 
+    const serializedPayload = JSON.stringify(payload);
     const webhookResponse = await fetch(CONSULTATION_WEBHOOK_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+        ...createWebhookSignatureHeaders({
+          payload: serializedPayload,
+          secret: process.env.CONSULTATION_WEBHOOK_SIGNING_SECRET,
+          source: "nritax-consultation",
+        }),
       },
-      body: JSON.stringify(payload),
+      body: serializedPayload,
       signal: controller.signal,
     });
 

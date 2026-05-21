@@ -21,7 +21,7 @@ export function AndroidYuktiPage() {
   }
 
   if (!hasAcceptedTerms) {
-    return <Navigate to="/profile" replace />;
+    return <Navigate to="/profile" replace state={{ requiresLegalAcceptance: true, returnTo: "/android-yukti" }} />;
   }
 
   return (

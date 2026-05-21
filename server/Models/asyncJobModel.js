@@ -24,6 +24,18 @@ const asyncJobSchema = new mongoose.Schema(
       default: "",
       index: true,
     },
+    resourceType: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
+    resourceId: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
     status: {
       type: String,
       enum: ["queued", "active", "completed", "failed", "dead_lettered"],
@@ -38,6 +50,17 @@ const asyncJobSchema = new mongoose.Schema(
     payloadSummary: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
+    },
+    progressPct: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 100,
+    },
+    statusMessage: {
+      type: String,
+      trim: true,
+      default: "",
     },
     resultSummary: {
       type: mongoose.Schema.Types.Mixed,
@@ -65,6 +88,7 @@ const asyncJobSchema = new mongoose.Schema(
 );
 
 asyncJobSchema.index({ queueName: 1, status: 1, createdAt: -1 });
+asyncJobSchema.index({ resourceType: 1, resourceId: 1, createdAt: -1 });
 
 const AsyncJob = mongoose.model("AsyncJob", asyncJobSchema);
 export default AsyncJob;

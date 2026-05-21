@@ -240,8 +240,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               </div>
             )}
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-                <CheckCircle2 className="size-8 text-blue-600" />
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-[#2563eb]/18 rounded-full mb-4 border border-[#2563eb]/30">
+                <CheckCircle2 className="size-8 text-[#60a5fa]" />
               </div>
               <CardTitle className="text-2xl">Request Submitted!</CardTitle>
               <CardDescription className="mt-2">
@@ -265,8 +265,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#2563eb]/12 rounded-lg">
-                <UserCheck className="size-6 text-[#2563eb]" />
+              <div className="rounded-lg border border-[#2563eb]/30 bg-[#2563eb]/12 p-2">
+                <UserCheck className="size-6 text-[#60a5fa]" />
               </div>
               <div>
                 <CardTitle>{renderTextWithShortForms("Consult a Certified CPA")}</CardTitle>
@@ -379,7 +379,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   </SelectContent>
                 </Select>
                 {!fieldErrors.timeZone ? (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-white/55">
                     {browserTimeZone
                       ? `Browser detected: ${browserTimeZone}. Select your timezone to continue.`
                       : "Pick your timezone first to see the matching consultation slots."}
@@ -432,7 +432,7 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   </SelectContent>
                 </Select>
                 {!fieldErrors.country ? (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-white/55">
                     {formData.country
                       ? `Using ${formData.country} as your country of residence.`
                       : "We try to auto-detect your country first, and you can adjust it here."}
@@ -457,14 +457,14 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   }}
                   className={cn(
                     "h-11 w-full justify-between px-3 text-left font-normal",
-                    !formattedPreferredDate && "text-slate-500",
+                    !formattedPreferredDate && "text-white/55",
                   )}
                 >
                   <span>{formattedPreferredDate || "Select a date"}</span>
-                  <CalendarIcon className="size-4 text-slate-500" />
+                  <CalendarIcon className="size-4 text-white/55" />
                 </Button>
                 {isDatePickerOpen && (
-                  <div className="absolute left-0 top-full z-30 rounded-md border bg-white p-2 shadow-lg">
+                  <div className="absolute left-0 top-full z-30 rounded-xl border border-white/10 bg-[#132040] p-2 shadow-lg">
                   <Calendar
                     mode="single"
                     selected={selectedDate}
@@ -507,8 +507,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                   />
                   </div>
                 )}
-                {!formData.timeZone ? <p className="text-xs text-slate-500">Select a timezone before choosing a date.</p> : null}
-                {datePickerMessage && <p className="text-xs text-slate-500">{datePickerMessage}</p>}
+                {!formData.timeZone ? <p className="text-xs text-white/55">Select a timezone before choosing a date.</p> : null}
+                {datePickerMessage && <p className="text-xs text-white/55">{datePickerMessage}</p>}
                 {fieldErrors.preferredDate ? <p className="text-sm text-red-600">{fieldErrors.preferredDate}</p> : null}
               </div>
             <div className="relative self-start space-y-2">
@@ -525,18 +525,18 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                 }}
                 className={cn(
                   "h-11 w-full justify-between px-3 text-left font-normal",
-                  !formData.preferredTime && "text-slate-500",
+                  !formData.preferredTime && "text-white/55",
                 )}
                 aria-invalid={Boolean(fieldErrors.preferredTime)}
               >
                 <span>{selectedPreferredTimeLabel || "Select a time slot"}</span>
                 <div className="flex items-center gap-2">
-                  <Clock3 className="size-4 text-slate-500" />
-                  <ChevronDown className="size-4 text-slate-500" />
+                  <Clock3 className="size-4 text-white/55" />
+                  <ChevronDown className="size-4 text-white/55" />
                 </div>
               </Button>
               {isTimePickerOpen && formData.preferredDate && (
-                <div className="absolute left-0 top-full z-30 w-full overflow-hidden rounded-md border bg-white shadow-lg">
+                <div className="absolute left-0 top-full z-30 w-full overflow-hidden rounded-xl border border-white/10 bg-[#132040] shadow-lg">
                   <ScrollArea className="w-full" style={{ height: `${timeSlotPanelHeight}px` }}>
                     <div className="grid gap-1 p-2">
                       {availableTimeSlots.map((slot) => (
@@ -560,13 +560,13 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
                         </Button>
                       ))}
                       {availableTimeSlots.length === 0 ? (
-                        <p className="px-2 py-3 text-sm text-slate-500">No slots are available for the rest of today.</p>
+                        <p className="px-2 py-3 text-sm text-white/55">No slots are available for the rest of today.</p>
                       ) : null}
                     </div>
                   </ScrollArea>
                 </div>
               )}
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-white/55">
                 {formData.timeZone
                   ? `Times shown in ${formData.timeZone}.`
                   : "Select a timezone to view time slots."}{" "}
@@ -609,8 +609,8 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               {fieldErrors.queryDetails ? <p id="query-error" className="text-sm text-red-600">{fieldErrors.queryDetails}</p> : null}
             </div>
 
-            <div className="bg-[#2563eb]/12 border border-[#2563eb]/40 rounded-lg p-4 text-sm">
-              <p className="text-[#2563eb]">
+            <div className="rounded-lg border border-[#2563eb]/30 bg-[#2563eb]/12 p-4 text-sm">
+              <p className="text-white/80">
                 <strong>Note:</strong> {renderTextWithShortForms("All consultations are confidential and comply with ICAI standards. Our CPAs are registered professionals with expertise in NRI taxation and DTAA regulations.")}
               </p>
             </div>
@@ -624,10 +624,10 @@ export function CPAContact({ onClose, embedded = false }: CPAContactProps) {
               </Button>
             </div>
             {successMessage && !submitted && (
-              <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">{successMessage}</p>
+              <p className="rounded-md border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{successMessage}</p>
             )}
             {errorMessage && (
-              <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{errorMessage}</p>
+              <p className="rounded-md border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">{errorMessage}</p>
             )}
           </form>
         </CardContent>

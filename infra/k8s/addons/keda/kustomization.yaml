@@ -1,0 +1,8 @@
+namespace: nritax-production
+
+resources:
+  - scaledobject-worker-default.yaml
+  - scaledobject-worker-priority.yaml
+  - scaledobject-worker-batch.yaml
+  - scaledobject-worker-ai.yaml
+  - scaledobject-gpu-worker.yaml

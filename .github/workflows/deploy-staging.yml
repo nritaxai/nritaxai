@@ -6,7 +6,19 @@ on:
       image_tag:
         description: "Image tag to deploy"
         required: true
-        default: "main"
+      run_migrations:
+        description: "Run migrations during staging deploy"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -14,24 +26,76 @@ jobs:
     environment: staging
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
       - uses: imranismail/setup-kustomize@v2
       - uses: azure/setup-kubectl@v4
+
+      - name: Preflight deployment inputs
+        env:
+          DEPLOY_ENVIRONMENT: staging
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          REQUIRE_APPROVAL: "false"
+          RUN_MIGRATIONS: ${{ inputs.run_migrations }}
+          MIGRATION_SAFETY_ACK: approved-no-destructive-migrations
+          HEALTHCHECK_URL: ${{ vars.STAGING_HEALTHCHECK_URL }}
+          CANARY_STEP_TIMEOUT_SECONDS: "240"
+        run: node scripts/deployment-preflight.mjs
+
       - name: Install Argo Rollouts plugin
         run: |
-          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-          chmod +x ./kubectl-argo-rollouts-linux-amd64
-          sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
-      - name: Render staging manifests
-        run: kustomize build infra/k8s/overlays/staging > /tmp/staging.yaml
+          curl -sSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
       - name: Configure kubectl
         env:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_STAGING }}
         run: |
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
+
+      - name: Render staging manifests
+        run: kustomize build infra/k8s/overlays/staging > /tmp/staging.yaml
+
+      - name: Dry-run manifest apply
+        run: kubectl apply --dry-run=server -f /tmp/staging.yaml
+
       - name: Apply staging manifests
         run: kubectl apply -f /tmp/staging.yaml
-      - name: Smoke check rollout
+
+      - name: Update staging API canary image
+        run: kubectl argo rollouts set image rollout/nritax-api api=${{ secrets.REGISTRY }}/${{ secrets.IMAGE_REPOSITORY }}:${{ inputs.image_tag }} -n nritax-staging
+
+      - name: Update staging worker image
+        run: kubectl set image deployment/nritax-worker worker=${{ secrets.REGISTRY }}/${{ secrets.WORKER_IMAGE_REPOSITORY }}:${{ inputs.image_tag }} -n nritax-staging
+
+      - name: Optional migration hook
+        if: ${{ inputs.run_migrations }}
+        run: echo "Migration stage reserved. No destructive migration automation is enabled in this repo."
+
+      - name: Wait for worker rollout
+        run: kubectl rollout status deployment/nritax-worker -n nritax-staging --timeout=240s
+
+      - name: Wait for API canary readiness
+        run: kubectl argo rollouts get rollout nritax-api -n nritax-staging --watch --timeout 240s
+
+      - name: Promote staging rollout
+        run: kubectl argo rollouts promote nritax-api -n nritax-staging
+
+      - name: Verify health endpoint
+        run: curl --fail --silent --show-error "${{ vars.STAGING_HEALTHCHECK_URL }}"
+
+      - name: Write deployment summary
         run: |
-          kubectl rollout status deployment/nritax-worker -n nritax-staging --timeout=180s
-          kubectl argo rollouts get rollout nritax-api -n nritax-staging --watch --timeout 180s
+          {
+            echo "## Staging Deployment"
+            echo ""
+            echo "- Image tag: \`${{ inputs.image_tag }}\`"
+            echo "- Environment: \`staging\`"
+            echo "- Health check: \`${{ vars.STAGING_HEALTHCHECK_URL }}\`"
+            echo "- Migrations requested: \`${{ inputs.run_migrations }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

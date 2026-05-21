@@ -32,6 +32,7 @@ import { enqueuePaymentReconciliationJob } from "../services/queueFacade.js";
 import { getPaymentReliabilitySummary } from "../services/paymentReliabilityMonitor.js";
 import { timingSafeEqualHex } from "../services/webhookSecurity.js";
 import { buildPaymentReadinessReport } from "../services/paymentReadinessService.js";
+import { validateSubscriptionCountryAccess } from "../services/subscriptionCountryPolicyService.js";
 
 const PLAN_ALIAS = {
   pro: PLAN_KEYS.PROFESSIONAL,
@@ -380,7 +381,7 @@ export const createSubscription = async (req, res) => {
     }
     const billingCountry = normalizeText(req.body?.billingCountry);
     const billingState = normalizeText(req.body?.billingState);
-    const displayCurrency = normalizeText(req.body?.displayCurrency || "INR").toUpperCase();
+    const requestedDisplayCurrency = normalizeText(req.body?.displayCurrency || "").toUpperCase();
     const countryCode = normalizeText(req.body?.countryCode);
     const organization = normalizeText(req.body?.organization);
     const gstVatNumber = normalizeUpper(req.body?.gstVatNumber);
@@ -400,6 +401,12 @@ export const createSubscription = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
     normalizeUserSubscriptionState(user);
+    const countryPolicy = validateSubscriptionCountryAccess({
+      user,
+      requestedPlanKey: meta.planKey,
+      requestedDisplayCurrency,
+    });
+    const displayCurrency = requestedDisplayCurrency || countryPolicy.billingCurrency || "INR";
 
     if (promoCode) {
       const existingPromoRedemption = await findExistingPromoRedemptionForUser(user);
@@ -448,6 +455,7 @@ export const createSubscription = async (req, res) => {
         amount: 0,
         currency: "INR",
         tax,
+        countryPolicy,
         subscription: user.subscription,
         subscriptionDetails: getSubscriptionSummary(user),
         message: `${promoCode} applied successfully. 1 month has been activated.`,
@@ -478,6 +486,8 @@ export const createSubscription = async (req, res) => {
               planKey: meta.planKey,
               billing,
               displayCurrency,
+              pricingCountryCode: countryPolicy.countryCode,
+              aiComplianceMode: countryPolicy.aiComplianceMode,
             },
           });
           return res.status(200).json({
@@ -496,6 +506,7 @@ export const createSubscription = async (req, res) => {
             discountAmount: discountPaise,
             tax,
             displayCurrency,
+            countryPolicy,
             reused: true,
           });
         } catch {
@@ -522,6 +533,10 @@ export const createSubscription = async (req, res) => {
         referralUserCode: referralUserCode || "NA",
         promoCode: promoCode || "NONE",
         discountPercent: String(discountPercent),
+        pricingCountryCode: countryPolicy.countryCode,
+        pricingRegion: countryPolicy.pricingRegion || "unknown",
+        aiComplianceMode: countryPolicy.aiComplianceMode || "default",
+        taxWorkflow: countryPolicy.taxWorkflow || "default",
         taxType: tax.taxType,
         gstMode: tax.gstMode,
         cgstRate: String(tax.cgstRate),
@@ -547,6 +562,9 @@ export const createSubscription = async (req, res) => {
           displayCurrency,
           settlementCurrency: "INR",
           internationalPayment,
+          pricingCountryCode: countryPolicy.countryCode,
+          pricingRegion: countryPolicy.pricingRegion,
+          aiComplianceMode: countryPolicy.aiComplianceMode,
         },
       });
       await appendPaymentAuditLog({
@@ -563,6 +581,7 @@ export const createSubscription = async (req, res) => {
           currency: order.currency,
           displayCurrency,
           internationalPayment,
+          pricingCountryCode: countryPolicy.countryCode,
         },
       });
     }
@@ -578,6 +597,7 @@ export const createSubscription = async (req, res) => {
       planKey: meta.planKey,
       billing,
       displayCurrency,
+      countryPolicy,
       promoCode: promoCode || null,
       discountPercent,
       baseAmount: baseAmountInPaise,

@@ -1,0 +1,34 @@
+{
+  "totalRequests": 0,
+  "totalFailures": 0,
+  "routeCounts": {
+    "small": 0,
+    "medium": 0,
+    "large": 0
+  },
+  "providerCounts": {
+    "openrouter": 0,
+    "gemini": 0,
+    "gemini-direct": 0,
+    "ollama": 0
+  },
+  "cacheHits": 0,
+  "strategyCounts": {
+    "lightweight": 0,
+    "rag-small": 0,
+    "advanced": 0
+  },
+  "modelFamilyCounts": {},
+  "workflowCounts": {},
+  "tokenTotals": {
+    "input": 0,
+    "output": 0,
+    "total": 0
+  },
+  "estimatedCostUsdTotal": 0,
+  "averageTokensPerRequest": 0,
+  "averageEstimatedCostUsd": 0,
+  "averageLatencyMs": 0,
+  "averageAttempts": 0,
+  "lastUpdatedAt": null
+}

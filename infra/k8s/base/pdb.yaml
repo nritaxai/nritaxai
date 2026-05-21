@@ -17,3 +17,43 @@ spec:
   selector:
     matchLabels:
       app: nritax-worker
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nritax-worker-priority
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: nritax-worker-priority
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nritax-worker-batch
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: nritax-worker-batch
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nritax-worker-ai
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: nritax-worker-ai
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: nritax-gpu-worker
+spec:
+  minAvailable: 0
+  selector:
+    matchLabels:
+      app: nritax-gpu-worker

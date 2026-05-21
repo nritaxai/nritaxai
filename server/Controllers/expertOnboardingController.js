@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { createWebhookSignatureHeaders } from "../services/webhookSecurity.js";
 
 const EXPERT_ONBOARDING_WEBHOOK_URL =
   String(process.env.EXPERT_ONBOARDING_WEBHOOK_URL || "https://n8n.caloganathan.com/webhook/expert-onboarding").trim();
@@ -6,6 +7,7 @@ const CAPTCHA_TTL_MS = Number(process.env.EXPERT_ONBOARDING_CAPTCHA_TTL_MS || 5 
 const CAPTCHA_LENGTH = Math.min(Math.max(Number(process.env.EXPERT_ONBOARDING_CAPTCHA_LENGTH || 5), 4), 6);
 const EXPERT_ONBOARDING_TIMEOUT_MS = Number(process.env.EXPERT_ONBOARDING_TIMEOUT_MS || 15000);
 const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim();
+const ANDROID_NATIVE_BYPASS_TOKEN = "ANDROID_NATIVE_BYPASS";
 
 const REQUIRED_FIELDS = [
   "fullName",
@@ -61,6 +63,13 @@ const verifyRecaptchaToken = async (token) => {
     return { ok: false, message: "Please complete the CAPTCHA." };
   }
 
+  // Android native apps bypass reCAPTCHA
+  // because Capacitor serves from localhost
+  // which Google reCAPTCHA does not support.
+  if (token === ANDROID_NATIVE_BYPASS_TOKEN) {
+    return { ok: true, success: true, score: 1.0 };
+  }
+
   if (!RECAPTCHA_SECRET_KEY) {
     console.error("[expert-onboarding] RECAPTCHA_SECRET_KEY is not configured");
     return { ok: false, message: "CAPTCHA verification is unavailable. Please try again later." };
@@ -89,7 +98,7 @@ const verifyRecaptchaToken = async (token) => {
       return { ok: false, message: "Please complete the CAPTCHA." };
     }
 
-    return { ok: true };
+    return { ok: true, success: true, score: Number(result?.score || 0) };
   } catch (error) {
     console.error("[expert-onboarding] reCAPTCHA verification error:", error);
     return { ok: false, message: "Unable to verify CAPTCHA. Please try again." };
@@ -122,6 +131,18 @@ const buildWebhookFormData = (body, file) => {
 
   return formData;
 };
+
+const buildSignedWebhookHeaders = (body) =>
+  createWebhookSignatureHeaders({
+    payload: JSON.stringify({
+      fullName: clean(body?.fullName),
+      email: clean(body?.email),
+      mobileNumber: clean(body?.mobileNumber),
+      membershipNumber: clean(body?.membershipNumber),
+    }),
+    secret: process.env.EXPERT_ONBOARDING_WEBHOOK_SIGNING_SECRET,
+    source: "nritax-expert-onboarding",
+  });
 
 const normalizeRequestBody = (body) => {
   const normalizedQualification = clean(body?.qualification) || clean(body?.profession);
@@ -259,6 +280,7 @@ export const submitExpertOnboarding = async (req, res) => {
     try {
       const webhookResponse = await fetch(EXPERT_ONBOARDING_WEBHOOK_URL, {
         method: "POST",
+        headers: buildSignedWebhookHeaders(body),
         body: buildWebhookFormData(body, uploadedFile),
         signal: abortController.signal,
       });

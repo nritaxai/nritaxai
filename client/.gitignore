@@ -29,3 +29,11 @@ node_modules/
 # Environment variables
 .env/
 
+# Android signing - never commit these
+*.jks
+*.keystore
+key.properties
+android/local.properties
+
+
+google-services.json

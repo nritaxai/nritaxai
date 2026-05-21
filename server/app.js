@@ -18,13 +18,15 @@ import { requestContextMiddleware } from "./Middlewares/requestContext.js";
 import { captureException, initErrorMonitoring } from "./services/monitoring.js";
 import { logger } from "./services/logger.js";
 import { metricsHandler, recordApiFailureMetric } from "./services/metrics.js";
-import { getRedisConnection, isQueueingConfigured } from "./queues/redis.js";
+import { getRedisConnection, isQueueingConfigured, isRedisConfigured } from "./queues/redis.js";
+import { getSecurityReadiness, validateSecurityConfiguration } from "./services/securityConfig.js";
 
 dotenv.config();
 
 const app = express();
 
 void initErrorMonitoring();
+validateSecurityConfiguration();
 
 const defaultAllowedOrigins = [
   "https://nritaxai-cw9w.vercel.app",
@@ -55,12 +57,32 @@ const corsOptions = {
     return callback(new Error(`CORS blocked: ${origin}`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "x-guest-session-id", "x-api-key"],
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "x-guest-session-id",
+    "x-api-key",
+    "x-request-id",
+    "x-tenant-id",
+    "x-tenant-key",
+  ],
   credentials: true,
 };
 
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  res.setHeader("Cross-Origin-Resource-Policy", "same-site");
+  if (req.secure || String(req.headers["x-forwarded-proto"] || "").includes("https")) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
+  next();
+});
 app.use(requestContextMiddleware);
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
@@ -128,14 +150,21 @@ app.get("/version", (_req, res) => {
 app.get("/ready", (_req, res) => {
   const db = getDbReadiness();
   const queueingConfigured = isQueueingConfigured();
+  const redisConfigured = isRedisConfigured();
+  const security = getSecurityReadiness();
   return res.status(200).json({
     success: true,
     status: db.ready ? "ready" : "degraded",
     dependencies: {
       database: db,
+      cache: {
+        configured: redisConfigured,
+        mode: redisConfigured ? "redis_or_local_fallback" : "local_only",
+      },
       queueing: {
         configured: queueingConfigured,
       },
+      security,
     },
   });
 });
@@ -143,10 +172,17 @@ app.get("/ready", (_req, res) => {
 app.get("/readyz", async (_req, res) => {
   const db = getDbReadiness();
   const queueingConfigured = isQueueingConfigured();
+  const redisConfigured = isRedisConfigured();
+  const security = getSecurityReadiness();
   let queueReady = true;
+  let cacheReady = !redisConfigured;
 
   if (queueingConfigured) {
     queueReady = Boolean(await getRedisConnection());
+  }
+
+  if (redisConfigured) {
+    cacheReady = Boolean(await getRedisConnection({ requireQueueing: false, role: "cache" }));
   }
 
   const ready = db.ready && queueReady;
@@ -155,10 +191,16 @@ app.get("/readyz", async (_req, res) => {
     status: ready ? "ready" : "not_ready",
     dependencies: {
       database: db,
+      cache: {
+        configured: redisConfigured,
+        ready: cacheReady,
+        mode: cacheReady ? "distributed" : "local_fallback",
+      },
       queueing: {
         configured: queueingConfigured,
         ready: queueReady,
       },
+      security,
     },
   });
 });

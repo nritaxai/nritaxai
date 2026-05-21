@@ -13,6 +13,7 @@ export const JOB_NAMES = {
   consultationNotifications: "consultation.notifications",
   aiEmbedding: "ai.embedding",
   aiGeneration: "ai.generation",
+  aiWorkflow: "ai.workflow",
   reportGeneration: "report.generation",
   paymentReconcile: "payment.reconcile",
 };

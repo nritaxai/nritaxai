@@ -1,0 +1,11 @@
+{
+  "name": "@nritax/backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix ../server run dev",
+    "start": "npm --prefix ../server run start",
+    "test": "npm --prefix ../server run test -- --test-isolation=none"
+  }
+}

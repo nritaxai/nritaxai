@@ -1,0 +1,71 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nritax-worker-priority
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: nritax-worker-priority
+  template:
+    metadata:
+      labels:
+        app: nritax-worker-priority
+        tier: worker
+        worker-group: priority
+        workload: priority
+    spec:
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: worker
+          image: ghcr.io/nritaxai/worker:latest
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: APP_NAME
+              value: nritax-worker-priority
+            - name: APP_RUNTIME
+              value: k8s
+            - name: WORKER_GROUP
+              value: priority
+            - name: WORKER_QUEUES
+              value: payment-jobs,notification-jobs
+            - name: BACKGROUND_JOBS_ENABLED
+              value: "true"
+            - name: PAYMENT_QUEUE_ENABLED
+              value: "true"
+            - name: CONSULTATION_QUEUE_ENABLED
+              value: "true"
+            - name: PROMETHEUS_METRICS_ENABLED
+              value: "true"
+            - name: WORKER_CONCURRENCY__PAYMENT_JOBS
+              value: "8"
+            - name: WORKER_CONCURRENCY__NOTIFICATION_JOBS
+              value: "12"
+            - name: WORKER_CONCURRENCY
+              value: "8"
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5000
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 15"]
+          resources:
+            requests:
+              cpu: 500m
+              memory: 768Mi
+            limits:
+              cpu: "2"
+              memory: 2Gi

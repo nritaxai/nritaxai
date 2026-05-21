@@ -12,8 +12,10 @@ spec:
       labels:
         app: nritax-gpu-worker
         tier: worker
+        worker-group: gpu-ai
         workload: gpu
     spec:
+      terminationGracePeriodSeconds: 90
       nodeSelector:
         workload-type: gpu
       tolerations:
@@ -26,12 +28,34 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            - name: APP_NAME
+              value: nritax-gpu-worker
             - name: APP_RUNTIME
               value: k8s
+            - name: WORKER_GROUP
+              value: gpu-ai
+            - name: WORKER_QUEUES
+              value: ai-jobs
             - name: AI_QUEUE_ENABLED
+              value: "true"
+            - name: PROMETHEUS_METRICS_ENABLED
               value: "true"
             - name: WORKER_CONCURRENCY
               value: "1"
+          ports:
+            - containerPort: 5000
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 5000
+            initialDelaySeconds: 30
+            periodSeconds: 30
           resources:
             limits:
               nvidia.com/gpu: 1

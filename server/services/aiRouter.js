@@ -44,6 +44,7 @@ export const requestValidatedCompletion = async ({
   temperature = AI_DEFAULT_TEMPERATURE,
   nonTaxReply = "",
   retries = 1,
+  routeHints = {},
 } = {}) => {
   if (featureFlags.aiGatewayEnabled) {
     return routeChatCompletion({
@@ -55,6 +56,7 @@ export const requestValidatedCompletion = async ({
       temperature,
       nonTaxReply,
       retries,
+      routeHints,
     });
   }
 

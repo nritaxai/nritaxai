@@ -168,15 +168,15 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
   };
 
   return (
-    <main className="min-h-[100dvh] bg-[#F8F9FA] text-[#1a1a2e]">
+    <main className="min-h-[100dvh] bg-transparent text-white">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 pb-8 pt-4">
-        <section className="rounded-[24px] bg-white px-5 py-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)]">
+        <section className="rounded-[24px] border border-white/10 bg-[#132040]/88 px-5 py-5 shadow-[0_8px_24px_rgba(0,0,0,0.24)] backdrop-blur-xl">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[22px] font-bold leading-tight text-[#1a1a2e]">{greeting}</p>
-              <p className="mt-2 text-sm text-[#6b7280]">Your AI Tax Assistant for faster NRI decisions.</p>
+              <p className="text-[22px] font-bold leading-tight text-white">{greeting}</p>
+              <p className="mt-2 text-sm text-white/65">Your AI Tax Assistant for faster NRI decisions.</p>
             </div>
-            <div className="rounded-2xl bg-[#eef2ff] px-3 py-2 text-xs font-semibold text-[#1a3cff]">
+            <div className="rounded-2xl border border-white/10 bg-white/8 px-3 py-2 text-xs font-semibold text-[#60a5fa]">
               NRITAX.AI
             </div>
           </div>
@@ -184,11 +184,11 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[#1a1a2e]">Explore categories</h2>
+            <h2 className="text-base font-semibold text-white">Explore categories</h2>
             <button
               type="button"
               onClick={() => handleNavigate("/chat", true)}
-              className="inline-flex items-center gap-1 text-sm font-medium text-[#1a3cff]"
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#60a5fa]"
             >
               Open chat
               <ChevronRight className="size-4" />
@@ -203,14 +203,14 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
                     key={category.label}
                     type="button"
                     onClick={() => handleNavigate("/chat", true)}
-                    className="flex min-w-[148px] items-center gap-3 rounded-[18px] bg-white px-4 py-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-transform duration-150 active:scale-[0.98]"
+                    className="flex min-w-[148px] items-center gap-3 rounded-[18px] border border-white/10 bg-[#132040]/88 px-4 py-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-transform duration-150 active:scale-[0.98]"
                   >
-                    <div className="flex size-11 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#1a3cff]">
+                    <div className="flex size-11 items-center justify-center rounded-2xl bg-white/8 text-[#60a5fa]">
                       <Icon className="size-5" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-[#1a1a2e]">{category.label}</p>
-                      <p className="text-xs text-[#6b7280]">{category.caption}</p>
+                      <p className="text-sm font-semibold text-white">{category.label}</p>
+                      <p className="text-xs text-white/60">{category.caption}</p>
                     </div>
                   </button>
                 );
@@ -220,7 +220,7 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-semibold text-[#1a1a2e]">Quick actions</h2>
+          <h2 className="text-base font-semibold text-white">Quick actions</h2>
           <div className="grid grid-cols-2 gap-3">
             {quickActions.map((action) => {
               const Icon = action.icon;
@@ -229,17 +229,17 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
                   key={action.title}
                   type="button"
                   onClick={() => handleNavigate(action.to, action.protected)}
-                  className="group flex min-h-[112px] flex-col justify-between rounded-2xl bg-white p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-transform duration-150 active:scale-[0.98]"
+                  className="group flex min-h-[112px] flex-col justify-between rounded-2xl border border-white/10 bg-[#132040]/88 p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-transform duration-150 active:scale-[0.98]"
                 >
                   <div className="flex items-start justify-between">
                     <div className={`flex size-12 items-center justify-center rounded-2xl ${action.iconBg}`}>
-                      <Icon className="size-7 text-[#1a1a2e]" />
+                      <Icon className="size-7 text-white" />
                     </div>
                     <div className={`h-2.5 w-10 rounded-full bg-gradient-to-r ${action.accent}`} />
                   </div>
                   <div>
-                    <p className="text-[14px] font-semibold text-[#1a1a2e]">{action.title}</p>
-                    <p className="mt-1 text-xs text-[#6b7280]">{action.subtitle}</p>
+                    <p className="text-[14px] font-semibold text-white">{action.title}</p>
+                    <p className="mt-1 text-xs text-white/60">{action.subtitle}</p>
                   </div>
                 </button>
               );
@@ -248,22 +248,22 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
         </section>
 
         <section className="space-y-3">
-          <h2 className="text-base font-semibold text-[#1a1a2e]">Why NRI Tax AI?</h2>
+          <h2 className="text-base font-semibold text-white">Why NRI Tax AI?</h2>
           <div className="space-y-3">
             {statItems.map((item) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.title}
-                  className="flex items-center gap-4 rounded-xl border-l-4 border-[#1a3cff] bg-white px-4 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.08)]"
+                  className="flex items-center gap-4 rounded-xl border border-white/10 border-l-4 border-l-[#2563eb] bg-[#132040]/88 px-4 py-4 shadow-[0_2px_8px_rgba(0,0,0,0.18)]"
                 >
-                  <div className="flex size-12 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#1a3cff]">
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-white/8 text-[#60a5fa]">
                     <Icon className="size-6" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-[18px] font-bold text-[#1a1a2e]">{item.value}</p>
-                    <p className="text-sm font-medium text-[#1a1a2e]">{item.title}</p>
-                    <p className="mt-1 text-xs text-[#6b7280]">{item.detail}</p>
+                    <p className="text-[18px] font-bold text-white">{item.value}</p>
+                    <p className="text-sm font-medium text-white">{item.title}</p>
+                    <p className="mt-1 text-xs text-white/60">{item.detail}</p>
                   </div>
                 </div>
               );
@@ -273,11 +273,11 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
 
         <section className="space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold text-[#1a1a2e]">Recent updates</h2>
+            <h2 className="text-base font-semibold text-white">Recent updates</h2>
             <button
               type="button"
               onClick={() => handleNavigate("/pricing")}
-              className="inline-flex items-center gap-1 text-sm font-medium text-[#1a3cff]"
+              className="inline-flex items-center gap-1 text-sm font-medium text-[#60a5fa]"
             >
               View more
               <ArrowRight className="size-4" />
@@ -289,15 +289,15 @@ export default function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps
                 key={update.title}
                 type="button"
                 onClick={() => handleNavigate("/chat", true)}
-                className="w-full rounded-2xl bg-white p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.08)] transition-transform duration-150 active:scale-[0.98]"
+                className="w-full rounded-2xl border border-white/10 bg-[#132040]/88 p-4 text-left shadow-[0_2px_8px_rgba(0,0,0,0.18)] transition-transform duration-150 active:scale-[0.98]"
               >
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex size-10 items-center justify-center rounded-2xl bg-[#eef2ff] text-[#1a3cff]">
+                  <div className="mt-0.5 flex size-10 items-center justify-center rounded-2xl bg-white/8 text-[#60a5fa]">
                     <MessageSquare className="size-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-semibold text-[#1a1a2e]">{update.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-[#6b7280]">{update.description}</p>
+                    <p className="text-sm font-semibold text-white">{update.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-white/60">{update.description}</p>
                   </div>
                 </div>
               </button>

@@ -37,8 +37,15 @@ export const processPdfIndexFile = async (payload) => {
     const knowledgeResult = await ingestKnowledgeDocumentFromFile({
       fileName: manifest.safeName,
       filePath: finalizedManifest.finalPath,
-      sourceType: "other_pdf",
+      sourceType: manifest.sourceType || "other_pdf",
       jobId: uploadId,
+      sourceUrl: manifest.sourceUrl || "",
+      policyTags: manifest.policyTags || [],
+      documentTitle: manifest.documentTitle || manifest.safeName,
+      documentMetadata: {
+        uploadId,
+        requestedBy: manifest.requestedBy || "",
+      },
     });
     removePdfUploadStage(uploadId);
 

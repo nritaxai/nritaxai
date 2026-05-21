@@ -14,6 +14,14 @@ spec:
         app: nritax-api
         tier: api
     spec:
+      terminationGracePeriodSeconds: 30
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: nritax-api
       containers:
         - name: api
           image: ghcr.io/nritaxai/server:latest
@@ -22,14 +30,18 @@ spec:
           env:
             - name: NODE_ENV
               value: production
+            - name: APP_NAME
+              value: nritax-api
             - name: APP_RUNTIME
               value: k8s
             - name: PROMETHEUS_METRICS_ENABLED
               value: "true"
             - name: BACKGROUND_JOBS_ENABLED
               value: "true"
-            - name: WORKER_CONCURRENCY
-              value: "4"
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
           readinessProbe:
             httpGet:
               path: /readyz

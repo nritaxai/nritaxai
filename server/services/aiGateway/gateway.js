@@ -20,8 +20,24 @@ import {
 } from "./cacheStore.js";
 import { featureFlags } from "../../Config/featureFlags.js";
 import { buildStreamingPreviewChunks, createSseEnvelope } from "./stream.js";
+import {
+  compressGatewayMessages,
+  compressSystemPrompt,
+  estimateAiCost,
+  resolveTokenBudget,
+} from "./costEngineering.js";
 
 const PRIMARY_TIMEOUT_THRESHOLD_MS = Math.max(Number(process.env.AI_ROUTER_TIMEOUT_THRESHOLD_MS || 12000), 3000);
+
+const buildOptimizedRequest = ({ routeTier = "medium", messages = [], systemPrompt = "", maxTokens } = {}) => ({
+  messages: featureFlags.aiContextCompressionEnabled
+    ? compressGatewayMessages({ messages, routeTier })
+    : messages,
+  systemPrompt: featureFlags.aiContextCompressionEnabled
+    ? compressSystemPrompt({ systemPrompt, routeTier })
+    : systemPrompt,
+  maxTokens: featureFlags.aiCostAwareRoutingEnabled ? resolveTokenBudget({ routeTier, maxTokens }) : maxTokens,
+});
 
 const buildAttempt = async ({
   provider = "openrouter",
@@ -205,6 +221,7 @@ const resolveGatewayRequest = async ({
   temperature,
   nonTaxReply,
   retries,
+  routeHints = {},
 }) => {
   const routePlan = buildRoutePlan({
     question,
@@ -215,10 +232,18 @@ const resolveGatewayRequest = async ({
     largeModel: process.env.AI_GATEWAY_LARGE_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
     ollamaModel: process.env.AI_GATEWAY_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "",
     ollamaEnabled: featureFlags.aiGatewayOllamaEnabled,
+    costAwareEnabled: featureFlags.aiCostAwareRoutingEnabled,
+    routeHints,
   });
 
   const primaryAttempt = routePlan.attempts[0];
   const secondaryAttempts = routePlan.attempts.slice(1);
+  const optimizedRequest = buildOptimizedRequest({
+    routeTier: routePlan.tier,
+    messages,
+    systemPrompt,
+    maxTokens,
+  });
 
   let execution;
   try {
@@ -228,9 +253,9 @@ const resolveGatewayRequest = async ({
             primaryAttempt,
             secondaryAttempts,
             question,
-            messages,
-            systemPrompt,
-            maxTokens,
+            messages: optimizedRequest.messages,
+            systemPrompt: optimizedRequest.systemPrompt,
+            maxTokens: optimizedRequest.maxTokens,
             temperature,
             retries,
             nonTaxReply,
@@ -238,9 +263,9 @@ const resolveGatewayRequest = async ({
         : await executeAttemptPlan({
             attempts: routePlan.attempts,
             question,
-            messages,
-            systemPrompt,
-            maxTokens,
+            messages: optimizedRequest.messages,
+            systemPrompt: optimizedRequest.systemPrompt,
+            maxTokens: optimizedRequest.maxTokens,
             temperature,
             retries,
             nonTaxReply,
@@ -255,6 +280,7 @@ const resolveGatewayRequest = async ({
   return {
     ...execution,
     routePlan,
+    optimizedRequest,
   };
 };
 
@@ -267,6 +293,7 @@ export const routeChatCompletion = async ({
   temperature = AI_DEFAULT_TEMPERATURE,
   nonTaxReply = "",
   retries = 1,
+  routeHints = {},
 } = {}) => {
   const startedAt = Date.now();
   const cacheKey = featureFlags.aiGatewayCacheEnabled
@@ -274,7 +301,7 @@ export const routeChatCompletion = async ({
     : "";
 
   if (featureFlags.aiGatewayCacheEnabled) {
-    const cached = getCachedGatewayResponse(cacheKey);
+    const cached = await getCachedGatewayResponse(cacheKey);
     if (cached) {
       await recordAiGatewayExecution({
         routeTier: cached.routeTier || "medium",
@@ -283,6 +310,9 @@ export const routeChatCompletion = async ({
         attempts: 0,
         failed: false,
         cacheHit: true,
+        modelFamily: cached?.usage?.modelFamily || "cache",
+        strategy: cached?.strategy || cached?.usage?.strategy || "cached",
+        workflow: routeHints?.workflow || cached?.workflow || "unknown",
       });
       return {
         ...cached,
@@ -298,7 +328,7 @@ export const routeChatCompletion = async ({
 
   const executionPromise = (async () => {
     try {
-      const { attempt, attempts, validationIssues, fallbackUsed, routePlan } = await resolveGatewayRequest({
+      const { attempt, attempts, validationIssues, fallbackUsed, routePlan, optimizedRequest } = await resolveGatewayRequest({
         question,
         messages,
         systemPrompt,
@@ -307,6 +337,7 @@ export const routeChatCompletion = async ({
         temperature,
         nonTaxReply,
         retries,
+        routeHints,
       });
 
       const result = {
@@ -315,7 +346,18 @@ export const routeChatCompletion = async ({
         validationIssues,
         attempts,
         routeTier: routePlan.tier,
+        strategy: routePlan.strategy,
       };
+      const usageEstimate = featureFlags.aiTokenTrackingEnabled
+        ? estimateAiCost({
+            provider: attempt.provider,
+            model: attempt.model,
+            routeTier: routePlan.tier,
+            messages: optimizedRequest?.messages || messages,
+            systemPrompt: optimizedRequest?.systemPrompt || systemPrompt,
+            response: attempt.response,
+          })
+        : null;
 
       await recordAiGatewayExecution({
         routeTier: routePlan.tier,
@@ -323,13 +365,27 @@ export const routeChatCompletion = async ({
         latencyMs: Date.now() - startedAt,
         attempts: attempts.length,
         failed: false,
+        inputTokens: usageEstimate?.inputTokens || 0,
+        outputTokens: usageEstimate?.outputTokens || 0,
+        estimatedCostUsd: usageEstimate?.estimatedCostUsd || 0,
+        modelFamily: usageEstimate?.modelFamily || "unknown",
+        strategy: routePlan.strategy || usageEstimate?.strategy || "unknown",
+        workflow: routeHints?.workflow || "unknown",
       });
 
       if (featureFlags.aiGatewayCacheEnabled && cacheKey) {
-        setCachedGatewayResponse(cacheKey, result);
+        await setCachedGatewayResponse(cacheKey, {
+          ...result,
+          strategy: routePlan.strategy,
+          workflow: routeHints?.workflow || "unknown",
+          usage: usageEstimate || undefined,
+        });
       }
 
-      return result;
+      return {
+        ...result,
+        usage: usageEstimate || undefined,
+      };
     } catch (error) {
       const attempts = Array.isArray(error?.attempts) ? error.attempts : [];
       const routeTier = error?.routeTier || "medium";
@@ -340,6 +396,8 @@ export const routeChatCompletion = async ({
         latencyMs: Date.now() - startedAt,
         attempts: attempts.length,
         failed: true,
+        strategy: "failure",
+        workflow: routeHints?.workflow || "unknown",
       });
 
       throw Object.assign(error instanceof Error ? error : new Error("All AI routes failed"), {

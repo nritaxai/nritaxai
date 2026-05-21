@@ -13,14 +13,33 @@ test("classifyRouteTier routes multi-country treaty prompts to large models", ()
   );
 });
 
+test("classifyRouteTier keeps short treaty chat prompts on the medium lane", () => {
+  assert.equal(
+    classifyRouteTier({
+      question: "What DTAA relief applies to UAE salary income?",
+      routeHints: {
+        workflow: "chat_dtaa",
+        ragLikely: true,
+        retrievedContextChars: 900,
+      },
+    }),
+    "medium"
+  );
+});
+
 test("buildRoutePlan preserves medium route fallback sequence", () => {
   const plan = buildRoutePlan({
-    question: "How is NRO interest taxed for an NRI in the UAE?",
+    question: "Explain NRO interest taxation, DTAA relief documentation, and filing implications for an NRI in the UAE.",
+    smallModel: "google/gemini-2.0-flash-001",
+    mediumModel: "anthropic/claude-3.5-sonnet",
     preferredModel: "anthropic/claude-3.5-sonnet",
   });
 
   assert.equal(plan.tier, "medium");
+  assert.equal(plan.strategy, "rag-small");
   assert.equal(plan.attempts[0].provider, "openrouter");
+  assert.equal(plan.attempts[0].preferredModel, "google/gemini-2.0-flash-001");
   assert.equal(plan.attempts[1].provider, "openrouter");
+  assert.equal(plan.attempts[1].preferredModel, "anthropic/claude-3.5-sonnet");
   assert.equal(plan.attempts[2].provider, "gemini-direct");
 });

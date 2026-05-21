@@ -10,4 +10,5 @@ test("queue names stay stable for deployment wiring", () => {
 test("job names stay stable for worker routing", () => {
   assert.equal(JOB_NAMES.pdfIndexFile, "pdf.index-file");
   assert.equal(JOB_NAMES.consultationNotifications, "consultation.notifications");
+  assert.equal(JOB_NAMES.aiWorkflow, "ai.workflow");
 });

@@ -3,6 +3,7 @@ import { sendEmail } from "../src/utils/emailService.js";
 import { logControllerError, respondError, respondOk } from "../services/controllerResponses.js";
 import { createWebhookSignatureHeaders } from "../services/webhookSecurity.js";
 import { retrieveKnowledgeContext } from "../services/knowledgeBaseService.js";
+import { resolveYuktiClarificationState } from "../services/yuktiClarificationService.js";
 
 const DEFAULT_YUKTI_WEBHOOK_URL =
   "https://n8n.caloganathan.com/webhook/yukti-tax-agent";
@@ -127,18 +128,68 @@ export const askYukti = async (req, res) => {
   const timeout = setTimeout(() => controller.abort(), YUKTI_TIMEOUT_MS);
 
   try {
+    const clarificationState = await resolveYuktiClarificationState({
+      question,
+      payload: {
+        currentCountry: req.body?.currentCountry || country,
+        relevantCountry: req.body?.relevantCountry || req.body?.countryRelevantToQuery,
+        residencyStatus: req.body?.residencyStatus || residentialStatus,
+        financialYear: req.body?.financialYear || taxYear,
+        incomeType: req.body?.incomeType,
+        maritalStatus: req.body?.maritalStatus,
+        dependents: req.body?.dependents ?? req.body?.numberOfChildren ?? req.body?.children,
+      },
+      userId,
+      sessionId: sanitizeText(req.body?.sessionId),
+    });
+
+    req.logger?.info?.(
+      {
+        workflow: "yukti_clarification",
+        route: clarificationState.routing.route,
+        confidence: clarificationState.routing.confidence,
+        missingFields: clarificationState.missingFields,
+      },
+      "resolved yukti clarification state"
+    );
+
+    if (clarificationState.shouldClarify) {
+      return respondOk(res, {
+        ok: true,
+        agent: "Yukti",
+        needsClarification: true,
+        answer: clarificationState.followUpQuestion,
+        missingFields: clarificationState.missingFields,
+        sessionContext: clarificationState.context,
+        routing: clarificationState.routing,
+        sources: [],
+      });
+    }
+
     const knowledge = await retrieveKnowledgeContext(question, {
       sourceTypes: ["dtaa_pdf", "tax_law", "fema_doc", "tds_rule", "capital_gains", "nri_compliance", "other_pdf"],
+      context: clarificationState.context,
     }).catch(() => ({ context: "", sources: [] }));
 
     const payload = {
       question,
-      ...(country ? { country } : {}),
-      ...(taxYear ? { taxYear } : {}),
-      ...(residentialStatus ? { residentialStatus } : {}),
+      ...(clarificationState.context.currentCountry ? { country: clarificationState.context.currentCountry } : country ? { country } : {}),
+      ...(clarificationState.context.financialYear ? { taxYear: clarificationState.context.financialYear } : taxYear ? { taxYear } : {}),
+      ...(clarificationState.context.residencyStatus
+        ? { residentialStatus: clarificationState.context.residencyStatus }
+        : residentialStatus
+          ? { residentialStatus }
+          : {}),
+      ...(clarificationState.context.relevantCountry ? { relevantCountry: clarificationState.context.relevantCountry } : {}),
+      ...(clarificationState.context.incomeType ? { incomeType: clarificationState.context.incomeType } : {}),
+      ...(clarificationState.context.maritalStatus ? { maritalStatus: clarificationState.context.maritalStatus } : {}),
+      ...(clarificationState.context.dependents !== null && clarificationState.context.dependents !== undefined
+        ? { dependents: clarificationState.context.dependents }
+        : {}),
       ...(userId ? { userId } : {}),
       ...(knowledge?.context ? { knowledgeContext: knowledge.context } : {}),
       ...(Array.isArray(knowledge?.sources) && knowledge.sources.length ? { knowledgeSources: knowledge.sources } : {}),
+      routing: clarificationState.routing,
     };
     const serializedPayload = JSON.stringify(payload);
 
@@ -180,6 +231,9 @@ export const askYukti = async (req, res) => {
       ok: true,
       agent: "Yukti",
       answer,
+      needsClarification: false,
+      sessionContext: clarificationState.context,
+      routing: clarificationState.routing,
       sources: knowledge?.sources || [],
     });
   } catch (error) {

@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@nritax/shared": [
+        "./shared/index.js"
+      ],
+      "@nritax/shared/*": [
+        "./shared/*"
+      ]
+    }
+  }
+}

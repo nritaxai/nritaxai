@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: nritax-worker-priority
+spec:
+  scaleTargetRef:
+    name: nritax-worker-priority
+  pollingInterval: 15
+  cooldownPeriod: 180
+  minReplicaCount: 0
+  maxReplicaCount: 12
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus.nritax-observability.svc.cluster.local:9090
+        metricName: nritax_worker_priority_queue_pressure
+        threshold: "6"
+        query: |
+          sum(nritax_queue_depth{queue=~"payment-jobs|notification-jobs",state=~"waiting|active|delayed"})

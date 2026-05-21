@@ -170,6 +170,23 @@ export const getUserProfile = async () => {
   return getRequest("/api/auth/profile");
 };
 
+export const getUserPrivacyStatus = async () => {
+  return getRequest("/api/auth/privacy-status");
+};
+
+export const updatePrivacyConsent = async (payload: {
+  acceptTerms?: boolean;
+  acceptPrivacyPolicy?: boolean;
+  policyVersion?: string;
+  consentSource?: string;
+  marketingEmails?: boolean;
+  productUpdates?: boolean;
+  analyticsTracking?: boolean;
+  consultationDataProcessing?: boolean;
+}) => {
+  return putRequest("/api/auth/consent", payload);
+};
+
 export const updateUserProfile = async (payload: {
   name?: string;
   profileImage?: string;

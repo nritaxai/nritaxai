@@ -6,24 +6,43 @@ on:
       rollback_target:
         description: "Optional Argo revision number"
         required: false
+        default: ""
+      rollback_workers:
+        description: "Rollback worker deployment too"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: rollback-production
+  cancel-in-progress: false
 
 jobs:
   rollback:
     runs-on: ubuntu-latest
     environment: production
     steps:
+      - uses: actions/checkout@v4
+
       - uses: azure/setup-kubectl@v4
+
       - name: Install Argo Rollouts plugin
         run: |
-          curl -LO https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
-          chmod +x ./kubectl-argo-rollouts-linux-amd64
-          sudo mv ./kubectl-argo-rollouts-linux-amd64 /usr/local/bin/kubectl-argo-rollouts
+          curl -sSL -o kubectl-argo-rollouts https://github.com/argoproj/argo-rollouts/releases/latest/download/kubectl-argo-rollouts-linux-amd64
+          chmod +x kubectl-argo-rollouts
+          sudo mv kubectl-argo-rollouts /usr/local/bin/kubectl-argo-rollouts
+
       - name: Configure kubectl
         env:
           KUBE_CONFIG_DATA: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
         run: |
           mkdir -p "$HOME/.kube"
           echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
+
       - name: Abort or undo API rollout
         run: |
           if [ -n "${{ inputs.rollback_target }}" ]; then
@@ -32,5 +51,34 @@ jobs:
             kubectl argo rollouts abort nritax-api -n nritax-production || true
             kubectl argo rollouts undo nritax-api -n nritax-production
           fi
+
+      - name: Wait for API rollback
+        run: kubectl argo rollouts get rollout nritax-api -n nritax-production --watch --timeout 300s
+
       - name: Undo worker deployment
+        if: ${{ inputs.rollback_workers }}
         run: kubectl rollout undo deployment/nritax-worker -n nritax-production
+
+      - name: Wait for worker rollback
+        if: ${{ inputs.rollback_workers }}
+        run: kubectl rollout status deployment/nritax-worker -n nritax-production --timeout=300s
+
+      - name: Verify production health endpoint
+        run: curl --fail --silent --show-error "${{ vars.PRODUCTION_HEALTHCHECK_URL }}"
+
+      - name: Rollback summary
+        run: |
+          {
+            echo "## Production Rollback"
+            echo ""
+            echo "- API rollback target: \`${{ inputs.rollback_target || 'previous stable revision' }}\`"
+            echo "- Workers rolled back: \`${{ inputs.rollback_workers }}\`"
+            echo "- Health check: \`${{ vars.PRODUCTION_HEALTHCHECK_URL }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Optional incident alert webhook
+        if: ${{ failure() && secrets.ALERT_WEBHOOK_URL != '' }}
+        run: |
+          curl -X POST -H "Content-Type: application/json" \
+            -d "{\"service\":\"nritax-api\",\"environment\":\"production\",\"status\":\"rollback_failed\",\"workflow\":\"${{ github.workflow }}\",\"run_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
+            "${{ secrets.ALERT_WEBHOOK_URL }}"

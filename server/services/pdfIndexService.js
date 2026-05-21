@@ -1,26 +1,62 @@
 import fs from "fs";
 import path from "path";
 import pdfParse from "pdf-parse";
+import {
+  ensureDocumentProcessingStorage,
+  getPdfAbsolutePath,
+  getPdfDir,
+  getDocumentStorageDir,
+  sanitizePdfFilename,
+} from "./documentProcessingService.js";
+import { recordDocumentProcessingMetric } from "./metrics.js";
 
-const STORAGE_DIR = path.resolve("storage");
-const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
+const STORAGE_DIR = getDocumentStorageDir();
+const PDF_DIR = getPdfDir();
 const INDEX_PATH = path.join(STORAGE_DIR, "pdf_index.json");
+const INDEX_LOCK_PATH = path.join(STORAGE_DIR, "pdf_index.lock");
 
 export const ensurePdfStorage = () => {
-  if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
-  if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
+  ensureDocumentProcessingStorage();
   if (!fs.existsSync(INDEX_PATH)) fs.writeFileSync(INDEX_PATH, JSON.stringify([], null, 2), "utf8");
 };
 
-export const getPdfDir = () => PDF_DIR;
-
 export const getPdfIndexPath = () => INDEX_PATH;
+export { getPdfDir, sanitizePdfFilename };
 
-export const sanitizePdfFilename = (name = "") =>
-  path
-    .basename(name)
-    .replace(/[^\w.\- ]/g, "_")
-    .trim();
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const withIndexLock = async (handler) => {
+  ensurePdfStorage();
+  const timeoutMs = Math.max(Number(process.env.PDF_INDEX_LOCK_TIMEOUT_MS || 15000), 1000);
+  const retryMs = Math.max(Number(process.env.PDF_INDEX_LOCK_RETRY_MS || 50), 10);
+  const startedAt = Date.now();
+  let handle = null;
+
+  while (!handle && Date.now() - startedAt < timeoutMs) {
+    try {
+      handle = fs.openSync(INDEX_LOCK_PATH, "wx");
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+      await sleep(retryMs);
+    }
+  }
+
+  if (!handle) {
+    throw new Error("PDF index is busy. Please retry.");
+  }
+
+  try {
+    return await handler();
+  } finally {
+    try {
+      fs.closeSync(handle);
+    } catch {
+    }
+    if (fs.existsSync(INDEX_LOCK_PATH)) {
+      fs.unlinkSync(INDEX_LOCK_PATH);
+    }
+  }
+};
 
 export const loadPdfIndex = () => {
   ensurePdfStorage();
@@ -33,19 +69,36 @@ export const loadPdfIndex = () => {
   }
 };
 
-export const savePdfIndex = (rows) => {
-  ensurePdfStorage();
-  fs.writeFileSync(INDEX_PATH, JSON.stringify(rows, null, 2), "utf8");
-};
+export const savePdfIndex = async (rows) =>
+  withIndexLock(async () => {
+    fs.writeFileSync(INDEX_PATH, JSON.stringify(rows, null, 2), "utf8");
+  });
 
-const chunkText = (text, size = 900, overlap = 150) => {
+const normalizeChunkFingerprint = (value = "") =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/[^a-z0-9 ]/g, "")
+    .trim()
+    .slice(0, 240);
+
+const chunkText = (text, size = Number(process.env.PDF_CHUNK_SIZE || 900), overlap = Number(process.env.PDF_CHUNK_OVERLAP || 180)) => {
   const chunks = [];
+  const safeSize = Math.max(size, 200);
+  const safeOverlap = Math.min(Math.max(overlap, 0), safeSize - 1);
+  const normalizedText = String(text || "").replace(/\s+/g, " ").trim();
   let start = 0;
+  const seenFingerprints = new Set();
 
-  while (start < text.length) {
-    const end = Math.min(start + size, text.length);
-    chunks.push(text.slice(start, end));
-    start += Math.max(1, size - overlap);
+  while (start < normalizedText.length) {
+    const end = Math.min(start + safeSize, normalizedText.length);
+    const chunk = normalizedText.slice(start, end).trim();
+    const fingerprint = normalizeChunkFingerprint(chunk);
+    if (chunk && !seenFingerprints.has(fingerprint)) {
+      chunks.push(chunk);
+      seenFingerprints.add(fingerprint);
+    }
+    start += Math.max(1, safeSize - safeOverlap);
   }
   return chunks;
 };
@@ -67,15 +120,57 @@ export const extractPageTexts = async (buffer) => {
   return pageTexts;
 };
 
+export const buildPdfIndexRowsFromFile = async (filePath, fileName) => {
+  const startedAt = Date.now();
+  const buffer = fs.readFileSync(filePath);
+  const pageTexts = await extractPageTexts(buffer);
+  const rows = [];
+  let totalTextChars = 0;
+
+  pageTexts.forEach(({ page, text }) => {
+    totalTextChars += text.length;
+    const chunks = chunkText(text);
+    chunks.forEach((chunk, index) => {
+      rows.push({
+        id: `${fileName}-${page}-${index}`,
+        file: fileName,
+        page,
+        text: chunk,
+      });
+    });
+  });
+
+  const stats = {
+    file: fileName,
+    chunks: rows.length,
+    pages: Math.max(pageTexts.length, 0),
+    sizeBytes: buffer.length,
+    parseDurationMs: Date.now() - startedAt,
+    textChars: totalTextChars,
+    extractionMode: totalTextChars > 0 ? "native_text" : "ocr_candidate",
+  };
+
+  recordDocumentProcessingMetric({
+    workflow: "pdf-index",
+    status: "completed",
+    fileSizeBytes: stats.sizeBytes,
+    durationMs: stats.parseDurationMs,
+    pages: stats.pages,
+    extractionMode: stats.extractionMode,
+  });
+
+  return { rows, stats };
+};
+
 export const indexPdfBuffer = async (buffer, fileName) => {
   const pageTexts = await extractPageTexts(buffer);
   const rows = [];
 
   pageTexts.forEach(({ page, text }) => {
     const chunks = chunkText(text);
-    chunks.forEach((chunk, i) => {
+    chunks.forEach((chunk, index) => {
       rows.push({
-        id: `${fileName}-${page}-${i}`,
+        id: `${fileName}-${page}-${index}`,
         file: fileName,
         page,
         text: chunk,
@@ -86,41 +181,57 @@ export const indexPdfBuffer = async (buffer, fileName) => {
   return rows;
 };
 
+export const replacePdfIndexRows = async ({ fileName, rows }) =>
+  withIndexLock(async () => {
+    const nextIndex = loadPdfIndex().filter((row) => row.file !== fileName);
+    nextIndex.push(...rows);
+    fs.writeFileSync(INDEX_PATH, JSON.stringify(nextIndex, null, 2), "utf8");
+    return nextIndex.length;
+  });
+
 export const indexStoredPdfByName = async (fileName) => {
   ensurePdfStorage();
-  const targetPath = path.join(PDF_DIR, fileName);
-  const buffer = fs.readFileSync(targetPath);
-  const fileRows = await indexPdfBuffer(buffer, fileName);
-  const nextIndex = loadPdfIndex().filter((row) => row.file !== fileName);
-  nextIndex.push(...fileRows);
-  savePdfIndex(nextIndex);
+  const safeName = sanitizePdfFilename(fileName);
+  const targetPath = getPdfAbsolutePath(safeName);
+  const { rows, stats } = await buildPdfIndexRowsFromFile(targetPath, safeName);
+  await replacePdfIndexRows({ fileName: safeName, rows });
 
   return {
-    file: fileName,
-    chunks: fileRows.length,
+    file: safeName,
+    chunks: rows.length,
+    pages: stats.pages,
+    sizeBytes: stats.sizeBytes,
+    extractionMode: stats.extractionMode,
+    parseDurationMs: stats.parseDurationMs,
   };
 };
 
-export const rebuildPdfIndex = async () => {
-  ensurePdfStorage();
+export const rebuildPdfIndex = async () =>
+  withIndexLock(async () => {
+    ensurePdfStorage();
+    const pdfFiles = fs
+      .readdirSync(PDF_DIR, { withFileTypes: true })
+      .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"))
+      .map((entry) => entry.name)
+      .sort();
 
-  const pdfFiles = fs
-    .readdirSync(PDF_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"))
-    .map((entry) => entry.name)
-    .sort();
+    const rebuiltIndex = [];
+    const fileStats = [];
 
-  const rebuiltIndex = [];
-  const fileStats = [];
+    for (const fileName of pdfFiles) {
+      const absPath = getPdfAbsolutePath(fileName);
+      const { rows, stats } = await buildPdfIndexRowsFromFile(absPath, fileName);
+      rebuiltIndex.push(...rows);
+      fileStats.push({
+        file: fileName,
+        chunks: rows.length,
+        pages: stats.pages,
+        sizeBytes: stats.sizeBytes,
+        extractionMode: stats.extractionMode,
+        parseDurationMs: stats.parseDurationMs,
+      });
+    }
 
-  for (const fileName of pdfFiles) {
-    const absPath = path.join(PDF_DIR, fileName);
-    const buffer = fs.readFileSync(absPath);
-    const rows = await indexPdfBuffer(buffer, fileName);
-    rebuiltIndex.push(...rows);
-    fileStats.push({ file: fileName, chunks: rows.length });
-  }
-
-  savePdfIndex(rebuiltIndex);
-  return { files: fileStats, totalChunks: rebuiltIndex.length, totalFiles: pdfFiles.length };
-};
+    fs.writeFileSync(INDEX_PATH, JSON.stringify(rebuiltIndex, null, 2), "utf8");
+    return { files: fileStats, totalChunks: rebuiltIndex.length, totalFiles: pdfFiles.length };
+  });

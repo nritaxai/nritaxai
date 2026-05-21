@@ -1,22 +1,21 @@
-const parseBoolean = (value, fallback = false) => {
-  if (typeof value === "boolean") return value;
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) return fallback;
-  if (["1", "true", "yes", "on"].includes(normalized)) return true;
-  if (["0", "false", "no", "off"].includes(normalized)) return false;
-  return fallback;
-};
+import { parseBoolean } from "../../shared/config/env.js";
 
 export const featureFlags = {
   aiGatewayEnabled: parseBoolean(process.env.AI_GATEWAY_ENABLED, true),
+  aiCostAwareRoutingEnabled: parseBoolean(process.env.AI_COST_AWARE_ROUTING_ENABLED, true),
   aiGatewayParallelFallbackEnabled: parseBoolean(process.env.AI_GATEWAY_ENABLE_PARALLEL_FALLBACK, false),
   aiGatewayCacheEnabled: parseBoolean(process.env.AI_GATEWAY_CACHE_ENABLED, true),
   aiGatewayStreamingEnabled: parseBoolean(process.env.AI_GATEWAY_STREAMING_ENABLED, false),
   aiGatewayOllamaEnabled: parseBoolean(process.env.AI_GATEWAY_OLLAMA_ENABLED, false),
+  aiContextCompressionEnabled: parseBoolean(process.env.AI_CONTEXT_COMPRESSION_ENABLED, true),
+  aiTokenTrackingEnabled: parseBoolean(process.env.AI_TOKEN_TRACKING_ENABLED, true),
   backgroundJobsEnabled: parseBoolean(process.env.BACKGROUND_JOBS_ENABLED, false),
   pdfQueueEnabled: parseBoolean(process.env.PDF_QUEUE_ENABLED, false),
   consultationQueueEnabled: parseBoolean(process.env.CONSULTATION_QUEUE_ENABLED, false),
   aiQueueEnabled: parseBoolean(process.env.AI_QUEUE_ENABLED, false),
+  multiAgentOrchestrationEnabled: parseBoolean(process.env.MULTI_AGENT_ORCHESTRATION_ENABLED, false),
+  multiAgentAsyncEnabled: parseBoolean(process.env.MULTI_AGENT_ASYNC_ENABLED, false),
+  multiAgentHumanReviewEnabled: parseBoolean(process.env.MULTI_AGENT_HUMAN_REVIEW_ENABLED, false),
   reportQueueEnabled: parseBoolean(process.env.REPORT_QUEUE_ENABLED, false),
   structuredLoggingEnabled: parseBoolean(process.env.STRUCTURED_LOGGING_ENABLED, true),
   tracingEnabled: parseBoolean(process.env.OTEL_ENABLED, false),
@@ -27,6 +26,11 @@ export const featureFlags = {
   paymentReconciliationEnabled: parseBoolean(process.env.PAYMENT_RECONCILIATION_ENABLED, true),
   paymentQueueEnabled: parseBoolean(process.env.PAYMENT_QUEUE_ENABLED, false),
   hybridRetrievalCacheEnabled: parseBoolean(process.env.HYBRID_RETRIEVAL_CACHE_ENABLED, true),
+  redisCacheEnabled: parseBoolean(process.env.REDIS_CACHE_ENABLED, true),
+  authSessionTrackingEnabled: parseBoolean(process.env.AUTH_SESSION_TRACKING_ENABLED, true),
+  authRefreshEnabled: parseBoolean(process.env.AUTH_REFRESH_ENABLED, true),
+  authSecurityAlertsEnabled: parseBoolean(process.env.AUTH_SECURITY_ALERTS_ENABLED, true),
+  enterpriseRbacEnabled: parseBoolean(process.env.ENTERPRISE_RBAC_ENABLED, false),
+  enterpriseTenantHeadersEnabled: parseBoolean(process.env.ENTERPRISE_TENANT_HEADERS_ENABLED, false),
+  enterpriseEnhancedAuditEnabled: parseBoolean(process.env.ENTERPRISE_ENHANCED_AUDIT_ENABLED, true),
 };
-
-export { parseBoolean };

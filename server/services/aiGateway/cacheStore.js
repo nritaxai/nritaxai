@@ -1,4 +1,4 @@
-import { recordCacheMetric } from "../metrics.js";
+import { getCachedValue, setCachedValue } from "../cacheService.js";
 
 const DEFAULT_TTL_MS = Math.max(Number(process.env.AI_GATEWAY_CACHE_TTL_MS || 120000), 1000);
 const DEFAULT_MAX_ITEMS = Math.max(Number(process.env.AI_GATEWAY_CACHE_MAX_ITEMS || 300), 25);
@@ -51,29 +51,47 @@ export const buildAiGatewayCacheKey = ({
   });
 };
 
-export const getCachedGatewayResponse = (cacheKey) => {
+export const getCachedGatewayResponse = async (cacheKey) => {
   if (!cacheKey) return null;
   const entry = responseCache.get(cacheKey);
-  if (!entry) {
-    recordCacheMetric({ layer: "ai_gateway_response", hit: false });
-    return null;
+  if (entry && Date.now() - entry.createdAt <= DEFAULT_TTL_MS) {
+    return entry.value;
   }
-  if (Date.now() - entry.createdAt > DEFAULT_TTL_MS) {
+  if (entry && Date.now() - entry.createdAt > DEFAULT_TTL_MS) {
     responseCache.delete(cacheKey);
-    recordCacheMetric({ layer: "ai_gateway_response", hit: false });
+  }
+
+  const distributed = await getCachedValue({
+    layer: "ai_gateway_response",
+    key: cacheKey,
+  });
+  if (!distributed) {
     return null;
   }
-  recordCacheMetric({ layer: "ai_gateway_response", hit: true });
-  return entry.value;
+
+  responseCache.set(cacheKey, {
+    value: distributed,
+    createdAt: Date.now(),
+  });
+  ensureBoundedCache();
+  return distributed;
 };
 
-export const setCachedGatewayResponse = (cacheKey, value) => {
+export const setCachedGatewayResponse = async (cacheKey, value) => {
   if (!cacheKey || !value) return;
   responseCache.set(cacheKey, {
     value,
     createdAt: Date.now(),
   });
   ensureBoundedCache();
+  await setCachedValue({
+    layer: "ai_gateway_response",
+    key: cacheKey,
+    value,
+    ttlSeconds: Math.ceil(DEFAULT_TTL_MS / 1000),
+    localTtlMs: DEFAULT_TTL_MS,
+    localMaxItems: DEFAULT_MAX_ITEMS,
+  });
 };
 
 export const getInFlightGatewayRequest = (cacheKey) => {

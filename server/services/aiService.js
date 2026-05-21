@@ -23,6 +23,15 @@ const CONTINUATION_PROMPT =
   "Please continue your previous response from exactly where you stopped. Keep the same structure and formatting, and finish the answer completely.";
 
 const MID_SENTENCE_PATTERN = /[a-z0-9,:;(\[]$/i;
+const MIN_COMPLETION_TOKENS = 128;
+
+const normalizeMaxTokens = (value, fallback = 768) => {
+  const numeric = Number(value || fallback);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+  return Math.max(Math.round(numeric), MIN_COMPLETION_TOKENS);
+};
 
 const createTimeoutSignal = (timeoutMs) => {
   const controller = new AbortController();
@@ -208,7 +217,7 @@ NEVER:
 - Add extra response sections beyond the required template
 `.trim();
 
-export const AI_DEFAULT_MAX_TOKENS = Math.max(Number(process.env.CHAT_MAX_TOKENS || 2048), 2048);
+export const AI_DEFAULT_MAX_TOKENS = normalizeMaxTokens(process.env.CHAT_MAX_TOKENS, 768);
 export const AI_DEFAULT_TEMPERATURE = 0.3;
 
 export const callOpenRouter = async (
@@ -249,7 +258,7 @@ export const callOpenRouter = async (
         body: JSON.stringify({
           model,
           messages: [{ role: "system", content: systemPrompt }, ...normalizedMessages],
-          max_tokens: Math.max(Number(maxTokens || 0), 2048),
+          max_tokens: normalizeMaxTokens(maxTokens, AI_DEFAULT_MAX_TOKENS),
           temperature,
           stream: false,
         }),
@@ -349,7 +358,7 @@ export const callGemini = async (
           },
           contents,
           generationConfig: {
-            maxOutputTokens: Math.max(Number(maxTokens || 0), 2048),
+            maxOutputTokens: normalizeMaxTokens(maxTokens, AI_DEFAULT_MAX_TOKENS),
             temperature,
           },
         }),
@@ -429,7 +438,7 @@ export const callOllama = async (
         stream: false,
         options: {
           temperature,
-          num_predict: Math.max(Number(maxTokens || 0), 512),
+          num_predict: normalizeMaxTokens(maxTokens, 384),
         },
       }),
       signal: controller.signal,

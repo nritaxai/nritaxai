@@ -17,6 +17,8 @@ export const dispatchJob = async ({
   payload,
   payloadSummary = {},
   dedupeKey = "",
+  resourceType = "",
+  resourceId = "",
   featureFlagEnabled = featureFlags.backgroundJobsEnabled,
   inlineHandler,
 }) => {
@@ -86,6 +88,8 @@ export const dispatchJob = async ({
     jobName,
     jobId: String(job.id),
     dedupeKey,
+    resourceType,
+    resourceId,
     payloadSummary,
   });
 

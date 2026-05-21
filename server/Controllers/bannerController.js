@@ -1,3 +1,5 @@
+import { logControllerError, respondError, respondOk } from "../services/controllerResponses.js";
+
 const defaultBannerUpdates = [
   {
     label: "IMPORTANT",
@@ -95,18 +97,12 @@ export const updateBannerUpdates = async (req, res) => {
     const providedApiKey = sanitizeString(req.get("x-api-key"));
 
     if (configuredApiKey && providedApiKey !== configuredApiKey) {
-      return res.status(401).json({
-        success: false,
-        message: "Invalid banner API key",
-      });
+      return respondError(res, 401, "Invalid banner API key", { success: false });
     }
 
     const extractedPayload = extractBannerPayload(req.body);
     if (!extractedPayload.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid payload. Expected { updates: [...] }",
-      });
+      return respondError(res, 400, "Invalid payload. Expected { updates: [...] }", { success: false });
     }
 
     const incomingUpdates = extractedPayload
@@ -114,10 +110,7 @@ export const updateBannerUpdates = async (req, res) => {
       .filter(Boolean);
 
     if (!incomingUpdates.length) {
-      return res.status(400).json({
-        success: false,
-        message: "Payload contained no valid banner updates",
-      });
+      return respondError(res, 400, "Payload contained no valid banner updates", { success: false });
     }
 
     bannerUpdates = incomingUpdates;
@@ -127,18 +120,15 @@ export const updateBannerUpdates = async (req, res) => {
       updatedAt: new Date().toISOString(),
     });
 
-    return res.status(200).json({ success: true });
+    return respondOk(res, { success: true });
   } catch (error) {
-    console.error("[banner-updates:update]", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to update banner updates",
-    });
+    logControllerError("banner.update", error);
+    return respondError(res, 500, "Unable to update banner updates", { success: false });
   }
 };
 
 export const getBannerHealth = async (_req, res) => {
-  return res.status(200).json({ ok: true });
+  return respondOk(res, { ok: true });
 };
 
 export const getBannerUpdates = async (req, res) => {
@@ -148,12 +138,9 @@ export const getBannerUpdates = async (req, res) => {
       ? sortAndFilterBannerUpdates(bannerUpdates, countryFilter)
       : bannerUpdates;
 
-    return res.status(200).json(data);
+    return respondOk(res, data);
   } catch (error) {
-    console.error("[banner-updates:get]", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to load banner updates",
-    });
+    logControllerError("banner.get", error);
+    return respondError(res, 500, "Unable to load banner updates", { success: false });
   }
 };

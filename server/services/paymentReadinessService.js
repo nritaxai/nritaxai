@@ -26,6 +26,7 @@ export const buildPaymentReadinessReport = () => {
     provider: "razorpay",
     supportedDisplayCurrencies: CHECKOUT_DISPLAY_CURRENCIES,
     supportedChargeCurrencies: GATEWAY_CHARGE_CURRENCIES,
+    supportedPricingCountries: ["IN", "US", "GB", "AE", "SG", "CA", "AU"],
     internationalCardSupport: "requires_provider_account_configuration",
     nonInrCheckout: "display_supported_charge_in_inr_only",
     foreignRemittanceHandling: "tracked_via_billing_country_and_tax_classification",

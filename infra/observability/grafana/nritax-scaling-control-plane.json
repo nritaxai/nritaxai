@@ -1,0 +1,105 @@
+{
+  "title": "nritax.ai Scaling Control Plane",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Worker Concurrency Configured",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "max(nritax_worker_concurrency_configured) by (queue, worker_group)",
+          "legendFormat": "{{worker_group}} / {{queue}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker Active Jobs",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "max(nritax_worker_jobs_active) by (queue, worker_group)",
+          "legendFormat": "{{worker_group}} / {{queue}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Worker Utilization Ratio",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "max(nritax_worker_utilization_ratio) by (queue, worker_group)",
+          "legendFormat": "{{worker_group}} / {{queue}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Throughput / 5m",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_queue_jobs_total{status=~\"completed|failed\"}[5m])) by (queue, job, status)",
+          "legendFormat": "{{queue}} / {{job}} / {{status}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Queue Wait P95",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(nritax_queue_job_wait_ms_bucket[5m])) by (le, queue, job))",
+          "legendFormat": "{{queue}} / {{job}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Process RSS Memory",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "max(process_resident_memory_bytes) by (job, instance)",
+          "legendFormat": "{{job}} / {{instance}}"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "AI Spend / 15m",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(increase(nritax_ai_estimated_cost_usd_total[15m]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "AI Request Failures / 15m",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(increase(nritax_ai_requests_total{status=\"failure\"}[15m]))"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "API Failure Rate",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(nritax_api_failures_total[5m])) / clamp_min(sum(rate(nritax_http_requests_total[5m])), 1)"
+        }
+      ]
+    }
+  ]
+}

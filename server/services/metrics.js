@@ -207,11 +207,59 @@ const aiLatencyMs = registry.register(
   })
 );
 
+const aiTokensTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_ai_tokens_total",
+    help: "Estimated AI token volume by route, provider, direction, and model family.",
+    labelNames: ["route_tier", "provider", "direction", "model_family"],
+  })
+);
+
+const aiEstimatedCostUsdTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_ai_estimated_cost_usd_total",
+    help: "Estimated AI inference spend in USD.",
+    labelNames: ["route_tier", "provider", "model_family", "strategy"],
+  })
+);
+
+const aiRouteStrategyTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_ai_route_strategy_total",
+    help: "AI route strategy decisions used by the gateway.",
+    labelNames: ["route_tier", "strategy"],
+  })
+);
+
+const aiWorkflowRequestsTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_ai_workflow_requests_total",
+    help: "AI workflow requests by workflow, route tier, strategy, and outcome.",
+    labelNames: ["workflow", "route_tier", "strategy", "status"],
+  })
+);
+
 const cacheRequestsTotal = registry.register(
   new CounterMetric({
     name: "nritax_cache_requests_total",
     help: "Cache requests by cache layer and result.",
     labelNames: ["layer", "result"],
+  })
+);
+
+const cacheOperationDurationMs = registry.register(
+  new HistogramMetric({
+    name: "nritax_cache_operation_duration_ms",
+    help: "Cache operation duration in milliseconds by layer, backend, and operation.",
+    labelNames: ["layer", "backend", "operation"],
+  })
+);
+
+const cacheBackendStateGauge = registry.register(
+  new GaugeMetric({
+    name: "nritax_cache_backend_state",
+    help: "Cache backend availability state.",
+    labelNames: ["backend", "role"],
   })
 );
 
@@ -247,6 +295,62 @@ const queueDepthGauge = registry.register(
   })
 );
 
+const workerConcurrencyConfiguredGauge = registry.register(
+  new GaugeMetric({
+    name: "nritax_worker_concurrency_configured",
+    help: "Configured worker concurrency by queue and worker group.",
+    labelNames: ["queue", "worker_group"],
+  })
+);
+
+const workerJobsActiveGauge = registry.register(
+  new GaugeMetric({
+    name: "nritax_worker_jobs_active",
+    help: "Currently active worker jobs by queue and worker group.",
+    labelNames: ["queue", "worker_group"],
+  })
+);
+
+const workerUtilizationRatioGauge = registry.register(
+  new GaugeMetric({
+    name: "nritax_worker_utilization_ratio",
+    help: "Active worker jobs divided by configured concurrency.",
+    labelNames: ["queue", "worker_group"],
+  })
+);
+
+const documentProcessingRunsTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_document_processing_runs_total",
+    help: "Document processing runs by workflow, extraction mode, and outcome.",
+    labelNames: ["workflow", "extraction_mode", "status"],
+  })
+);
+
+const documentProcessingDurationMs = registry.register(
+  new HistogramMetric({
+    name: "nritax_document_processing_duration_ms",
+    help: "Document processing duration in milliseconds.",
+    labelNames: ["workflow", "extraction_mode", "status"],
+  })
+);
+
+const documentProcessingPagesGauge = registry.register(
+  new GaugeMetric({
+    name: "nritax_document_processing_pages",
+    help: "Last observed page count for a document workflow.",
+    labelNames: ["workflow", "extraction_mode"],
+  })
+);
+
+const documentProcessingBytesTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_document_processing_bytes_total",
+    help: "Total bytes processed by document workflow and extraction mode.",
+    labelNames: ["workflow", "extraction_mode"],
+  })
+);
+
 const dbOperationDurationMs = registry.register(
   new HistogramMetric({
     name: "nritax_db_operation_duration_ms",
@@ -268,6 +372,30 @@ const paymentAttemptsTotal = registry.register(
     name: "nritax_payment_attempts_total",
     help: "Payment attempts and lifecycle outcomes.",
     labelNames: ["provider", "status"],
+  })
+);
+
+const securityEventsTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_security_events_total",
+    help: "Security and privacy events by category, severity, and outcome.",
+    labelNames: ["category", "severity", "status"],
+  })
+);
+
+const authEventsTotal = registry.register(
+  new CounterMetric({
+    name: "nritax_auth_events_total",
+    help: "Authentication lifecycle events by action and outcome.",
+    labelNames: ["action", "status", "provider"],
+  })
+);
+
+const authSessionsGauge = registry.register(
+  new GaugeMetric({
+    name: "nritax_auth_sessions_active",
+    help: "Active tracked authentication sessions by provider.",
+    labelNames: ["provider"],
   })
 );
 
@@ -377,7 +505,18 @@ export const recordApiFailureMetric = ({
   );
 };
 
-export const recordAiMetric = ({ routeTier = "medium", provider = "unknown", latencyMs = 0, failed = false }) => {
+export const recordAiMetric = ({
+  routeTier = "medium",
+  provider = "unknown",
+  latencyMs = 0,
+  failed = false,
+  inputTokens = 0,
+  outputTokens = 0,
+  estimatedCostUsd = 0,
+  modelFamily = "unknown",
+  strategy = "unknown",
+  workflow = "unknown",
+}) => {
   const labels = {
     route_tier: String(routeTier || "medium"),
     provider: String(provider || "unknown"),
@@ -385,6 +524,57 @@ export const recordAiMetric = ({ routeTier = "medium", provider = "unknown", lat
   };
   aiRequestsTotal.inc(labels, 1);
   aiLatencyMs.observe(labels, latencyMs);
+  aiRouteStrategyTotal.inc(
+    {
+      route_tier: String(routeTier || "medium"),
+      strategy: String(strategy || "unknown"),
+    },
+    1
+  );
+  aiWorkflowRequestsTotal.inc(
+    {
+      workflow: String(workflow || "unknown"),
+      route_tier: String(routeTier || "medium"),
+      strategy: String(strategy || "unknown"),
+      status: failed ? "failure" : "success",
+    },
+    1
+  );
+
+  const family = String(modelFamily || "unknown");
+  if (Number(inputTokens) > 0) {
+    aiTokensTotal.inc(
+      {
+        route_tier: String(routeTier || "medium"),
+        provider: String(provider || "unknown"),
+        direction: "input",
+        model_family: family,
+      },
+      Number(inputTokens)
+    );
+  }
+  if (Number(outputTokens) > 0) {
+    aiTokensTotal.inc(
+      {
+        route_tier: String(routeTier || "medium"),
+        provider: String(provider || "unknown"),
+        direction: "output",
+        model_family: family,
+      },
+      Number(outputTokens)
+    );
+  }
+  if (Number(estimatedCostUsd) > 0) {
+    aiEstimatedCostUsdTotal.inc(
+      {
+        route_tier: String(routeTier || "medium"),
+        provider: String(provider || "unknown"),
+        model_family: family,
+        strategy: String(strategy || "unknown"),
+      },
+      Number(estimatedCostUsd)
+    );
+  }
 };
 
 export const recordCacheMetric = ({ layer = "unknown", hit = false }) => {
@@ -394,6 +584,27 @@ export const recordCacheMetric = ({ layer = "unknown", hit = false }) => {
       result: hit ? "hit" : "miss",
     },
     1
+  );
+};
+
+export const recordCacheOperationMetric = ({ layer = "unknown", backend = "local", operation = "get", durationMs = 0 }) => {
+  cacheOperationDurationMs.observe(
+    {
+      layer: String(layer || "unknown"),
+      backend: String(backend || "local"),
+      operation: String(operation || "get"),
+    },
+    durationMs
+  );
+};
+
+export const setCacheBackendStateMetric = ({ backend = "redis", role = "shared", connected = false }) => {
+  cacheBackendStateGauge.set(
+    {
+      backend: String(backend || "redis"),
+      role: String(role || "shared"),
+    },
+    connected ? 1 : 0
   );
 };
 
@@ -455,6 +666,76 @@ export const setQueueDepthMetric = ({ queueName = "unknown", state = "waiting", 
   );
 };
 
+export const setWorkerConcurrencyMetric = ({ queueName = "unknown", workerGroup = "default", concurrency = 0 }) => {
+  workerConcurrencyConfiguredGauge.set(
+    {
+      queue: String(queueName || "unknown"),
+      worker_group: String(workerGroup || "default"),
+    },
+    Math.max(Number(concurrency) || 0, 0)
+  );
+};
+
+export const setWorkerActiveJobsMetric = ({ queueName = "unknown", workerGroup = "default", activeJobs = 0, concurrency = 0 }) => {
+  const safeConcurrency = Math.max(Number(concurrency) || 0, 0);
+  const safeActiveJobs = Math.max(Number(activeJobs) || 0, 0);
+  const labels = {
+    queue: String(queueName || "unknown"),
+    worker_group: String(workerGroup || "default"),
+  };
+
+  workerJobsActiveGauge.set(labels, safeActiveJobs);
+  workerUtilizationRatioGauge.set(labels, safeConcurrency > 0 ? Number((safeActiveJobs / safeConcurrency).toFixed(4)) : 0);
+};
+
+export const recordDocumentProcessingMetric = ({
+  workflow = "pdf-index",
+  extractionMode = "native_text",
+  status = "completed",
+  durationMs = 0,
+  fileSizeBytes = 0,
+  pages = 0,
+}) => {
+  const workflowLabel = String(workflow || "pdf-index");
+  const modeLabel = String(extractionMode || "native_text");
+  const statusLabel = String(status || "completed");
+
+  documentProcessingRunsTotal.inc(
+    {
+      workflow: workflowLabel,
+      extraction_mode: modeLabel,
+      status: statusLabel,
+    },
+    1
+  );
+  documentProcessingDurationMs.observe(
+    {
+      workflow: workflowLabel,
+      extraction_mode: modeLabel,
+      status: statusLabel,
+    },
+    Math.max(Number(durationMs) || 0, 0)
+  );
+  documentProcessingPagesGauge.set(
+    {
+      workflow: workflowLabel,
+      extraction_mode: modeLabel,
+    },
+    Math.max(Number(pages) || 0, 0)
+  );
+
+  const bytes = Math.max(Number(fileSizeBytes) || 0, 0);
+  if (bytes > 0) {
+    documentProcessingBytesTotal.inc(
+      {
+        workflow: workflowLabel,
+        extraction_mode: modeLabel,
+      },
+      bytes
+    );
+  }
+};
+
 export const recordDbOperationMetric = ({ operation = "unknown", collection = "unknown", durationMs = 0, failed = false }) => {
   dbOperationDurationMs.observe(
     {
@@ -491,6 +772,37 @@ export const recordPaymentMetric = ({ provider = "unknown", status = "unknown" }
       status: String(status || "unknown"),
     },
     1
+  );
+};
+
+export const recordSecurityEvent = ({ category = "security", severity = "low", status = "info" }) => {
+  securityEventsTotal.inc(
+    {
+      category: String(category || "security"),
+      severity: String(severity || "low"),
+      status: String(status || "info"),
+    },
+    1
+  );
+};
+
+export const recordAuthEvent = ({ action = "unknown", status = "info", provider = "unknown", value = 1 }) => {
+  authEventsTotal.inc(
+    {
+      action: String(action || "unknown"),
+      status: String(status || "info"),
+      provider: String(provider || "unknown"),
+    },
+    Math.max(Number(value) || 0, 0)
+  );
+};
+
+export const setAuthActiveSessionsMetric = ({ provider = "unknown", count = 0 }) => {
+  authSessionsGauge.set(
+    {
+      provider: String(provider || "unknown"),
+    },
+    Math.max(Number(count) || 0, 0)
   );
 };
 

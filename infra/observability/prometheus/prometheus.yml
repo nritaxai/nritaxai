@@ -16,6 +16,10 @@ scrape_configs:
     static_configs:
       - targets:
           - nritax-worker.nritax-production.svc.cluster.local:5000
+          - nritax-worker-priority.nritax-production.svc.cluster.local:5000
+          - nritax-worker-batch.nritax-production.svc.cluster.local:5000
+          - nritax-worker-ai.nritax-production.svc.cluster.local:5000
+          - nritax-gpu-worker.nritax-production.svc.cluster.local:5000
     bearer_token: ${METRICS_AUTH_TOKEN}
 
   - job_name: otel-collector
