@@ -100,7 +100,17 @@ export const resetPassword = async (payload: {
   return postRequest("/api/auth/reset-password", payload);
 };
 
-export const googleLoginUser = async (credential: string | { credential: string; termsAccepted?: boolean; policyVersion?: string }) => {
+export const googleLoginUser = async (
+  credential:
+    | string
+    | {
+        credential: string;
+        termsAccepted?: boolean;
+        policyVersion?: string;
+        country?: string;
+        countryCode?: string;
+      }
+) => {
   return postRequest(
     "/api/auth/google-login",
     typeof credential === "string" ? { credential } : credential
@@ -117,6 +127,8 @@ export const appleLoginUser = async (payload: {
   fullName?: { firstName?: string; lastName?: string };
   termsAccepted?: boolean;
   policyVersion?: string;
+  country?: string;
+  countryCode?: string;
 }) => {
   return postRequest("/api/auth/apple", payload);
 };
@@ -126,6 +138,8 @@ export const linkedinLoginUser = async (payload: {
   redirectUri: string;
   termsAccepted?: boolean;
   policyVersion?: string;
+  country?: string;
+  countryCode?: string;
 }) => {
   return postRequest("/api/auth/linkedin", payload);
 };
@@ -192,11 +206,30 @@ export const updateUserProfile = async (payload: {
   profileImage?: string;
   phone?: string;
   countryOfResidence?: string;
+  countryCode?: string;
   preferredLanguage?: "english" | "hindi" | "tamil" | "indonesian";
   bio?: string;
   linkedinProfile?: string;
 }) => {
   return putRequest("/api/auth/profile", payload);
+};
+
+export const requestCountryChange = async (payload: {
+  countryCode: string;
+  reason?: string;
+}) => {
+  return postRequest("/api/auth/country-change-request", payload);
+};
+
+export const getAdminCountryChangeRequests = async () => {
+  return getRequest("/api/auth/admin/country-change-requests");
+};
+
+export const decideAdminCountryChangeRequest = async (
+  requestId: string,
+  payload: { decision: "approved" | "rejected"; decisionNotes?: string }
+) => {
+  return putRequest(`/api/auth/admin/country-change-requests/${encodeURIComponent(requestId)}`, payload);
 };
 
 export const getSubscriptionStatus = async () => {

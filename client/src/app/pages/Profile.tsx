@@ -43,7 +43,17 @@ type ProfileData = {
   countryOfResidence?: string;
   countryCode?: string;
   countryLocked?: boolean;
+  countryApprovalStatus?: "none" | "pending" | "approved" | "rejected";
   countryChangeStatus?: "none" | "pending" | "approved" | "rejected";
+  countryChangeRequest?: {
+    requestedCountry?: string;
+    requestedCountryCode?: string;
+    reason?: string;
+    status?: string;
+    requestedAt?: string;
+    reviewedAt?: string;
+    decisionNotes?: string;
+  } | null;
   termsAccepted?: boolean;
   termsAcceptedAt?: string | null;
   acceptedAt?: string | null;
@@ -224,7 +234,7 @@ export function Profile() {
 
     let active = true;
 
-    const applyProfileData = (data: ProfileData, nextSubscription: SubscriptionData | null) => {
+    const applyProfileData = (data: ProfileData, nextSubscription: SubscriptionMe | null) => {
       setProfile(data);
       setName(data.name || "");
       setProfileImage(data.profileImage || "");
@@ -418,6 +428,7 @@ export function Profile() {
         prev
           ? {
               ...prev,
+              countryApprovalStatus: "pending",
               countryChangeStatus: "pending",
             }
           : prev
@@ -995,7 +1006,7 @@ export function Profile() {
                           </p>
                         </div>
                         <Badge variant="outline" className="capitalize">
-                          {profile.countryChangeStatus || "none"}
+                          {profile.countryApprovalStatus || profile.countryChangeStatus || "none"}
                         </Badge>
                       </div>
                       <div className="mt-4 grid gap-3 sm:grid-cols-2">

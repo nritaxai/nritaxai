@@ -4,8 +4,12 @@ import jwt from "jsonwebtoken";
 import { OAuth2Client } from "google-auth-library";
 import { generateToken } from "../Utils/generateToken.js";
 import User from "../Models/userModel.js";
+import CountryChangeRequest from "../Models/countryChangeRequestModel.js";
 import { sendEmail } from "../src/utils/emailService.js";
 import { getSubscriptionSummary, normalizeUserSubscriptionState } from "../Utils/subscriptionAccess.js";
+import { resolveSignupCountrySelection } from "../Middlewares/countryMiddleware.js";
+import { buildCountryProfile, normalizeCountryCode, resolveCountryRule } from "../services/countryPolicyService.js";
+import { writeSecurityAuditLog } from "../services/securityAudit.js";
 
 const PROFILE_LANGUAGES = new Set(["english", "hindi", "tamil", "indonesian"]);
 const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i;
@@ -315,6 +319,8 @@ const completeLinkedInLogin = async ({ code, redirectUri, termsContext = null })
       policyVersion: termsContext.policyVersion || CURRENT_POLICY_VERSION,
       acceptedIp: termsContext.acceptedIp || "",
     });
+    applySignupCountrySelection(user, termsContext.countrySelection, { source: "linkedin" });
+    await user.save();
   } else {
     let changed = false;
 
@@ -481,6 +487,71 @@ const applyTermsAcceptance = (userDoc, req) => {
   userDoc.acceptedIp = acceptance.acceptedIp;
 };
 
+const buildCountryAuditEntry = ({
+  action,
+  fromCountry = "",
+  fromCountryCode = "",
+  toCountry = "",
+  toCountryCode = "",
+  status = "info",
+  actor = null,
+  reason = "",
+  metadata = {},
+} = {}) => ({
+  action,
+  fromCountry,
+  fromCountryCode,
+  toCountry,
+  toCountryCode,
+  status,
+  actor,
+  reason,
+  metadata,
+  createdAt: new Date(),
+});
+
+const applySignupCountrySelection = (userDoc, countrySelection, { actor = null, source = "signup" } = {}) => {
+  const selection = countrySelection || resolveSignupCountrySelection({});
+  userDoc.$locals.allowCountryMutation = true;
+  userDoc.country = selection.country;
+  userDoc.countryOfResidence = selection.country;
+  userDoc.countryCode = selection.countryCode;
+  userDoc.initialCountry = userDoc.initialCountry || selection.countryCode;
+  userDoc.initialCountryName = userDoc.initialCountryName || selection.country;
+  userDoc.countryLocked = true;
+  userDoc.countryLockedAt = userDoc.countryLockedAt || new Date();
+  userDoc.countryApprovalStatus = "none";
+  userDoc.countryChangeStatus = "none";
+  userDoc.countryChangeRequest = {
+    requestId: null,
+    requestedCountry: "",
+    requestedCountryCode: "",
+    reason: "",
+    status: "none",
+    requestedAt: null,
+    reviewedAt: null,
+    reviewedBy: null,
+    decisionNotes: "",
+  };
+  userDoc.complianceProfile = selection.countryProfile || {};
+  userDoc.countryAuditLogs = [
+    ...(Array.isArray(userDoc.countryAuditLogs) ? userDoc.countryAuditLogs : []),
+    buildCountryAuditEntry({
+      action: "country.signup_locked",
+      toCountry: selection.country,
+      toCountryCode: selection.countryCode,
+      status: "locked",
+      actor,
+      metadata: { source },
+    }),
+  ].slice(-50);
+};
+
+const getCountrySelectionFromRequest = (req) => req.countrySelection || resolveSignupCountrySelection(req.body || {});
+
+const toCountryChangeStatus = (user = {}) =>
+  user.countryApprovalStatus || user.countryChangeStatus || user.countryChangeRequest?.status || "none";
+
 const rejectMissingTerms = (res) =>
   res.status(400).json({
     success: false,
@@ -499,11 +570,22 @@ const toSafeUser = (userDoc) => {
     email: user.email,
     profileImage: user.profileImage || "",
     phone: user.phone || "",
+    country: user.country || user.countryOfResidence || "",
     countryOfResidence: user.countryOfResidence || "",
+    countryCode: user.countryCode || "",
+    initialCountry: user.initialCountry || "",
+    initialCountryName: user.initialCountryName || "",
+    countryLocked: Boolean(user.countryLocked),
+    countryApprovalStatus: toCountryChangeStatus(user),
+    countryChangeStatus: toCountryChangeStatus(user),
+    countryChangeRequest: user.countryChangeRequest || null,
+    countryAuditLogs: Array.isArray(user.countryAuditLogs) ? user.countryAuditLogs.slice(-20) : [],
+    complianceProfile: user.complianceProfile || {},
     preferredLanguage: user.preferredLanguage || "english",
     bio: user.bio || "",
     linkedinProfile: user.linkedinProfile || "",
     provider: user.provider || "local",
+    roles: Array.isArray(user.roles) ? user.roles : ["end_user"],
     termsAccepted: Boolean(user.termsAccepted),
     acceptedAt: user.acceptedAt || null,
     policyVersion: user.policyVersion || "",
@@ -532,6 +614,12 @@ const toAppleAuthResponseUser = (userDoc) => {
     _id: safeUser._id,
     provider: safeUser.provider,
     profileImage: safeUser.profileImage,
+    country: safeUser.country,
+    countryOfResidence: safeUser.countryOfResidence,
+    countryCode: safeUser.countryCode,
+    countryLocked: safeUser.countryLocked,
+    countryApprovalStatus: safeUser.countryApprovalStatus,
+    countryChangeStatus: safeUser.countryChangeStatus,
     termsAccepted: safeUser.termsAccepted,
     acceptedAt: safeUser.acceptedAt,
     policyVersion: safeUser.policyVersion,
@@ -618,6 +706,7 @@ export const googleLogin = async (req, res) => {
       if (!hasTermsAcceptancePayload(req)) {
         return rejectMissingTerms(res);
       }
+      const countrySelection = getCountrySelectionFromRequest(req);
       // Create new Google user
       user = await User.create({
         name,
@@ -627,6 +716,8 @@ export const googleLogin = async (req, res) => {
         provider: "google",
         ...buildTermsAcceptance(req),
       });
+      applySignupCountrySelection(user, countrySelection, { source: "google" });
+      await user.save();
     } else {
       let changed = false;
       if (!user.googleId) {
@@ -660,9 +751,10 @@ export const googleLogin = async (req, res) => {
 
   } catch (error) {
     logAuthError("google-login", error, { email: req.body?.email || null });
-    return res.status(401).json({
+    return res.status(error?.statusCode || 401).json({
       success: false,
-      message: "Google authentication failed",
+      code: error?.code,
+      message: error?.statusCode ? error.message : "Google authentication failed",
     });
   }
 };
@@ -707,6 +799,7 @@ export const googleNativeLogin = async (req, res) => {
       if (!hasTermsAcceptancePayload(req)) {
         return rejectMissingTerms(res);
       }
+      const countrySelection = getCountrySelectionFromRequest(req);
       user = await User.create({
         name,
         email: normalizedEmail,
@@ -715,6 +808,8 @@ export const googleNativeLogin = async (req, res) => {
         provider: "google",
         ...buildTermsAcceptance(req),
       });
+      applySignupCountrySelection(user, countrySelection, { source: "google_native" });
+      await user.save();
     } else {
       let changed = false;
 
@@ -744,9 +839,10 @@ export const googleNativeLogin = async (req, res) => {
 
   } catch (error) {
     logAuthError("google-native-login", error);
-    return res.status(401).json({
+    return res.status(error?.statusCode || 401).json({
       success: false,
-      message: "Google authentication failed",
+      code: error?.code,
+      message: error?.statusCode ? error.message : "Google authentication failed",
       error: error?.message,
     });
   }
@@ -796,6 +892,7 @@ export const appleLogin = async (req, res) => {
       if (!hasTermsAcceptancePayload(req)) {
         return rejectMissingTerms(res);
       }
+      const countrySelection = getCountrySelectionFromRequest(req);
       const parsedFirstName = sanitizeString(fullName?.firstName);
       const parsedLastName = sanitizeString(fullName?.lastName);
       const providedName = sanitizeString(req.body?.name);
@@ -808,6 +905,8 @@ export const appleLogin = async (req, res) => {
         provider: "apple",
         ...buildTermsAcceptance(req),
       });
+      applySignupCountrySelection(user, countrySelection, { source: "apple" });
+      await user.save();
     } else if (!user.appleId) {
       user.appleId = appleId;
       if (!user.provider || user.provider === "local") user.provider = "apple";
@@ -828,9 +927,10 @@ export const appleLogin = async (req, res) => {
     });
   } catch (error) {
     logAuthError("apple-login", error);
-    return res.status(getAppleAuthErrorStatus(error)).json({
+    return res.status(error?.statusCode || getAppleAuthErrorStatus(error)).json({
       success: false,
-      message: "Apple authentication failed",
+      code: error?.code,
+      message: error?.statusCode ? error.message : "Apple authentication failed",
       error: error?.message || "Unknown Apple authentication error",
     });
   }
@@ -887,6 +987,7 @@ export const registerUser = async (req, res) => {
     if (!hasTermsAcceptancePayload(req)) {
       return rejectMissingTerms(res);
     }
+    const countrySelection = getCountrySelectionFromRequest(req);
 
     const newUser = new User({
       name,
@@ -896,6 +997,7 @@ export const registerUser = async (req, res) => {
       provider: "local",
       ...buildTermsAcceptance(req),
     });
+    applySignupCountrySelection(newUser, countrySelection, { source: "local" });
     await newUser.save();
     await ensureWelcomeEmailSent(newUser);
 
@@ -910,9 +1012,10 @@ export const registerUser = async (req, res) => {
 
   } catch (error) {
     logAuthError("register", error, { email: req.body?.email || null });
-    return res.status(500).json({
+    return res.status(error?.statusCode || 500).json({
       success: false,
-      message: "Server error",
+      code: error?.code,
+      message: error?.statusCode ? error.message : "Server error",
       error: error.message
     });
   }
@@ -1051,6 +1154,7 @@ export const startLinkedInAuth = async (req, res) => {
           termsAccepted: true,
           policyVersion: sanitizeString(req.query?.policyVersion) || CURRENT_POLICY_VERSION,
           acceptedIp: getRequestIp(req),
+          countrySelection: resolveSignupCountrySelection(req.query || {}),
         }
       : null;
     if (mode === "signup" && !termsContext) {
@@ -1067,9 +1171,10 @@ export const startLinkedInAuth = async (req, res) => {
     return res.redirect(authUrl.toString());
   } catch (error) {
     logAuthError("linkedin-start", error);
-    return res.status(500).json({
+    return res.status(error?.statusCode || 500).json({
       success: false,
-      message: "Unable to start LinkedIn authentication",
+      code: error?.code,
+      message: error?.statusCode ? error.message : "Unable to start LinkedIn authentication",
     });
   }
 };
@@ -1134,7 +1239,12 @@ export const linkedinLogin = async (req, res) => {
       });
     }
 
-    const termsContext = hasTermsAcceptancePayload(req) ? buildTermsAcceptance(req) : null;
+    const termsContext = hasTermsAcceptancePayload(req)
+      ? {
+          ...buildTermsAcceptance(req),
+          countrySelection: getCountrySelectionFromRequest(req),
+        }
+      : null;
     const { token, user } = await completeLinkedInLogin({ code, redirectUri, termsContext });
 
     return res.status(200).json({
@@ -1145,9 +1255,10 @@ export const linkedinLogin = async (req, res) => {
     });
   } catch (error) {
     logAuthError("linkedin-login", error);
-    return res.status(401).json({
+    return res.status(error?.statusCode || 401).json({
       success: false,
-      message: "LinkedIn authentication failed",
+      code: error?.code,
+      message: error?.statusCode ? error.message : "LinkedIn authentication failed",
       error: error?.message || "Unknown LinkedIn authentication error",
     });
   }
@@ -1344,10 +1455,57 @@ export const updateUserProfile = async (req, res) => {
       });
     }
 
+    const requestedCountryCode = normalizeCountryCode(req.body?.countryCode || countryOfResidence);
+    const currentCountryCode = normalizeCountryCode(user.countryCode || user.countryOfResidence);
+
+    if (
+      user.countryLocked &&
+      ((countryOfResidence && countryOfResidence !== (user.countryOfResidence || user.country || "")) ||
+        (requestedCountryCode && requestedCountryCode !== currentCountryCode))
+    ) {
+      user.countryAuditLogs = [
+        ...(Array.isArray(user.countryAuditLogs) ? user.countryAuditLogs : []),
+        buildCountryAuditEntry({
+          action: "country.profile_mutation_blocked",
+          fromCountry: user.countryOfResidence || user.country || "",
+          fromCountryCode: user.countryCode || "",
+          toCountry: countryOfResidence,
+          toCountryCode: requestedCountryCode,
+          status: "blocked",
+          actor: user._id,
+        }),
+      ].slice(-50);
+      await user.save();
+      await writeSecurityAuditLog({
+        req,
+        action: "country.profile_mutation_blocked",
+        category: "country",
+        status: "blocked",
+        severity: "medium",
+        message: "Blocked profile API attempt to mutate locked signup country.",
+        metadata: {
+          requestedCountry: countryOfResidence,
+          requestedCountryCode,
+          currentCountry: user.countryOfResidence || user.country || "",
+          currentCountryCode: user.countryCode || "",
+        },
+      });
+      return res.status(403).json({
+        success: false,
+        code: "COUNTRY_LOCKED",
+        message: "Signup country is locked. Submit a country change request for admin approval.",
+      });
+    }
+
     user.name = name || user.name;
     user.profileImage = profileImage;
     user.phone = phone;
-    user.countryOfResidence = countryOfResidence;
+    if (!user.countryLocked && countryOfResidence) {
+      const unlockedRule = resolveCountryRule(requestedCountryCode || countryOfResidence);
+      user.country = unlockedRule.name;
+      user.countryOfResidence = unlockedRule.name;
+      user.countryCode = unlockedRule.code;
+    }
     user.bio = bio;
     if (linkedinProfile || user.linkedinProfile) {
       user.linkedinProfile = linkedinProfile;
@@ -1367,6 +1525,230 @@ export const updateUserProfile = async (req, res) => {
       success: false,
       message: "Server error",
       error: error.message
+    });
+  }
+};
+
+export const requestCountryChange = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const requestedCountryCode = normalizeCountryCode(req.body?.countryCode || req.body?.country);
+    if (!requestedCountryCode) {
+      return res.status(400).json({
+        success: false,
+        code: "COUNTRY_INVALID",
+        message: "Please select a supported requested country.",
+      });
+    }
+
+    const currentCountryCode = normalizeCountryCode(user.countryCode || user.countryOfResidence);
+    if (requestedCountryCode === currentCountryCode) {
+      return res.status(400).json({
+        success: false,
+        code: "COUNTRY_UNCHANGED",
+        message: "Please choose a different country before submitting the request.",
+      });
+    }
+
+    const existingPending = await CountryChangeRequest.findOne({ user: user._id, status: "pending" });
+    if (existingPending) {
+      return res.status(409).json({
+        success: false,
+        code: "COUNTRY_REQUEST_PENDING",
+        message: "A country change request is already pending admin approval.",
+        data: existingPending,
+      });
+    }
+
+    const requestedRule = resolveCountryRule(requestedCountryCode);
+    const currentRule = resolveCountryRule(currentCountryCode || user.countryOfResidence);
+    const reason = sanitizeString(req.body?.reason).slice(0, 500);
+    const changeRequest = await CountryChangeRequest.create({
+      user: user._id,
+      currentCountryCode: currentRule.code,
+      requestedCountryCode: requestedRule.code,
+      currentCountryName: user.countryOfResidence || user.country || currentRule.name,
+      requestedCountryName: requestedRule.name,
+      reason,
+      requestedBy: "user",
+    });
+
+    user.countryApprovalStatus = "pending";
+    user.countryChangeStatus = "pending";
+    user.countryChangeRequest = {
+      requestId: changeRequest._id,
+      requestedCountry: requestedRule.name,
+      requestedCountryCode: requestedRule.code,
+      reason,
+      status: "pending",
+      requestedAt: changeRequest.createdAt || new Date(),
+      reviewedAt: null,
+      reviewedBy: null,
+      decisionNotes: "",
+    };
+    user.countryAuditLogs = [
+      ...(Array.isArray(user.countryAuditLogs) ? user.countryAuditLogs : []),
+      buildCountryAuditEntry({
+        action: "country.change_requested",
+        fromCountry: user.countryOfResidence || user.country || "",
+        fromCountryCode: user.countryCode || "",
+        toCountry: requestedRule.name,
+        toCountryCode: requestedRule.code,
+        status: "pending",
+        actor: user._id,
+        reason,
+        metadata: { requestId: String(changeRequest._id) },
+      }),
+    ].slice(-50);
+    await user.save();
+
+    await writeSecurityAuditLog({
+      req,
+      action: "country.change_requested",
+      category: "country",
+      status: "info",
+      severity: "low",
+      message: "User requested locked country change.",
+      metadata: {
+        requestId: String(changeRequest._id),
+        fromCountryCode: currentRule.code,
+        toCountryCode: requestedRule.code,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Country change request submitted for admin approval.",
+      data: changeRequest,
+      user: toSafeUser(user),
+    });
+  } catch (error) {
+    logAuthError("country-change-request", error, { userId: req.user?._id || null });
+    return res.status(500).json({
+      success: false,
+      message: "Unable to submit country change request.",
+    });
+  }
+};
+
+export const listCountryChangeRequests = async (_req, res) => {
+  try {
+    const requests = await CountryChangeRequest.find({ status: "pending" })
+      .populate("user", "name email country countryOfResidence countryCode countryLocked")
+      .sort({ createdAt: -1 })
+      .limit(100);
+    return res.status(200).json({ success: true, data: requests });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: "Unable to load country change requests." });
+  }
+};
+
+export const decideCountryChangeRequest = async (req, res) => {
+  try {
+    const decision = sanitizeString(req.body?.decision).toLowerCase();
+    if (!["approved", "rejected"].includes(decision)) {
+      return res.status(400).json({
+        success: false,
+        message: "Decision must be approved or rejected.",
+      });
+    }
+
+    const changeRequest = await CountryChangeRequest.findById(req.params.requestId);
+    if (!changeRequest) {
+      return res.status(404).json({ success: false, message: "Country change request not found." });
+    }
+
+    if (changeRequest.status !== "pending") {
+      return res.status(409).json({
+        success: false,
+        message: `Country change request is already ${changeRequest.status}.`,
+      });
+    }
+
+    const user = await User.findById(changeRequest.user);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "Request user not found." });
+    }
+
+    const decisionNotes = sanitizeString(req.body?.decisionNotes || req.body?.notes).slice(0, 500);
+    const requestedRule = resolveCountryRule(changeRequest.requestedCountryCode);
+    const previousCountry = user.countryOfResidence || user.country || "";
+    const previousCountryCode = user.countryCode || "";
+
+    changeRequest.status = decision;
+    changeRequest.decisionNotes = decisionNotes;
+    changeRequest.reviewedBy = req.user._id;
+    changeRequest.reviewedAt = new Date();
+    await changeRequest.save();
+
+    if (decision === "approved") {
+      user.$locals.allowCountryMutation = true;
+      user.country = requestedRule.name;
+      user.countryOfResidence = requestedRule.name;
+      user.countryCode = requestedRule.code;
+      user.complianceProfile = buildCountryProfile(requestedRule.code);
+    }
+
+    user.countryApprovalStatus = decision;
+    user.countryChangeStatus = decision;
+    user.countryChangeRequest = {
+      requestId: changeRequest._id,
+      requestedCountry: requestedRule.name,
+      requestedCountryCode: requestedRule.code,
+      reason: changeRequest.reason || "",
+      status: decision,
+      requestedAt: changeRequest.createdAt,
+      reviewedAt: changeRequest.reviewedAt,
+      reviewedBy: req.user._id,
+      decisionNotes,
+    };
+    user.countryAuditLogs = [
+      ...(Array.isArray(user.countryAuditLogs) ? user.countryAuditLogs : []),
+      buildCountryAuditEntry({
+        action: `country.change_${decision}`,
+        fromCountry: previousCountry,
+        fromCountryCode: previousCountryCode,
+        toCountry: requestedRule.name,
+        toCountryCode: requestedRule.code,
+        status: decision,
+        actor: req.user._id,
+        reason: decisionNotes,
+        metadata: { requestId: String(changeRequest._id) },
+      }),
+    ].slice(-50);
+    await user.save();
+
+    await writeSecurityAuditLog({
+      req,
+      actorUserId: req.user?._id || null,
+      action: `country.admin_${decision}`,
+      category: "country",
+      status: decision,
+      severity: "medium",
+      message: `Admin ${decision} country change request.`,
+      metadata: {
+        requestId: String(changeRequest._id),
+        targetUserId: String(user._id),
+        fromCountryCode: previousCountryCode,
+        toCountryCode: requestedRule.code,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Country change request ${decision}.`,
+      data: changeRequest,
+      user: toSafeUser(user),
+    });
+  } catch (error) {
+    logAuthError("country-change-decision", error, { requestId: req.params?.requestId || null });
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update country change request.",
     });
   }
 };

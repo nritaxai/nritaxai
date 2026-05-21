@@ -51,6 +51,154 @@ const userSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    country: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    countryCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    initialCountry: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: "",
+    },
+    initialCountryName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    countryLocked: {
+      type: Boolean,
+      default: false,
+    },
+    countryLockedAt: {
+      type: Date,
+      default: null,
+    },
+    countryApprovalStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "rejected"],
+      default: "none",
+    },
+    countryChangeStatus: {
+      type: String,
+      enum: ["none", "pending", "approved", "rejected"],
+      default: "none",
+    },
+    countryChangeRequest: {
+      requestId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "CountryChangeRequest",
+        default: null,
+      },
+      requestedCountry: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      requestedCountryCode: {
+        type: String,
+        trim: true,
+        uppercase: true,
+        default: "",
+      },
+      reason: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+      status: {
+        type: String,
+        enum: ["none", "pending", "approved", "rejected", "cancelled"],
+        default: "none",
+      },
+      requestedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedAt: {
+        type: Date,
+        default: null,
+      },
+      reviewedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+        default: null,
+      },
+      decisionNotes: {
+        type: String,
+        trim: true,
+        default: "",
+      },
+    },
+    countryAuditLogs: [
+      {
+        action: {
+          type: String,
+          trim: true,
+          required: true,
+        },
+        fromCountry: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        fromCountryCode: {
+          type: String,
+          trim: true,
+          uppercase: true,
+          default: "",
+        },
+        toCountry: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        toCountryCode: {
+          type: String,
+          trim: true,
+          uppercase: true,
+          default: "",
+        },
+        status: {
+          type: String,
+          trim: true,
+          default: "info",
+        },
+        actor: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          default: null,
+        },
+        reason: {
+          type: String,
+          trim: true,
+          default: "",
+        },
+        metadata: {
+          type: mongoose.Schema.Types.Mixed,
+          default: {},
+        },
+        createdAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
+    complianceProfile: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
+    roles: {
+      type: [String],
+      default: ["end_user"],
+    },
     preferredLanguage: {
       type: String,
       enum: ["english", "hindi", "tamil", "indonesian"],
@@ -199,6 +347,21 @@ userSchema.pre("save", async function () {
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+});
+
+userSchema.pre("save", function () {
+  if (this.isNew || !this.countryLocked || this.$locals?.allowCountryMutation) return;
+
+  const countryChanged =
+    this.isModified("country") ||
+    this.isModified("countryOfResidence") ||
+    this.isModified("countryCode") ||
+    this.isModified("initialCountry") ||
+    this.isModified("initialCountryName");
+
+  if (countryChanged) {
+    throw new Error("Locked signup country cannot be changed without admin approval.");
+  }
 });
 
 

@@ -29,6 +29,7 @@ import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
 import { CURRENT_POLICY_VERSION } from "../../config/legal";
 import { COMPANY_LEGAL_NAME } from "../../config/branding";
+import { COUNTRY_OPTIONS } from "../utils/countries";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -48,6 +49,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     name: "",
     email: "",
     linkedinProfile: "",
+    countryCode: "",
     password: "",
     confirmPassword: "",
     termsAccepted: false,
@@ -70,7 +72,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const canUseLinkedInAuth =
     Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
   const canUseAppleAuth = APPLE_AUTH_CONFIG.isConfigured;
-  const signupCanContinue = signupData.termsAccepted;
+  const selectedSignupCountry = COUNTRY_OPTIONS.find((country) => country.code === signupData.countryCode);
+  const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -83,7 +86,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const handleLinkedInAuth = (mode: "login" | "signup") => {
     try {
       if (mode === "signup" && !signupCanContinue) {
-        setSignupError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+        setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
         return;
       }
       if (!LINKEDIN_AUTH_CONFIG.authBaseUrl) {
@@ -96,6 +99,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       if (mode === "signup") {
         authUrl.searchParams.set("termsAccepted", "true");
         authUrl.searchParams.set("policyVersion", CURRENT_POLICY_VERSION);
+        authUrl.searchParams.set("countryCode", signupData.countryCode);
+        authUrl.searchParams.set("country", selectedSignupCountry?.name || "");
       }
 
       console.info("[auth] starting LinkedIn auth", {
@@ -226,12 +231,19 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       return;
     }
 
+    if (!signupData.countryCode || !selectedSignupCountry) {
+      setSignupError("Please select your country. It will be locked for pricing and compliance.");
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await signupUser({
         name: signupData.name.trim(),
         email: signupData.email.trim().toLowerCase(),
         linkedinProfile: signupData.linkedinProfile.trim(),
+        country: selectedSignupCountry.name,
+        countryCode: signupData.countryCode,
         password: signupData.password,
         confirmPassword: signupData.confirmPassword,
         termsAccepted: signupData.termsAccepted,
@@ -255,7 +267,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const handleAppleLogin = async (mode: "login" | "signup") => {
     if (mode === "signup" && !signupCanContinue) {
-      setSignupError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+      setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
       return;
     }
     setLoginError(null);
@@ -271,6 +283,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         fullName: appleResponse?.user?.name,
         termsAccepted: mode === "signup" ? true : undefined,
         policyVersion: mode === "signup" ? CURRENT_POLICY_VERSION : undefined,
+        country: mode === "signup" ? selectedSignupCountry?.name : undefined,
+        countryCode: mode === "signup" ? signupData.countryCode : undefined,
       });
       const user = resolveAuthUser(response);
       handleAuthSuccess(
@@ -521,6 +535,26 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   />
                 </div>
 
+                <div className="space-y-2">
+                  <Label>Country of Residence</Label>
+                  <select
+                    required
+                    value={signupData.countryCode}
+                    onChange={(e) => setSignupData({ ...signupData, countryCode: e.target.value })}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                  >
+                    <option value="">Select your country</option>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-[#475569]">
+                    This country is locked at signup for pricing, tax workflow, and compliance.
+                  </p>
+                </div>
+
                 <div className="relative space-y-2">
                   <Label>Password</Label>
                   <Input
@@ -636,6 +670,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                                 credential: credentialResponse.credential,
                                 termsAccepted: true,
                                 policyVersion: CURRENT_POLICY_VERSION,
+                                country: selectedSignupCountry?.name,
+                                countryCode: signupData.countryCode,
                               });
                               const user = resolveAuthUser(response);
                               handleAuthSuccess(
