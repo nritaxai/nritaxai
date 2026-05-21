@@ -14,6 +14,7 @@ import { TaxRuleTimeline, type TaxRuleTimelineItem } from "./TaxRuleTimeline";
 import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
+import { ClarificationPanel, type ClarificationState } from "./ClarificationPanel";
 
 const getStoredUserName = () => {
   try {
@@ -67,6 +68,29 @@ type ChatMessage = {
   taxRuleTimelines?: TaxRuleTimelineItem[];
 };
 
+const getClarificationStorageKey = (language: string, knowledgeSource: string) => {
+  const userKey =
+    typeof window !== "undefined" ? localStorage.getItem("user") || localStorage.getItem("token") || "guest" : "guest";
+  return `nritax_clarification:${knowledgeSource}:${language}:${userKey}`;
+};
+
+const buildClarificationSummary = (values: Record<string, string>) => {
+  const labelMap: Record<string, string> = {
+    residencyCountry: "Residency country",
+    targetCountry: "Target country",
+    financialYear: "Financial year",
+    incomeType: "Income type",
+    maritalStatus: "Marital status",
+    dependentsOrUserCategory: "Dependents or user category",
+  };
+
+  const lines = Object.entries(values)
+    .filter(([, value]) => String(value || "").trim())
+    .map(([field, value]) => `- ${labelMap[field] || field}: ${String(value || "").trim()}`);
+
+  return lines.length ? `Clarification details:\n${lines.join("\n")}` : "";
+};
+
 const normalizeMessage = (message: any): ChatMessage | null => {
   if (!message || typeof message !== "object") return null;
   return {
@@ -92,6 +116,8 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
       content: getWelcomeMessage("english", getStoredUserName()),
     },
   ]);
+  const [clarificationState, setClarificationState] = useState<ClarificationState | null>(null);
+  const [isSubmittingClarification, setIsSubmittingClarification] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [sessionMessage, setSessionMessage] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
@@ -139,6 +165,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   const clearChat = async () => {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const welcomeMessage = getWelcomeMessage(language, userName);
+    setClarificationState(null);
     if (!token) {
       setMessages([{ role: "ai", content: welcomeMessage }]);
       return;
@@ -260,6 +287,32 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
   }, []);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const stored = sessionStorage.getItem(getClarificationStorageKey(language, knowledgeSource));
+    if (!stored) {
+      setClarificationState(null);
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(stored);
+      setClarificationState(parsed && typeof parsed === "object" ? parsed : null);
+    } catch {
+      setClarificationState(null);
+    }
+  }, [language, knowledgeSource]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const storageKey = getClarificationStorageKey(language, knowledgeSource);
+    if (!clarificationState) {
+      sessionStorage.removeItem(storageKey);
+      return;
+    }
+    sessionStorage.setItem(storageKey, JSON.stringify(clarificationState));
+  }, [clarificationState, language, knowledgeSource]);
+
+  useEffect(() => {
     if (!isAuthenticated || !localStorage.getItem("token")) {
       setSubscription(null);
       return;
@@ -371,6 +424,11 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         setSubscription(response.data.usage);
       }
       const aiReply = ensureVisibleReply(response.data.reply);
+      if (response.data?.clarificationRequired && response.data?.clarification) {
+        setClarificationState(response.data.clarification as ClarificationState);
+      } else {
+        setClarificationState(null);
+      }
       setMessages((prev) => [
         ...prev,
         {
@@ -392,6 +450,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
       if (error.response?.status === 401) {
         clearStoredAuth();
         setSessionMessage("Your session expired. Please sign in again.");
+        setClarificationState(null);
         onRequireLogin();
       }
       const errorMessage =
@@ -405,6 +464,103 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         activeRequestControllerRef.current = null;
         setIsTyping(false);
       }
+    }
+  };
+
+  const submitClarification = async (values: Record<string, string>) => {
+    if (!clarificationState) return;
+    if (starterLimitReached) {
+      setSessionMessage("Free plan limit reached. Upgrade to Professional.");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      onRequireLogin();
+      return;
+    }
+
+    const summaryMessage = buildClarificationSummary(values);
+    const requestId = activeRequestIdRef.current + 1;
+    activeRequestIdRef.current = requestId;
+    activeRequestControllerRef.current?.abort();
+    const controller = new AbortController();
+    activeRequestControllerRef.current = controller;
+
+    if (summaryMessage) {
+      setMessages((prev) => [...prev, { role: "user", content: summaryMessage }]);
+    }
+    setIsSubmittingClarification(true);
+    setIsTyping(true);
+
+    try {
+      const response = await axios.post(
+        buildApiUrl("/api/chat"),
+        {
+          message: clarificationState.originalQuestion,
+          language,
+          knowledgeSource,
+          clarificationContext: values,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          signal: controller.signal,
+        }
+      );
+
+      if (activeRequestIdRef.current !== requestId) return;
+      if (response.data?.usage) {
+        setSubscription(response.data.usage);
+      }
+
+      const aiReply = ensureVisibleReply(response.data.reply);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: aiReply,
+          taxRuleTimelines: Array.isArray(response.data?.taxRuleTimelines) ? response.data.taxRuleTimelines : [],
+        },
+      ]);
+
+      if (response.data?.clarificationRequired && response.data?.clarification) {
+        setClarificationState(response.data.clarification as ClarificationState);
+      } else {
+        setClarificationState(null);
+      }
+    } catch (error: any) {
+      if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
+        return;
+      }
+      if (activeRequestIdRef.current !== requestId) return;
+
+      if (error.response?.status === 403 && error.response?.data?.usage) {
+        setSubscription(error.response.data.usage);
+        setSessionMessage(error.response?.data?.error || "Free plan limit reached. Upgrade to Professional.");
+        return;
+      }
+
+      if (error.response?.status === 401) {
+        clearStoredAuth();
+        setSessionMessage("Your session expired. Please sign in again.");
+        setClarificationState(null);
+        onRequireLogin();
+      }
+
+      const errorMessage =
+        error.response?.status === 401
+          ? "Please sign in again to continue."
+          : error.response?.data?.error || "Something went wrong. Please try again.";
+
+      setMessages((prev) => [...prev, { role: "ai", content: ensureVisibleReply(errorMessage), taxRuleTimelines: [] }]);
+    } finally {
+      if (activeRequestIdRef.current === requestId) {
+        activeRequestControllerRef.current = null;
+        setIsTyping(false);
+      }
+      setIsSubmittingClarification(false);
     }
   };
 
@@ -639,6 +795,15 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
               </div>
             </div>
           )}
+
+          {clarificationState ? (
+            <ClarificationPanel
+              clarification={clarificationState}
+              submitting={isSubmittingClarification}
+              onSubmit={submitClarification}
+              onReset={() => setClarificationState(null)}
+            />
+          ) : null}
         </CardContent>
 
         <CardFooter className="flex-shrink-0 border-t border-[#E2E8F0]/80 bg-[rgba(255,255,255,0.9)] p-3 sm:p-4">

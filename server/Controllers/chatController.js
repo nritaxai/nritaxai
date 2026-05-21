@@ -15,6 +15,14 @@ import {
 } from "../Utils/subscriptionAccess.js";
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
+import {
+  buildClarificationContextSummary,
+  buildClarificationPrompt,
+  buildClarificationQuestions,
+  extractClarificationContextFromText,
+  mergeClarificationContext,
+  shouldAskClarification,
+} from "../Utils/chatClarification.js";
 
 const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 15000);
 const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
@@ -34,6 +42,7 @@ const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES |
 const MAX_STORED_MESSAGES = 100;
 const chatSessionMemory = new Map();
 const chatSessionStore = new Map();
+const chatClarificationStore = new Map();
 const RAG_TOP_K = Number(process.env.RAG_TOP_K || 4);
 const RAG_LEXICAL_CANDIDATES = Number(process.env.RAG_LEXICAL_CANDIDATES || 12);
 const RAG_LEXICAL_MIN_SCORE = 1.05;
@@ -920,6 +929,44 @@ const syncSessionStoresAsync = (payload) => {
   });
 };
 
+const getClarificationState = (sessionKey) => {
+  const state = chatClarificationStore.get(sessionKey);
+  return state && typeof state === "object" ? state : null;
+};
+
+const clearClarificationState = (sessionKey) => {
+  chatClarificationStore.delete(sessionKey);
+};
+
+const setClarificationState = (sessionKey, state = {}) => {
+  chatClarificationStore.set(sessionKey, {
+    active: true,
+    originalQuestion: String(state.originalQuestion || "").trim(),
+    requiredFields: Array.isArray(state.requiredFields) ? state.requiredFields : [],
+    missingFields: Array.isArray(state.missingFields) ? state.missingFields : [],
+    context: mergeClarificationContext(state.context),
+  });
+};
+
+const buildClarificationResponsePayload = ({
+  originalQuestion = "",
+  requiredFields = [],
+  missingFields = [],
+  context = {},
+}) => ({
+  originalQuestion,
+  requiredFields,
+  missingFields,
+  context,
+  contextSummary: buildClarificationContextSummary(context),
+  questions: buildClarificationQuestions(missingFields),
+});
+
+const buildClarificationUserMessage = (context = {}) => {
+  const summary = buildClarificationContextSummary(context);
+  return summary ? `Clarification details:\n${summary}` : "";
+};
+
 const loadSessionMessages = async ({
   userId,
   language,
@@ -1061,6 +1108,7 @@ export const clearChatHistory = async (req, res) => {
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
     chatSessionMemory.delete(sessionKey);
     chatSessionStore.delete(sessionKey);
+    clearClarificationState(sessionKey);
     return res.status(200).json({ success: true });
   } catch (error) {
     console.error("clearChatHistory error:", error);
@@ -1081,6 +1129,8 @@ export const chatWithAI = async (req, res) => {
     let model = DEFAULT_CHAT_MODEL;
     const userId = getSessionActorId(req);
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
+    const providedClarificationContext = mergeClarificationContext(req.body?.clarificationContext);
+    const activeClarificationState = getClarificationState(sessionKey);
 
     const languageMap = {
       english: {
@@ -1186,14 +1236,83 @@ export const chatWithAI = async (req, res) => {
       }
     }
 
+    const shouldResumeClarification =
+      Boolean(activeClarificationState?.active) && Object.keys(providedClarificationContext).length > 0;
+    if (activeClarificationState?.active && !shouldResumeClarification) {
+      clearClarificationState(sessionKey);
+    }
+
+    const effectiveQuestion = shouldResumeClarification
+      ? activeClarificationState?.originalQuestion || message
+      : message;
+    const collectedClarificationContext = shouldResumeClarification
+      ? mergeClarificationContext(activeClarificationState?.context, providedClarificationContext)
+      : mergeClarificationContext(extractClarificationContextFromText(message), providedClarificationContext);
+    const clarificationAssessment = shouldAskClarification({
+      message: effectiveQuestion,
+      knowledgeSource,
+      context: collectedClarificationContext,
+    });
+
+    if (clarificationAssessment.needsClarification) {
+      const clarificationPayload = buildClarificationResponsePayload({
+        originalQuestion: effectiveQuestion,
+        requiredFields: clarificationAssessment.requiredFields,
+        missingFields: clarificationAssessment.missingFields,
+        context: collectedClarificationContext,
+      });
+      const clarificationReply = buildClarificationPrompt({
+        originalQuestion: effectiveQuestion,
+        missingFields: clarificationAssessment.missingFields,
+      });
+      setClarificationState(sessionKey, {
+        originalQuestion: effectiveQuestion,
+        requiredFields: clarificationAssessment.requiredFields,
+        missingFields: clarificationAssessment.missingFields,
+        context: collectedClarificationContext,
+      });
+
+      const clarificationMessages = [...sessionMessages];
+      if (shouldResumeClarification) {
+        const clarificationUserMessage = buildClarificationUserMessage(providedClarificationContext);
+        if (clarificationUserMessage) {
+          clarificationMessages.push({ role: "user", content: clarificationUserMessage });
+        }
+      } else {
+        clarificationMessages.push({ role: "user", content: message });
+      }
+      clarificationMessages.push({ role: "ai", content: clarificationReply });
+
+      syncSessionStoresAsync({
+        userId,
+        language: rawLanguage,
+        knowledgeSource,
+        sessionKey,
+        messages: clarificationMessages.slice(-MAX_STORED_MESSAGES),
+      });
+
+      return res.status(200).json({
+        reply: clarificationReply,
+        clarificationRequired: true,
+        clarification: clarificationPayload,
+        usage: subscriptionSummary,
+      });
+    }
+
+    clearClarificationState(sessionKey);
+    const clarificationContextSummary = buildClarificationContextSummary(collectedClarificationContext);
+    const effectiveQuestionWithContext = clarificationContextSummary
+      ? `${effectiveQuestion}\n\nTax context:\n${clarificationContextSummary}`
+      : effectiveQuestion;
+
     const cacheKey = getResponseCacheKey({
       userId,
       language: rawLanguage,
       knowledgeSource,
-      message,
+      message: `${effectiveQuestionWithContext}|${clarificationContextSummary}`,
       contextFingerprint: buildContextFingerprint(sessionMessages),
     });
-    const repeatedReply = getInstantRepeatReply(sessionMessages, message);
+    const repeatedReply = getInstantRepeatReply(sessionMessages, effectiveQuestionWithContext);
     if (repeatedReply) {
       return res.status(200).json({
         reply: ensureStructuredSections(sanitizeAiReply(repeatedReply), rawLanguage),
@@ -1203,7 +1322,7 @@ export const chatWithAI = async (req, res) => {
     }
     const cachedReply = getCachedResponse(cacheKey);
     if (cachedReply) {
-      const cachedTaxRuleTimelines = getTaxRuleTimelinesForQuery(message);
+      const cachedTaxRuleTimelines = getTaxRuleTimelinesForQuery(effectiveQuestion);
       return res.status(200).json({
         reply: appendTimelineToAnswer(
           ensureStructuredSections(sanitizeAiReply(cachedReply), rawLanguage),
@@ -1243,11 +1362,11 @@ export const chatWithAI = async (req, res) => {
 
     if (knowledgeSource === "dtaa") {
       const dtaaChunks = await loadDtaaChunks();
-      const matches = await getRagMatches(message, dtaaChunks);
+      const matches = await getRagMatches(effectiveQuestionWithContext, dtaaChunks);
       const hiddenContext = buildHiddenContextFromMatches(matches);
 
-      const contextualMessages = buildContextualMessages(sessionMessages, message);
-      const taxRuleTimelines = getTaxRuleTimelinesForQuery(message);
+      const contextualMessages = buildContextualMessages(sessionMessages, effectiveQuestionWithContext);
+      const taxRuleTimelines = getTaxRuleTimelinesForQuery(effectiveQuestion);
       const dtaaReplyRaw = await generateGeneralTaxReply({
         model,
         selectedLanguage,
@@ -1255,11 +1374,16 @@ export const chatWithAI = async (req, res) => {
         hiddenContext,
       });
       const dtaaReply = String(dtaaReplyRaw || "").trim() || dtaaNoAnswerByLanguage[rawLanguage] || dtaaNoAnswerByLanguage.english;
-      const updatedContext = [
-        ...sessionMessages,
-        { role: "user", content: message },
-        { role: "ai", content: dtaaReply, taxRuleTimelines },
-      ].slice(-MAX_STORED_MESSAGES);
+      const updatedContext = [...sessionMessages];
+      if (shouldResumeClarification) {
+        const clarificationUserMessage = buildClarificationUserMessage(collectedClarificationContext);
+        if (clarificationUserMessage) {
+          updatedContext.push({ role: "user", content: clarificationUserMessage });
+        }
+      } else {
+        updatedContext.push({ role: "user", content: effectiveQuestionWithContext });
+      }
+      updatedContext.push({ role: "ai", content: dtaaReply, taxRuleTimelines });
       syncSessionStoresAsync({
         userId,
         language: rawLanguage,
@@ -1272,22 +1396,29 @@ export const chatWithAI = async (req, res) => {
       return await finalizeReply(dtaaReply, {
         ragUsed: Boolean(matches.length),
         taxRuleTimelines,
+        clarificationResolved: shouldResumeClarification,
+        clarificationContext: collectedClarificationContext,
       });
     }
 
-    const contextualMessages = buildContextualMessages(sessionMessages, message);
-    const taxRuleTimelines = getTaxRuleTimelinesForQuery(message);
+    const contextualMessages = buildContextualMessages(sessionMessages, effectiveQuestionWithContext);
+    const taxRuleTimelines = getTaxRuleTimelinesForQuery(effectiveQuestion);
 
     const reply = await generateGeneralTaxReply({
       model,
       selectedLanguage,
       contextualMessages,
     });
-    const persistedUpdatedContext = [
-      ...sessionMessages,
-      { role: "user", content: message },
-      { role: "ai", content: reply, taxRuleTimelines },
-    ].slice(-MAX_STORED_MESSAGES);
+    const persistedUpdatedContext = [...sessionMessages];
+    if (shouldResumeClarification) {
+      const clarificationUserMessage = buildClarificationUserMessage(collectedClarificationContext);
+      if (clarificationUserMessage) {
+        persistedUpdatedContext.push({ role: "user", content: clarificationUserMessage });
+      }
+    } else {
+      persistedUpdatedContext.push({ role: "user", content: effectiveQuestionWithContext });
+    }
+    persistedUpdatedContext.push({ role: "ai", content: reply, taxRuleTimelines });
     syncSessionStoresAsync({
       userId,
       language: rawLanguage,
@@ -1297,7 +1428,11 @@ export const chatWithAI = async (req, res) => {
     });
 
     setCachedResponse(cacheKey, reply, rawLanguage);
-    return await finalizeReply(reply, { taxRuleTimelines });
+    return await finalizeReply(reply, {
+      taxRuleTimelines,
+      clarificationResolved: shouldResumeClarification,
+      clarificationContext: collectedClarificationContext,
+    });
   } catch (error) {
     console.error("OpenRouter Error:", error);
 
