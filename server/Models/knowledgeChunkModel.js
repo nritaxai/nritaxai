@@ -52,6 +52,24 @@ const knowledgeChunkSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    startOffset: {
+      type: Number,
+      default: 0,
+    },
+    endOffset: {
+      type: Number,
+      default: 0,
+    },
+    overlapChars: {
+      type: Number,
+      default: 0,
+    },
+    dedupeHash: {
+      type: String,
+      trim: true,
+      default: "",
+      index: true,
+    },
     metadata: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
@@ -62,6 +80,9 @@ const knowledgeChunkSchema = new mongoose.Schema(
 
 knowledgeChunkSchema.index({ document: 1, page: 1, chunkIndex: 1 });
 knowledgeChunkSchema.index({ sourceType: 1, updatedAt: -1 });
+knowledgeChunkSchema.index({ documentHash: 1, dedupeHash: 1 });
+knowledgeChunkSchema.index({ sourceType: 1, "metadata.taxType": 1, "metadata.financialYear": 1, updatedAt: -1 });
+knowledgeChunkSchema.index({ "metadata.country": 1, "metadata.article": 1, "metadata.section": 1 });
 
 const KnowledgeChunk = mongoose.model("KnowledgeChunk", knowledgeChunkSchema);
 export default KnowledgeChunk;

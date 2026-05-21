@@ -5,14 +5,32 @@ import KnowledgeChunk from "../Models/knowledgeChunkModel.js";
 import KnowledgeDocument from "../Models/knowledgeDocumentModel.js";
 import KnowledgeIngestionLog from "../Models/knowledgeIngestionLogModel.js";
 import { buildPdfIndexRowsFromFile } from "./pdfIndexService.js";
+import {
+  buildContextForPrompt,
+  buildMetadataBoost,
+  buildRetrievalBreakdown,
+  buildSourceAttributions,
+  computeChunkConfidence,
+  computeRetrievalConfidence,
+  computeRetrievalScore,
+  cosineSimilarity,
+  extractQuerySignals,
+  filterDuplicateChunks,
+  lexicalScore,
+  parseDocumentMetadata,
+  sanitizeString,
+  tokenize,
+} from "./knowledgeRetrievalUtils.js";
 import { recordDocumentProcessingMetric } from "./metrics.js";
 
 const GEMINI_EMBED_MODEL = String(process.env.GEMINI_EMBED_MODEL || "text-embedding-004").trim();
+const KNOWLEDGE_EMBED_PROVIDER = String(process.env.KNOWLEDGE_EMBED_PROVIDER || "gemini").trim().toLowerCase();
+const KNOWLEDGE_EMBED_CONCURRENCY = Math.max(Number(process.env.KNOWLEDGE_EMBED_CONCURRENCY || 4), 1);
 const KNOWLEDGE_TOP_K = Math.max(Number(process.env.KNOWLEDGE_BASE_TOP_K || 6), 1);
 const KNOWLEDGE_MAX_SCAN = Math.max(Number(process.env.KNOWLEDGE_BASE_MAX_SCAN || 1500), 100);
 const KNOWLEDGE_MIN_RETRIEVAL_SCORE = Number(process.env.KNOWLEDGE_MIN_RETRIEVAL_SCORE || 0.08);
+const KNOWLEDGE_LOW_CONFIDENCE_THRESHOLD = Number(process.env.KNOWLEDGE_LOW_CONFIDENCE_THRESHOLD || 0.42);
 
-const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 const sha256File = (filePath) => crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
 const normalizePolicyTags = (value = []) =>
   (Array.isArray(value) ? value : String(value || "").split(","))
@@ -26,89 +44,6 @@ const normalizeSourceType = (value = "") => {
   )
     ? normalized
     : "other_pdf";
-};
-
-const parseDocumentMetadata = ({ fileName = "", text = "" } = {}) => {
-  const source = `${sanitizeString(fileName)} ${sanitizeString(text).slice(0, 500)}`;
-  const upper = source.toUpperCase();
-  const countryMatches = Array.from(upper.matchAll(/\b(?:INDIA|USA|US|UNITED STATES|UK|UNITED KINGDOM|UAE|SINGAPORE|CANADA|AUSTRALIA|INDONESIA|MALAYSIA)\b/g)).map(
-    (match) => match[0]
-  );
-  const articleMatch = source.match(/\bArticle\s+(\d+[A-Z]?)\b/i);
-  const sectionMatch = source.match(/\bSection\s+(\d+[A-Z]?)\b/i);
-  const financialYearMatch = source.match(/\b(?:FY|AY|Financial Year|Assessment Year)\s*[-:]?\s*(\d{4}(?:-\d{2,4})?)\b/i);
-  const taxType =
-    /\bcapital gains?\b/i.test(source)
-      ? "capital_gains"
-      : /\bdividend\b/i.test(source)
-        ? "dividend"
-        : /\binterest\b/i.test(source)
-          ? "interest"
-          : /\brental?\b/i.test(source)
-            ? "rental_income"
-            : /\bsalary\b/i.test(source)
-              ? "salary"
-              : /\btds\b|\bwithholding\b/i.test(source)
-                ? "withholding"
-                : "general_tax";
-
-  return {
-    country: Array.from(new Set(countryMatches)).slice(0, 4),
-    article: articleMatch ? articleMatch[1] : "",
-    section: sectionMatch ? sectionMatch[1] : "",
-    financialYear: financialYearMatch ? financialYearMatch[1] : "",
-    taxType,
-  };
-};
-
-const buildMetadataBoost = (chunk = {}, context = {}) => {
-  let boost = 0;
-  const chunkCountries = Array.isArray(chunk.metadata?.country) ? chunk.metadata.country : [];
-  const currentCountry = sanitizeString(context?.currentCountry).toUpperCase();
-  const relevantCountry = sanitizeString(context?.relevantCountry).toUpperCase();
-  const financialYear = sanitizeString(context?.financialYear).toUpperCase();
-  const incomeType = sanitizeString(context?.incomeType).toLowerCase();
-
-  if (currentCountry && chunkCountries.includes(currentCountry)) boost += 0.12;
-  if (relevantCountry && chunkCountries.includes(relevantCountry)) boost += 0.14;
-  if (financialYear && sanitizeString(chunk.metadata?.financialYear).toUpperCase() === financialYear) boost += 0.1;
-  if (incomeType && sanitizeString(chunk.metadata?.taxType).toLowerCase() === incomeType) boost += 0.08;
-
-  return boost;
-};
-
-const cosineSimilarity = (left = [], right = []) => {
-  if (!Array.isArray(left) || !Array.isArray(right) || !left.length || left.length !== right.length) return 0;
-  let dot = 0;
-  let leftNorm = 0;
-  let rightNorm = 0;
-  for (let index = 0; index < left.length; index += 1) {
-    const a = Number(left[index] || 0);
-    const b = Number(right[index] || 0);
-    dot += a * b;
-    leftNorm += a * a;
-    rightNorm += b * b;
-  }
-  if (!leftNorm || !rightNorm) return 0;
-  return dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm));
-};
-
-const tokenize = (text = "") =>
-  String(text || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, " ")
-    .split(/\s+/)
-    .filter((token) => token.length > 1);
-
-const lexicalScore = (query = "", candidate = "") => {
-  const queryTokens = new Set(tokenize(query));
-  if (!queryTokens.size) return 0;
-  const candidateTokens = new Set(tokenize(candidate));
-  let overlap = 0;
-  queryTokens.forEach((token) => {
-    if (candidateTokens.has(token)) overlap += 1;
-  });
-  return overlap / Math.max(queryTokens.size, 1);
 };
 
 const getGeminiApiKey = () =>
@@ -143,6 +78,31 @@ const embedTextWithGemini = async (text = "") => {
   return Array.isArray(json?.embedding?.values)
     ? json.embedding.values.map((value) => Number(value)).filter((value) => Number.isFinite(value))
     : [];
+};
+
+const embedText = async (text = "") => {
+  if (!sanitizeString(text)) return [];
+  if (KNOWLEDGE_EMBED_PROVIDER === "disabled") return [];
+  if (KNOWLEDGE_EMBED_PROVIDER === "gemini") {
+    return embedTextWithGemini(text);
+  }
+  throw new Error(`Unsupported knowledge embedding provider: ${KNOWLEDGE_EMBED_PROVIDER}`);
+};
+
+const mapWithConcurrency = async (items = [], limit = KNOWLEDGE_EMBED_CONCURRENCY, mapper) => {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  const workers = Array.from({ length: Math.min(limit, Math.max(items.length, 1)) }, async () => {
+    while (cursor < items.length) {
+      const currentIndex = cursor;
+      cursor += 1;
+      results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
 };
 
 export const logKnowledgeIngestionEvent = async ({
@@ -238,12 +198,10 @@ export const ingestKnowledgeDocumentFromFile = async ({
   try {
     const { rows, stats } = await buildPdfIndexRowsFromFile(filePath, fileName);
     await KnowledgeChunk.deleteMany({ document: document._id });
-
-    const chunkDocs = [];
-    for (let index = 0; index < rows.length; index += 1) {
-      const row = rows[index];
-      const embedding = await embedTextWithGemini(row.text).catch(() => []);
-      chunkDocs.push({
+    const dedupedRows = filterDuplicateChunks(rows);
+    const chunkDocs = await mapWithConcurrency(dedupedRows.chunks, KNOWLEDGE_EMBED_CONCURRENCY, async (row, index) => {
+      const embedding = await embedText(row.text).catch(() => []);
+      return {
         document: document._id,
         documentHash: fileHash,
         chunkId: `${fileHash}:${row.page}:${index}`,
@@ -254,15 +212,21 @@ export const ingestKnowledgeDocumentFromFile = async ({
         text: row.text,
         embedding,
         tokenCount: tokenize(row.text).length,
+        startOffset: Number(row.startOffset || 0),
+        endOffset: Number(row.endOffset || 0),
+        overlapChars: Number(row.overlapChars || 0),
+        dedupeHash: sanitizeString(row.dedupeHash),
         metadata: {
           ...parseDocumentMetadata({ fileName, text: row.text }),
           sourceReference: `${fileName}#page=${row.page}`,
           sourceUrl: normalizedSourceUrl,
           policyTags: normalizedPolicyTags,
           documentTitle: normalizedDocumentTitle || fileName,
+          embeddingProvider: KNOWLEDGE_EMBED_PROVIDER,
+          embeddingModel: GEMINI_EMBED_MODEL,
         },
-      });
-    }
+      };
+    });
 
     if (chunkDocs.length) {
       await KnowledgeChunk.insertMany(chunkDocs, { ordered: false });
@@ -280,6 +244,10 @@ export const ingestKnowledgeDocumentFromFile = async ({
       documentTitle: normalizedDocumentTitle || fileName,
       sourceUrl: normalizedSourceUrl,
       policyTags: normalizedPolicyTags,
+      duplicateChunkCount: dedupedRows.duplicateCount,
+      ingestionPipeline: "pdf->chunking->embeddings->knowledge-chunks->semantic-retrieval",
+      embeddingProvider: KNOWLEDGE_EMBED_PROVIDER,
+      embeddingModel: GEMINI_EMBED_MODEL,
       ...(documentMetadata && typeof documentMetadata === "object" ? documentMetadata : {}),
     };
     await document.save();
@@ -296,6 +264,7 @@ export const ingestKnowledgeDocumentFromFile = async ({
         chunkCount: chunkDocs.length,
         pageCount: stats.pages,
         sourceType: normalizedSourceType,
+        duplicateChunkCount: dedupedRows.duplicateCount,
       },
     });
 
@@ -353,6 +322,8 @@ export const retrieveKnowledgeContext = async (query, { topK = KNOWLEDGE_TOP_K, 
       context: "",
       sources: [],
       matches: [],
+      confidence: 0,
+      insufficientContext: true,
     };
   }
 
@@ -367,47 +338,59 @@ export const retrieveKnowledgeContext = async (query, { topK = KNOWLEDGE_TOP_K, 
       context: "",
       sources: [],
       matches: [],
+      confidence: 0,
+      insufficientContext: true,
     };
   }
 
-  const queryEmbedding = await embedTextWithGemini(normalizedQuery).catch(() => []);
+  const querySignals = extractQuerySignals(normalizedQuery, context);
+  const queryEmbedding = await embedText(normalizedQuery).catch(() => []);
   const ranked = chunks
     .map((chunk) => {
       const semantic = queryEmbedding.length && Array.isArray(chunk.embedding) && chunk.embedding.length
         ? cosineSimilarity(queryEmbedding, chunk.embedding)
         : 0;
       const lexical = lexicalScore(normalizedQuery, chunk.text);
-      const metadataBoost = buildMetadataBoost(chunk, context);
+      const metadataBoost = buildMetadataBoost(chunk, querySignals);
+      const retrievalScore = computeRetrievalScore({
+        semantic,
+        lexical,
+        metadataBoost,
+      });
+      const retrievalBreakdown = buildRetrievalBreakdown({
+        semantic,
+        lexical,
+        metadataBoost,
+        score: retrievalScore,
+      });
+      const chunkConfidence = computeChunkConfidence({
+        semantic,
+        lexical,
+        metadataBoost,
+        score: retrievalScore,
+      });
       return {
         ...chunk,
-        retrievalScore: Number((semantic * 0.65 + lexical * 0.25 + metadataBoost).toFixed(4)),
+        retrievalScore,
+        retrievalBreakdown,
+        chunkConfidence,
         metadataBoost,
       };
     })
     .filter((chunk) => chunk.retrievalScore >= KNOWLEDGE_MIN_RETRIEVAL_SCORE)
     .sort((left, right) => right.retrievalScore - left.retrievalScore)
+    .filter((chunk, index, rankedRows) => index === rankedRows.findIndex((row) => row.dedupeHash === chunk.dedupeHash))
     .slice(0, topK);
 
-  const sources = ranked.map((chunk) => ({
-    fileName: chunk.fileName,
-    page: chunk.page,
-    sourceType: chunk.sourceType,
-    score: chunk.retrievalScore,
-    confidence: Number(Math.min(Math.max(chunk.retrievalScore, 0), 1).toFixed(3)),
-    metadata: {
-      country: chunk.metadata?.country || [],
-      article: chunk.metadata?.article || "",
-      section: chunk.metadata?.section || "",
-      financialYear: chunk.metadata?.financialYear || "",
-      taxType: chunk.metadata?.taxType || "",
-    },
-    sourceReference: chunk.metadata?.sourceReference || `${chunk.fileName}#page=${chunk.page}`,
-  }));
+  const confidence = computeRetrievalConfidence(ranked);
+  const sources = buildSourceAttributions(ranked);
 
   return {
-    context: ranked.map((chunk) => `[${chunk.fileName} p.${chunk.page}] ${chunk.text}`).join("\n\n"),
+    context: buildContextForPrompt(ranked),
     sources,
     matches: ranked,
+    confidence,
+    insufficientContext: confidence < KNOWLEDGE_LOW_CONFIDENCE_THRESHOLD || ranked.length === 0,
   };
 };
 

@@ -8,6 +8,7 @@ import {
   getDocumentStorageDir,
   sanitizePdfFilename,
 } from "./documentProcessingService.js";
+import { chunkTextWithMetadata } from "./knowledgeRetrievalUtils.js";
 import { recordDocumentProcessingMetric } from "./metrics.js";
 
 const STORAGE_DIR = getDocumentStorageDir();
@@ -74,34 +75,8 @@ export const savePdfIndex = async (rows) =>
     fs.writeFileSync(INDEX_PATH, JSON.stringify(rows, null, 2), "utf8");
   });
 
-const normalizeChunkFingerprint = (value = "") =>
-  String(value || "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .replace(/[^a-z0-9 ]/g, "")
-    .trim()
-    .slice(0, 240);
-
-const chunkText = (text, size = Number(process.env.PDF_CHUNK_SIZE || 900), overlap = Number(process.env.PDF_CHUNK_OVERLAP || 180)) => {
-  const chunks = [];
-  const safeSize = Math.max(size, 200);
-  const safeOverlap = Math.min(Math.max(overlap, 0), safeSize - 1);
-  const normalizedText = String(text || "").replace(/\s+/g, " ").trim();
-  let start = 0;
-  const seenFingerprints = new Set();
-
-  while (start < normalizedText.length) {
-    const end = Math.min(start + safeSize, normalizedText.length);
-    const chunk = normalizedText.slice(start, end).trim();
-    const fingerprint = normalizeChunkFingerprint(chunk);
-    if (chunk && !seenFingerprints.has(fingerprint)) {
-      chunks.push(chunk);
-      seenFingerprints.add(fingerprint);
-    }
-    start += Math.max(1, safeSize - safeOverlap);
-  }
-  return chunks;
-};
+const chunkText = (text, size = Number(process.env.PDF_CHUNK_SIZE || 900), overlap = Number(process.env.PDF_CHUNK_OVERLAP || 180)) =>
+  chunkTextWithMetadata(text, { size, overlap });
 
 export const extractPageTexts = async (buffer) => {
   const pageTexts = [];
@@ -135,7 +110,11 @@ export const buildPdfIndexRowsFromFile = async (filePath, fileName) => {
         id: `${fileName}-${page}-${index}`,
         file: fileName,
         page,
-        text: chunk,
+        text: chunk.text,
+        startOffset: chunk.startOffset,
+        endOffset: chunk.endOffset,
+        overlapChars: chunk.overlapChars,
+        dedupeHash: chunk.dedupeHash,
       });
     });
   });
@@ -173,7 +152,11 @@ export const indexPdfBuffer = async (buffer, fileName) => {
         id: `${fileName}-${page}-${index}`,
         file: fileName,
         page,
-        text: chunk,
+        text: chunk.text,
+        startOffset: chunk.startOffset,
+        endOffset: chunk.endOffset,
+        overlapChars: chunk.overlapChars,
+        dedupeHash: chunk.dedupeHash,
       });
     });
   });

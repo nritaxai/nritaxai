@@ -71,6 +71,7 @@ const knowledgeDocumentSchema = new mongoose.Schema(
 );
 
 knowledgeDocumentSchema.index({ sourceType: 1, status: 1, updatedAt: -1 });
+knowledgeDocumentSchema.index({ lastIngestedAt: -1, sourceType: 1 });
 
 const KnowledgeDocument = mongoose.model("KnowledgeDocument", knowledgeDocumentSchema);
 export default KnowledgeDocument;

@@ -169,7 +169,7 @@ export const askYukti = async (req, res) => {
     const knowledge = await retrieveKnowledgeContext(question, {
       sourceTypes: ["dtaa_pdf", "tax_law", "fema_doc", "tds_rule", "capital_gains", "nri_compliance", "other_pdf"],
       context: clarificationState.context,
-    }).catch(() => ({ context: "", sources: [] }));
+    }).catch(() => ({ context: "", sources: [], confidence: 0, insufficientContext: true }));
 
     const payload = {
       question,
@@ -189,6 +189,10 @@ export const askYukti = async (req, res) => {
       ...(userId ? { userId } : {}),
       ...(knowledge?.context ? { knowledgeContext: knowledge.context } : {}),
       ...(Array.isArray(knowledge?.sources) && knowledge.sources.length ? { knowledgeSources: knowledge.sources } : {}),
+      knowledgeConfidence: Number(knowledge?.confidence || 0),
+      knowledgeInsufficientContext: Boolean(knowledge?.insufficientContext),
+      knowledgeInstructions:
+        "Use retrieved knowledge context as the primary grounding source. Prefer quoted or paraphrased content from the provided sources, cite Source IDs where possible, and if the context is insufficient say you are unsure instead of inferring unsupported tax rules.",
       routing: clarificationState.routing,
     };
     const serializedPayload = JSON.stringify(payload);
@@ -235,6 +239,10 @@ export const askYukti = async (req, res) => {
       sessionContext: clarificationState.context,
       routing: clarificationState.routing,
       sources: knowledge?.sources || [],
+      retrieval: {
+        confidence: Number(knowledge?.confidence || 0),
+        insufficientContext: Boolean(knowledge?.insufficientContext),
+      },
     });
   } catch (error) {
     if (error?.name === "AbortError") {
