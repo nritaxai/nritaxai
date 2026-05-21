@@ -19,6 +19,7 @@ import {
   setInFlightGatewayRequest,
 } from "./cacheStore.js";
 import { featureFlags } from "../../Config/featureFlags.js";
+import { appConfig } from "../../Config/runtimeConfig.js";
 import { buildStreamingPreviewChunks, createSseEnvelope } from "./stream.js";
 import {
   compressGatewayMessages,
@@ -27,7 +28,7 @@ import {
   resolveTokenBudget,
 } from "./costEngineering.js";
 
-const PRIMARY_TIMEOUT_THRESHOLD_MS = Math.max(Number(process.env.AI_ROUTER_TIMEOUT_THRESHOLD_MS || 12000), 3000);
+const PRIMARY_TIMEOUT_THRESHOLD_MS = appConfig.ai.routing.timeoutThresholdMs;
 
 const buildOptimizedRequest = ({ routeTier = "medium", messages = [], systemPrompt = "", maxTokens } = {}) => ({
   messages: featureFlags.aiContextCompressionEnabled
@@ -226,11 +227,11 @@ const resolveGatewayRequest = async ({
   const routePlan = buildRoutePlan({
     question,
     preferredModel,
-    openRouterGeminiModel: process.env.OPENROUTER_GEMINI_MODEL || "google/gemini-2.0-flash-001",
-    smallModel: process.env.AI_GATEWAY_SMALL_MODEL || "google/gemini-2.0-flash-001",
-    mediumModel: process.env.AI_GATEWAY_MEDIUM_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
-    largeModel: process.env.AI_GATEWAY_LARGE_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
-    ollamaModel: process.env.AI_GATEWAY_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "",
+    openRouterGeminiModel: appConfig.ai.openRouter.geminiModel,
+    smallModel: appConfig.ai.routing.smallModel,
+    mediumModel: appConfig.ai.routing.mediumModel,
+    largeModel: appConfig.ai.routing.largeModel,
+    ollamaModel: appConfig.ai.routing.ollamaModel,
     ollamaEnabled: featureFlags.aiGatewayOllamaEnabled,
     costAwareEnabled: featureFlags.aiCostAwareRoutingEnabled,
     routeHints,

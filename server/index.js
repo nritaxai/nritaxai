@@ -1,12 +1,12 @@
-import dotenv from "dotenv";
+import { appConfig, assertRuntimeConfig } from "./Config/runtimeConfig.js";
 import app from "./app.js";
 import { initObservability, shutdownObservability } from "./services/observability.js";
 import { logger } from "./services/logger.js";
 import { startQueueMonitoring } from "./services/queueMonitoring.js";
 
-dotenv.config();
+assertRuntimeConfig();
 
-const PORT = process.env.PORT || 5000;
+const PORT = appConfig.app.port;
 
 const start = async () => {
   await initObservability();

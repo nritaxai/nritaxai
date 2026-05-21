@@ -1,5 +1,3 @@
-const sanitize = (value) => (typeof value === "string" ? value.trim() : "");
+import { appConfig } from "./runtimeConfig.js";
 
-export const CONSULTATION_WEBHOOK_URL =
-  sanitize(process.env.CONSULTATION_WEBHOOK_URL) ||
-  "https://n8n.caloganathan.com/webhook/consultation-booking";
+export const CONSULTATION_WEBHOOK_URL = appConfig.urls.consultationWebhookUrl;

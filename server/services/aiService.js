@@ -1,23 +1,17 @@
-import dotenv from "dotenv";
+import { appConfig } from "../Config/runtimeConfig.js";
 
-dotenv.config();
+const OPENROUTER_URL = appConfig.urls.openRouterApiUrl;
+const OPENROUTER_REFERER = appConfig.ai.openRouter.referer;
+const OPENROUTER_TITLE = appConfig.ai.openRouter.appTitle;
+const OPENROUTER_TIMEOUT_MS = appConfig.ai.openRouter.timeoutMs;
+const GEMINI_TIMEOUT_MS = appConfig.ai.gemini.timeoutMs;
+const OLLAMA_TIMEOUT_MS = appConfig.ai.ollama.timeoutMs;
+const OLLAMA_BASE_URL = appConfig.ai.ollama.baseUrl;
+const OLLAMA_MODEL = appConfig.ai.ollama.model;
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_REFERER = process.env.OPENROUTER_SITE_URL || "https://www.nritax.ai";
-const OPENROUTER_TITLE = process.env.OPENROUTER_APP_NAME || "NRI Tax AI";
-const OPENROUTER_TIMEOUT_MS = Math.max(Number(process.env.OPENROUTER_TIMEOUT_MS || 20000), 5000);
-const GEMINI_TIMEOUT_MS = Math.max(Number(process.env.GEMINI_TIMEOUT_MS || 20000), 5000);
-const OLLAMA_TIMEOUT_MS = Math.max(Number(process.env.OLLAMA_TIMEOUT_MS || 12000), 3000);
-const OLLAMA_BASE_URL = String(process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").trim().replace(/\/+$/, "");
-const OLLAMA_MODEL = String(process.env.OLLAMA_MODEL || "llama3.1:8b-instruct-q4_K_M").trim();
+const DEFAULT_OPENROUTER_MODELS = appConfig.ai.openRouter.fallbackModels;
 
-const DEFAULT_OPENROUTER_MODELS = [
-  process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
-  "openai/gpt-4o",
-  "meta-llama/llama-3.1-70b-instruct",
-];
-
-const DEFAULT_GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-1.5-pro";
+const DEFAULT_GEMINI_MODEL = appConfig.ai.gemini.model;
 
 const CONTINUATION_PROMPT =
   "Please continue your previous response from exactly where you stopped. Keep the same structure and formatting, and finish the answer completely.";
@@ -217,8 +211,8 @@ NEVER:
 - Add extra response sections beyond the required template
 `.trim();
 
-export const AI_DEFAULT_MAX_TOKENS = normalizeMaxTokens(process.env.CHAT_MAX_TOKENS, 768);
-export const AI_DEFAULT_TEMPERATURE = 0.3;
+export const AI_DEFAULT_MAX_TOKENS = normalizeMaxTokens(appConfig.ai.routing.defaultMaxTokens, 768);
+export const AI_DEFAULT_TEMPERATURE = appConfig.ai.routing.defaultTemperature;
 
 export const callOpenRouter = async (
   messages,
@@ -230,7 +224,7 @@ export const callOpenRouter = async (
     allowContinuation = true,
   } = {}
 ) => {
-  const apiKey = String(process.env.OPENROUTER_API_KEY || "").trim();
+  const apiKey = appConfig.ai.openRouter.apiKey;
   if (!apiKey) {
     throw new Error("Missing OPENROUTER_API_KEY");
   }
@@ -325,7 +319,7 @@ export const callGemini = async (
     allowContinuation = true,
   } = {}
 ) => {
-  const apiKey = String(process.env.GEMINI_API_KEY || "").trim();
+  const apiKey = appConfig.ai.gemini.apiKey;
   if (!apiKey) {
     throw new Error("Missing GEMINI_API_KEY");
   }

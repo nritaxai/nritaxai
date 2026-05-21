@@ -7,6 +7,7 @@ import OpenAI from "openai";
 import pdfParse from "pdf-parse";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 import { CHAT_MODEL_KEYS, PLAN_KEYS } from "../../shared/subscriptionConfig.js";
 import {
   checkAndConsumeChatUsage,
@@ -24,19 +25,28 @@ import {
   shouldAskClarification,
 } from "../Utils/chatClarification.js";
 
-const OPENROUTER_TIMEOUT_MS = Number(process.env.OPENROUTER_TIMEOUT_MS || 15000);
+const OPENROUTER_TIMEOUT_MS = appConfig.ai.openRouter.timeoutMs;
 const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
 
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-  timeout: OPENROUTER_TIMEOUT_MS,
-  maxRetries: 0,
-  defaultHeaders: {
-    "HTTP-Referer": process.env.OPENROUTER_SITE_URL || "https://nritax.ai",
-    "X-Title": process.env.OPENROUTER_APP_NAME || "NRITAX AI",
-  },
-});
+const client = appConfig.ai.openRouter.apiKey
+  ? new OpenAI({
+      apiKey: appConfig.ai.openRouter.apiKey,
+      baseURL: appConfig.urls.openRouterApiUrl.replace(/\/chat\/completions$/, ""),
+      timeout: OPENROUTER_TIMEOUT_MS,
+      maxRetries: 0,
+      defaultHeaders: {
+        "HTTP-Referer": appConfig.ai.openRouter.referer,
+        "X-Title": appConfig.ai.openRouter.appTitle,
+      },
+    })
+  : null;
+
+const getOpenRouterClient = () => {
+  if (!client) {
+    throw new Error("Missing OPENROUTER_API_KEY");
+  }
+  return client;
+};
 
 const MAX_CONTEXT_MESSAGES = Math.max(Number(process.env.CHAT_CONTEXT_MESSAGES || 8), 6);
 const MAX_STORED_MESSAGES = 100;
@@ -188,7 +198,7 @@ const createChatCompletionWithRetry = async (payload) => {
 
   for (let attempt = 0; attempt <= OPENROUTER_MAX_RETRIES; attempt += 1) {
     try {
-      return await client.chat.completions.create(payload);
+      return await getOpenRouterClient().chat.completions.create(payload);
     } catch (error) {
       lastError = error;
       if (attempt === OPENROUTER_MAX_RETRIES || !isRetryableOpenRouterError(error)) {
@@ -576,7 +586,7 @@ const rerankWithEmbeddings = async (question, lexicalCandidates) => {
 
   try {
     const inputs = [question, ...lexicalCandidates.map((chunk) => chunk.text)];
-    const emb = await client.embeddings.create({
+    const emb = await getOpenRouterClient().embeddings.create({
       model: RAG_EMBEDDING_MODEL,
       input: inputs,
     });

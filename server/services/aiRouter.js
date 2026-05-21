@@ -9,9 +9,10 @@ import {
 import { validateChatbotResponse } from "./responseValidation.js";
 import { featureFlags } from "../Config/featureFlags.js";
 import { routeChatCompletion } from "./aiGateway/gateway.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
-const PRIMARY_TIMEOUT_THRESHOLD_MS = Math.max(Number(process.env.AI_ROUTER_TIMEOUT_THRESHOLD_MS || 12000), 3000);
-const OPENROUTER_GEMINI_MODEL = process.env.OPENROUTER_GEMINI_MODEL || "google/gemini-2.0-flash-001";
+const PRIMARY_TIMEOUT_THRESHOLD_MS = appConfig.ai.routing.timeoutThresholdMs;
+const OPENROUTER_GEMINI_MODEL = appConfig.ai.openRouter.geminiModel;
 
 const buildAttempt = async ({
   provider = "openrouter",
@@ -66,7 +67,7 @@ export const requestValidatedCompletion = async ({
   const attemptConfigs = [
     { provider: "openrouter", preferredModel, fallbackUsed: false },
     { provider: "openrouter", preferredModel: OPENROUTER_GEMINI_MODEL, fallbackUsed: true },
-    { provider: "gemini-direct", preferredModel: process.env.GEMINI_MODEL || "", fallbackUsed: true },
+    { provider: "gemini-direct", preferredModel: appConfig.ai.gemini.model, fallbackUsed: true },
   ];
 
   for (const attemptConfig of attemptConfigs) {

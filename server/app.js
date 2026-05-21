@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 import connectDB, { getDbReadiness } from "./Config/db.js";
+import { appConfig } from "./Config/runtimeConfig.js";
 import { createRateLimiter } from "./Middlewares/rateLimit.js";
 import authRoute from "./Routes/authRoutes.js";
 import chatRoute from "./Routes/chatRoutes.js";
@@ -21,34 +21,12 @@ import { metricsHandler, recordApiFailureMetric } from "./services/metrics.js";
 import { getRedisConnection, isQueueingConfigured, isRedisConfigured } from "./queues/redis.js";
 import { getSecurityReadiness, validateSecurityConfiguration } from "./services/securityConfig.js";
 
-dotenv.config();
-
 const app = express();
 
 void initErrorMonitoring();
 validateSecurityConfiguration();
 
-const defaultAllowedOrigins = [
-  "https://nritaxai-cw9w.vercel.app",
-  "https://nritax.ai",
-  "https://www.nritax.ai",
-  "https://www.nritaxai.com",
-  "capacitor://localhost",
-  "https://localhost",
-  "https://127.0.0.1",
-  "http://localhost",
-  "http://127.0.0.1",
-  "http://localhost:3000",
-  "http://localhost:5173",
-  "http://127.0.0.1:5173",
-];
-
-const envAllowedOrigins = String(process.env.ALLOWED_ORIGINS || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envAllowedOrigins]));
+const allowedOrigins = appConfig.app.allowedOrigins;
 
 const corsOptions = {
   origin(origin, callback) {
@@ -89,7 +67,7 @@ app.options("*", cors(corsOptions));
 
 const globalRateLimiter = createRateLimiter({
   windowMs: 60 * 1000,
-  maxRequests: Number(process.env.GLOBAL_RATE_LIMIT_PER_MIN || 120),
+  maxRequests: appConfig.app.globalRateLimitPerMin,
   message: "Too many API requests. Please retry in a minute.",
 });
 
@@ -97,7 +75,7 @@ app.use("/api", globalRateLimiter);
 
 app.use(
   express.json({
-    limit: process.env.JSON_BODY_LIMIT || "5mb",
+    limit: appConfig.app.jsonBodyLimit,
     verify: (req, _res, buf) => {
       if (
         req.originalUrl.startsWith("/api/subscription/razorpay-webhook") ||
@@ -108,7 +86,7 @@ app.use(
     },
   })
 );
-app.use(express.urlencoded({ extended: true, limit: process.env.JSON_BODY_LIMIT || "5mb" }));
+app.use(express.urlencoded({ extended: true, limit: appConfig.app.jsonBodyLimit }));
 
 // Keep health checks independent from the database so Render can verify the
 // process is alive even if MongoDB is temporarily unavailable.
@@ -140,9 +118,9 @@ app.use(async (_req, _res, next) => {
 app.get("/version", (_req, res) => {
   return res.status(200).json({
     success: true,
-    app: "nritax-server",
-    version: String(process.env.APP_VERSION || "dev").trim(),
-    commit: String(process.env.APP_COMMIT || "unknown").trim(),
+    app: appConfig.app.name,
+    version: appConfig.app.version,
+    commit: appConfig.app.commit,
     timestamp: new Date().toISOString(),
   });
 });

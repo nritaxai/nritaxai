@@ -106,7 +106,7 @@ export const buildRoutePlan = ({
       attempts: [
         ...(ollamaEnabled ? [{ provider: "ollama", preferredModel: ollamaModel, fallbackUsed: false }] : []),
         { provider: "openrouter", preferredModel: smallModel || openRouterGeminiModel, fallbackUsed: !ollamaEnabled },
-        { provider: "gemini-direct", preferredModel: process.env.GEMINI_MODEL || "", fallbackUsed: true },
+        { provider: "gemini-direct", preferredModel: appConfig.ai.gemini.model, fallbackUsed: true },
       ],
     };
   }
@@ -117,7 +117,7 @@ export const buildRoutePlan = ({
       strategy: costAwareEnabled ? "advanced" : "legacy",
       attempts: [
         { provider: "openrouter", preferredModel: largeModel || preferredModel || mediumModel, fallbackUsed: false },
-        { provider: "gemini-direct", preferredModel: process.env.GEMINI_MODEL || "", fallbackUsed: true },
+        { provider: "gemini-direct", preferredModel: appConfig.ai.gemini.model, fallbackUsed: true },
       ],
     };
   }
@@ -135,7 +135,8 @@ export const buildRoutePlan = ({
       ...(costAwareEnabled
         ? [{ provider: "openrouter", preferredModel: preferredModel || mediumModel, fallbackUsed: true }]
         : [{ provider: "openrouter", preferredModel: openRouterGeminiModel, fallbackUsed: true }]),
-      { provider: "gemini-direct", preferredModel: process.env.GEMINI_MODEL || "", fallbackUsed: true },
+      { provider: "gemini-direct", preferredModel: appConfig.ai.gemini.model, fallbackUsed: true },
     ],
   };
 };
+import { appConfig } from "../../Config/runtimeConfig.js";

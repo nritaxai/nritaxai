@@ -1,4 +1,5 @@
 import { logger } from "./logger.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
 const REQUIRED_SECRETS = [
   "JWT_SECRET",
@@ -27,7 +28,10 @@ export const getSecurityReadiness = () => {
   return {
     required,
     recommended,
-    ready: required.every((item) => item.configured),
+    ready:
+      required.every((item) => item.configured) &&
+      Boolean(appConfig.branding.supportEmail) &&
+      Boolean(appConfig.branding.appSiteUrl),
   };
 };
 

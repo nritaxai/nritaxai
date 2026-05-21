@@ -10,11 +10,12 @@ import { getSubscriptionSummary, normalizeUserSubscriptionState } from "../Utils
 import { resolveSignupCountrySelection } from "../Middlewares/countryMiddleware.js";
 import { buildCountryProfile, normalizeCountryCode, resolveCountryRule } from "../services/countryPolicyService.js";
 import { writeSecurityAuditLog } from "../services/securityAudit.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
 const PROFILE_LANGUAGES = new Set(["english", "hindi", "tamil", "indonesian"]);
 const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i;
 const MAX_PROFILE_IMAGE_LENGTH = 2_800_000;
-const CURRENT_POLICY_VERSION = process.env.CURRENT_POLICY_VERSION || "2026-05-terms-privacy";
+const CURRENT_POLICY_VERSION = appConfig.policies.currentVersion;
 
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 const sanitizeEmail = (value) => sanitizeString(value).toLowerCase();
@@ -226,9 +227,7 @@ const getAllowedFrontendOrigins = () =>
   Array.from(
     new Set(
       [
-        sanitizeString(process.env.FRONTEND_URL),
-        sanitizeString(process.env.CLIENT_URL),
-        sanitizeString(process.env.APP_URL),
+        appConfig.branding.appSiteUrl,
         "https://www.nritax.ai",
         "https://nritax.ai",
         "http://localhost:5173",
@@ -392,9 +391,7 @@ const isValidLinkedInProfile = (value) => {
 
 const buildPasswordResetUrl = (req, token) => {
   const configuredBase =
-    sanitizeString(process.env.FRONTEND_URL) ||
-    sanitizeString(process.env.CLIENT_URL) ||
-    sanitizeString(process.env.APP_URL);
+    appConfig.branding.appSiteUrl;
   const originBase = sanitizeString(req.get("origin"));
   const fallbackBase = "http://localhost:5173";
   const appBase = configuredBase || originBase || fallbackBase;
@@ -408,11 +405,9 @@ const sendWelcomeEmail = async ({ name, email }) => {
 
   const safeName = sanitizeString(name) || "there";
   const appUrl =
-    sanitizeString(process.env.FRONTEND_URL) ||
-    sanitizeString(process.env.CLIENT_URL) ||
-    sanitizeString(process.env.APP_URL) ||
+    appConfig.branding.appSiteUrl ||
     "https://www.nritax.ai";
-  const supportEmail = sanitizeString(process.env.SUPPORT_EMAIL) || "ask@nritax.ai";
+  const supportEmail = appConfig.branding.supportEmail;
 
   await sendEmail({
     to: safeEmail,

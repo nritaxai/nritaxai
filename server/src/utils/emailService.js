@@ -1,9 +1,10 @@
 import nodemailer from "nodemailer";
 import { COMPANY_SHORT_NAME, DEFAULT_FROM_EMAIL } from "../../Config/branding.js";
+import { appConfig } from "../../Config/runtimeConfig.js";
 
 let cachedTransporter = null;
 
-const RESEND_API_URL = "https://api.resend.com/emails";
+const RESEND_API_URL = appConfig.urls.resendApiUrl;
 
 const sanitizeEnv = (value) => String(value || "").trim();
 const sanitizePassword = (value) => sanitizeEnv(value).replace(/\s+/g, "");

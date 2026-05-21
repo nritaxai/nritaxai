@@ -1,14 +1,7 @@
 import { buildCountryProfile } from "./countryPolicyService.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
-const DISPLAY_CURRENCY_MATRIX = {
-  IN: ["INR"],
-  US: ["USD", "INR"],
-  GB: ["GBP", "INR"],
-  AE: ["AED", "INR"],
-  SG: ["SGD", "INR"],
-  CA: ["CAD", "INR"],
-  AU: ["AUD", "INR"],
-};
+const DISPLAY_CURRENCY_MATRIX = appConfig.country.checkoutDisplayCurrencyMatrix;
 
 const normalizeText = (value) => String(value || "").trim();
 

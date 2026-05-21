@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
 import fetch from "node-fetch";
+import { appConfig } from "./runtimeConfig.js";
 
 dotenv.config();
 
@@ -17,17 +18,17 @@ export const generateChatResponse = async (userMessages) => {
   try {
     // Call OpenRouter API with streaming enabled
     const response = await fetch(
-      "https://openrouter.ai/api/v1/chat/completions",
+      appConfig.urls.openRouterApiUrl,
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          Authorization: `Bearer ${appConfig.ai.openRouter.apiKey}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://nritax.ai",
-          "X-Title": "NRITAX AI",
+          "HTTP-Referer": appConfig.ai.openRouter.referer,
+          "X-Title": appConfig.ai.openRouter.appTitle,
         },
         body: JSON.stringify({
-          model: "openai/gpt-4o-mini",
+          model: appConfig.ai.routing.smallModel,
           messages: messages,
           temperature: 0,
           stream: true,

@@ -16,11 +16,21 @@ import {
 import { listKnowledgeDocuments, listKnowledgeIngestionLogs } from "../services/knowledgeBaseService.js";
 import { logControllerError, respondLegacyError, respondOk } from "../services/controllerResponses.js";
 import { enqueuePdfIndexJob, enqueuePdfReindexJob } from "../services/queueFacade.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENROUTER_API_KEY,
-  baseURL: "https://openrouter.ai/api/v1",
-});
+const client = appConfig.ai.openRouter.apiKey
+  ? new OpenAI({
+      apiKey: appConfig.ai.openRouter.apiKey,
+      baseURL: appConfig.urls.openRouterApiUrl.replace(/\/chat\/completions$/, ""),
+    })
+  : null;
+
+const getOpenRouterClient = () => {
+  if (!client) {
+    throw new Error("Missing OPENROUTER_API_KEY");
+  }
+  return client;
+};
 
 const PDF_DIR = getPdfDir();
 const TOP_K = 5;
@@ -308,8 +318,8 @@ export const askPdf = async (req, res) => {
 
     const context = matches.map((m) => `[${m.file} p.${m.page}] ${m.text}`).join("\n\n");
 
-    const response = await client.chat.completions.create({
-      model: "openai/gpt-4o-mini",
+    const response = await getOpenRouterClient().chat.completions.create({
+      model: appConfig.ai.routing.smallModel,
       temperature: 0,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },

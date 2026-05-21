@@ -33,6 +33,7 @@ import { getPaymentReliabilitySummary } from "../services/paymentReliabilityMoni
 import { timingSafeEqualHex } from "../services/webhookSecurity.js";
 import { buildPaymentReadinessReport } from "../services/paymentReadinessService.js";
 import { validateSubscriptionCountryAccess } from "../services/subscriptionCountryPolicyService.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
 const PLAN_ALIAS = {
   pro: PLAN_KEYS.PROFESSIONAL,
@@ -40,8 +41,10 @@ const PLAN_ALIAS = {
   enterprise: PLAN_KEYS.ENTERPRISE,
 };
 
+const { razorpay: razorpayConfig, countryKeys: paymentCountryKeys, taxRules: paymentTaxRules } = appConfig.payments;
+
 const mapPlanFromRazorpayPlanId = (planId) => {
-  if (planId && planId === process.env.RAZORPAY_PRO_PLAN_ID) return getLegacyPlanCode(PLAN_KEYS.PROFESSIONAL);
+  if (planId && planId === razorpayConfig.proPlanId) return getLegacyPlanCode(PLAN_KEYS.PROFESSIONAL);
   return getLegacyPlanCode(PLAN_KEYS.STARTER);
 };
 
@@ -85,8 +88,8 @@ const normalizeCountryKey = (value) => normalizeText(value).toLowerCase();
 
 const normalizeStateKey = (value) => normalizeText(value).toLowerCase();
 
-const INDIA_COUNTRY_KEYS = new Set(["india", "in", "bharat"]);
-const KARNATAKA_STATE_KEYS = new Set(["karnataka", "ka"]);
+const INDIA_COUNTRY_KEYS = new Set(paymentCountryKeys.india);
+const KARNATAKA_STATE_KEYS = new Set(paymentCountryKeys.karnataka);
 
 const resolveTaxClassification = ({ billingCountry, billingState }) => {
   const countryKey = normalizeCountryKey(billingCountry);
@@ -105,23 +108,23 @@ const resolveTaxClassification = ({ billingCountry, billingState }) => {
   }
 
   if (KARNATAKA_STATE_KEYS.has(stateKey)) {
-    return {
-      taxType: "DOMESTIC_INTRA_STATE",
-      gstMode: "CGST_SGST",
-      cgstRate: 9,
-      sgstRate: 9,
-      igstRate: 0,
-      totalTaxRate: 18,
-    };
+      return {
+        taxType: "DOMESTIC_INTRA_STATE",
+        gstMode: "CGST_SGST",
+        cgstRate: paymentTaxRules.intraState.cgstRate,
+        sgstRate: paymentTaxRules.intraState.sgstRate,
+        igstRate: paymentTaxRules.intraState.igstRate,
+        totalTaxRate: paymentTaxRules.domesticTaxRate,
+      };
   }
 
   return {
     taxType: "DOMESTIC_INTER_STATE",
     gstMode: "IGST",
-    cgstRate: 0,
-    sgstRate: 0,
-    igstRate: 18,
-    totalTaxRate: 18,
+    cgstRate: paymentTaxRules.interState.cgstRate,
+    sgstRate: paymentTaxRules.interState.sgstRate,
+    igstRate: paymentTaxRules.interState.igstRate,
+    totalTaxRate: paymentTaxRules.domesticTaxRate,
   };
 };
 
@@ -147,7 +150,13 @@ const maskValue = (value, keepStart = 4, keepEnd = 3) => {
 };
 
 const ensureRequiredEnv = (...keys) => {
-  const missing = keys.filter((key) => !process.env[key]);
+  const values = {
+    RAZORPAY_KEY_ID: razorpayConfig.keyId,
+    RAZORPAY_KEY_SECRET: razorpayConfig.keySecret,
+    RAZORPAY_WEBHOOK_SECRET: razorpayConfig.webhookSecret,
+    RAZORPAY_PRO_PLAN_ID: razorpayConfig.proPlanId,
+  };
+  const missing = keys.filter((key) => !String(values[key] || process.env[key] || "").trim());
   if (missing.length > 0) {
     return `Missing required env vars: ${missing.join(", ")}`;
   }
@@ -283,8 +292,8 @@ export const getRazorpayDebugConfig = async (_req, res) => {
       razorpay: {
         ready: missing.length === 0,
         missing,
-        keyIdMasked: maskValue(process.env.RAZORPAY_KEY_ID),
-        keySecretMasked: maskValue(process.env.RAZORPAY_KEY_SECRET),
+        keyIdMasked: maskValue(razorpayConfig.keyId),
+        keySecretMasked: maskValue(razorpayConfig.keySecret),
       },
     });
   } catch (error) {
@@ -496,7 +505,7 @@ export const createSubscription = async (req, res) => {
             orderId: reusableOrder.id,
             amount: reusableOrder.amount,
             currency: reusableOrder.currency,
-            razorpayKey: process.env.RAZORPAY_KEY_ID,
+            razorpayKey: razorpayConfig.keyId,
             plan: meta.planName,
             planKey: meta.planKey,
             billing,
@@ -592,7 +601,7 @@ export const createSubscription = async (req, res) => {
       orderId: order.id,
       amount: order.amount,
       currency: order.currency,
-      razorpayKey: process.env.RAZORPAY_KEY_ID,
+      razorpayKey: razorpayConfig.keyId,
       plan: meta.planName,
       planKey: meta.planKey,
       billing,
@@ -635,7 +644,7 @@ export const verifySubscriptionPayment = async (req, res) => {
       return res.status(500).json({ success: false, message: envError });
     }
 
-    const secret = process.env.RAZORPAY_KEY_SECRET;
+    const secret = razorpayConfig.keySecret;
     const expectedSignature = hmacSha256(`${orderId}|${paymentId}`, secret);
 
     if (!timingSafeEqualHex(expectedSignature, signature)) {
@@ -916,7 +925,7 @@ export const razorpayWebhook = async (req, res) => {
 
     const signature = getHeaderValue(req.headers["x-razorpay-signature"]);
     const rawBody = req.rawBody || JSON.stringify(req.body);
-    const expected = hmacSha256(rawBody, process.env.RAZORPAY_WEBHOOK_SECRET);
+    const expected = hmacSha256(rawBody, razorpayConfig.webhookSecret);
 
     if (!signature || !timingSafeEqualHex(expected, signature)) {
       if (featureFlags.paymentReliabilityEnabled) {

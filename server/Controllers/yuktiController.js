@@ -4,19 +4,16 @@ import { logControllerError, respondError, respondOk } from "../services/control
 import { createWebhookSignatureHeaders } from "../services/webhookSecurity.js";
 import { retrieveKnowledgeContext } from "../services/knowledgeBaseService.js";
 import { resolveYuktiClarificationState } from "../services/yuktiClarificationService.js";
+import { appConfig } from "../Config/runtimeConfig.js";
 
-const DEFAULT_YUKTI_WEBHOOK_URL =
-  "https://n8n.caloganathan.com/webhook/yukti-tax-agent";
-const YUKTI_WEBHOOK_URL = String(
-  process.env.YUKTI_WEBHOOK_URL || DEFAULT_YUKTI_WEBHOOK_URL
-).trim();
-const YUKTI_TIMEOUT_MS = Number(process.env.YUKTI_TIMEOUT_MS || 15000);
+const YUKTI_WEBHOOK_URL = appConfig.urls.yuktiWebhookUrl;
+const YUKTI_TIMEOUT_MS = Math.max(Number(process.env.YUKTI_TIMEOUT_MS || 15000), 1000);
 
 const TAX_KEYWORD_PATTERN =
   /\b(tax|taxes|taxation|nri|india|indian|dtaa|itr|tds|gst|income tax|capital gains|withholding|residential status|residency|trc|form 10f|pan|nre|nro|fema|remittance)\b/i;
 
 const sanitizeText = (value) => (typeof value === "string" ? value.trim() : "");
-const DEFAULT_ADMIN_EMAIL = "admin@nritax.ai";
+const DEFAULT_ADMIN_EMAIL = appConfig.branding.adminEmail;
 
 const isValidOptionalField = (value, maxLength = 80) =>
   !value || (typeof value === "string" && value.trim().length <= maxLength);
