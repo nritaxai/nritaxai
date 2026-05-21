@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { SITE_URL, SUPPORT_EMAIL } from "./branding";
 
 const PROD_API_URL_DEFAULT = "https://nritax.ai";
 const DEV_API_URL_DEFAULT = "http://localhost:5000";
@@ -35,7 +36,7 @@ export const API_BASE_URL = normalizeUrl(
 
 const getBannerOrigin = () => {
   if (envBannerApiUrl) return normalizeUrl(envBannerApiUrl);
-  return "https://www.nritax.ai";
+  return normalizeUrl(SITE_URL);
 };
 
 export const BANNER_API_BASE_URL = normalizeUrl(
@@ -94,6 +95,6 @@ export const LINKEDIN_AUTH_CONFIG = {
 };
 
 export const GSTIN = String(import.meta.env.VITE_GSTIN || "GSTIN_PLACEHOLDER").trim();
-export const CONTACT_EMAIL = String(import.meta.env.VITE_CONTACT_EMAIL || "ask@nritax.ai").trim();
+export const CONTACT_EMAIL = SUPPORT_EMAIL;
 export const CONTACT_WHATSAPP = String(import.meta.env.VITE_CONTACT_WHATSAPP || "+62-xxx-xxxx-xxxx").trim();
 export const CONTACT_CALENDLY_URL = String(import.meta.env.VITE_CONTACT_CALENDLY_URL || "https://calendly.com/logan786-jkt/30min").trim();

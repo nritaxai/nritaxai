@@ -2,6 +2,7 @@ import { useSearchParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import axios from "axios";
 import { buildApiUrl } from "../../utils/api";
+import { COMPANY_LEGAL_NAME } from "../../config/branding";
 
 export function Checkout() {
   const [searchParams] = useSearchParams();
@@ -31,7 +32,7 @@ export function Checkout() {
         const options = {
           key: import.meta.env.VITE_RAZORPAY_KEY,
           subscription_id: data.id,
-          name: "NRITAX.AI",
+          name: COMPANY_LEGAL_NAME,
           description: `Plan: ${plan}`,
           handler: function () {
             alert("Payment successful!");

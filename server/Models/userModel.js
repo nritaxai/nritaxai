@@ -86,6 +86,24 @@ const userSchema = new mongoose.Schema(
       type: Date,
       default: null,
     },
+    termsAccepted: {
+      type: Boolean,
+      default: false,
+    },
+    acceptedAt: {
+      type: Date,
+      default: null,
+    },
+    policyVersion: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    acceptedIp: {
+      type: String,
+      trim: true,
+      default: "",
+    },
 
     plan: {
       type: String,

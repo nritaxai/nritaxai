@@ -15,6 +15,7 @@ import {
   SUPPORTED_CURRENCIES,
 } from "../../utils/currency";
 import { IS_IOS_NATIVE_APP } from "../../config/appConfig";
+import { COMPANY_LEGAL_NAME, applyDocumentMetadata } from "../../config/branding";
 
 type BillingType = "monthly" | "yearly";
 type PlanType = "pro";
@@ -143,6 +144,10 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [currencyOverride, setCurrencyOverride] = useState<string>(
     () => resolveStoredCheckoutCurrency(currencyFromQuery || localStorage.getItem("pricing_currency_override"))
   );
+
+  React.useEffect(() => {
+    applyDocumentMetadata(`Checkout | ${COMPANY_LEGAL_NAME}`);
+  }, []);
 
   const selectedPlan = PLAN_META[plan];
   const price = billing === "monthly" ? selectedPlan.monthlyPrice : selectedPlan.yearlyPrice;
@@ -464,7 +469,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
       const options = {
         key: data.razorpayKey || import.meta.env.VITE_RAZORPAY_KEY,
         order_id: data.id,
-        name: "NRITAX.AI",
+        name: COMPANY_LEGAL_NAME,
         description: `${selectedPlan.label} (${billing})${appliedPromo ? ` - ${appliedPromo.code}` : ""}`,
         prefill: {
           name: fullName,

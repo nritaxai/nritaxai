@@ -9,6 +9,7 @@ import NewsTicker from "./components/NewsTicker";
 import { ComplianceStandards } from "./components/ComplianceStandards";
 import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
+import { LegalAcceptanceGate } from "./components/LegalAcceptanceGate";
 import { TigerBotAvatar } from "./components/TigerBotAvatar";
 import { Button } from "./components/ui/button";
 import { iOSBottomNav as IOSBottomNav } from "../components/iOSBottomNav";
@@ -65,6 +66,7 @@ export default function App() {
   );
   const [successPopup, setSuccessPopup] = useState<string | null>(null);
   const [showPromoUpgradePrompt, setShowPromoUpgradePrompt] = useState(false);
+  const [requiresLegalAcceptance, setRequiresLegalAcceptance] = useState(false);
   const popupTimeoutRef = useRef<number | null>(null);
   const [isOnline, setIsOnline] = useState(
     typeof navigator === "undefined" ? true : navigator.onLine
@@ -106,6 +108,7 @@ export default function App() {
   useEffect(() => {
     const handleRequireLogin = () => setShowLoginModal(true);
     const syncAuthState = () => setIsAuthenticated(Boolean(getStoredAuthToken()));
+    const handleRequireTerms = () => setRequiresLegalAcceptance(true);
     const handleAuthPopup = (event: Event) => {
       const customEvent = event as CustomEvent<{
         message?: string;
@@ -130,12 +133,14 @@ export default function App() {
     window.addEventListener("storage", syncAuthState);
     window.addEventListener("auth-changed", syncAuthState);
     window.addEventListener("nritax:auth-popup", handleAuthPopup as EventListener);
+    window.addEventListener("nritax:require-terms", handleRequireTerms as EventListener);
 
     return () => {
       window.removeEventListener("nritax:require-login", handleRequireLogin as EventListener);
       window.removeEventListener("storage", syncAuthState);
       window.removeEventListener("auth-changed", syncAuthState);
       window.removeEventListener("nritax:auth-popup", handleAuthPopup as EventListener);
+      window.removeEventListener("nritax:require-terms", handleRequireTerms as EventListener);
       if (popupTimeoutRef.current) {
         window.clearTimeout(popupTimeoutRef.current);
       }
@@ -147,6 +152,25 @@ export default function App() {
       setShowLoginModal(false);
     }
   }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setRequiresLegalAcceptance(false);
+      return;
+    }
+
+    if (location.pathname !== "/chat" && location.pathname !== "/yukti" && location.pathname !== "/ios-yukti") {
+      return;
+    }
+
+    try {
+      const rawUser = localStorage.getItem("user");
+      const user = rawUser ? JSON.parse(rawUser) : null;
+      setRequiresLegalAcceptance(!user?.termsAccepted || !user?.acceptedAt);
+    } catch {
+      setRequiresLegalAcceptance(true);
+    }
+  }, [isAuthenticated, location.pathname]);
 
   useEffect(() => {
     if (isAuthenticated || location.pathname !== "/home") return;
@@ -526,6 +550,10 @@ export default function App() {
       )}
 
       {successPopup && <AuthPopup message={successPopup} type="success" />}
+
+      {requiresLegalAcceptance ? (
+        <LegalAcceptanceGate onAccepted={() => setRequiresLegalAcceptance(false)} />
+      ) : null}
 
       {showPromoUpgradePrompt ? (
         <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#0F172A]/55 px-4">

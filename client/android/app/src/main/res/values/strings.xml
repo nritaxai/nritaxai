@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">Nritaxai</string>
     <string name="title_activity_main">Nritaxai</string>
-    <string name="package_name">www.nritaxai.com</string>
-    <string name="custom_url_scheme">www.nritaxai.com</string>
+    <string name="package_name">com.nritaxai.app</string>
+    <string name="custom_url_scheme">com.nritaxai.app</string>
 </resources>

@@ -3,12 +3,23 @@ import {
   AI_DEFAULT_TEMPERATURE,
   NRI_TAX_SYSTEM_PROMPT,
   callGemini,
+  callOllama,
   callOpenRouter,
   withRetry,
 } from "../aiService.js";
 import { validateChatbotResponse } from "../responseValidation.js";
 import { recordAiGatewayExecution } from "./metricsStore.js";
 import { buildRoutePlan } from "./router.js";
+import {
+  buildAiGatewayCacheKey,
+  clearInFlightGatewayRequest,
+  getCachedGatewayResponse,
+  getInFlightGatewayRequest,
+  setCachedGatewayResponse,
+  setInFlightGatewayRequest,
+} from "./cacheStore.js";
+import { featureFlags } from "../../Config/featureFlags.js";
+import { buildStreamingPreviewChunks, createSseEnvelope } from "./stream.js";
 
 const PRIMARY_TIMEOUT_THRESHOLD_MS = Math.max(Number(process.env.AI_ROUTER_TIMEOUT_THRESHOLD_MS || 12000), 3000);
 
@@ -25,12 +36,225 @@ const buildAttempt = async ({
   const runner =
     provider === "gemini-direct"
       ? () => callGemini(messages, systemPrompt, { maxTokens, temperature })
+      : provider === "ollama"
+        ? () => callOllama(messages, systemPrompt, { preferredModel, maxTokens, temperature })
       : () => callOpenRouter(messages, systemPrompt, { preferredModel, maxTokens, temperature });
 
   const result = await withRetry(runner, retries, `${provider}:${preferredModel || "default"}`);
   return {
     ...result,
     responseTimeMs: Date.now() - startedAt,
+  };
+};
+
+const validateAttempt = ({ question, response, responseTimeMs, nonTaxReply }) => {
+  const validation = validateChatbotResponse({
+    question,
+    response,
+    nonTaxReply,
+  });
+  const timedOutByThreshold = responseTimeMs > PRIMARY_TIMEOUT_THRESHOLD_MS;
+  return {
+    validation,
+    timedOutByThreshold,
+    valid: validation.valid && !timedOutByThreshold,
+  };
+};
+
+const toAttemptMeta = (attempt, attemptConfig, validationIssues) => ({
+  provider: attempt.provider,
+  model: attempt.model,
+  responseTimeMs: attempt.responseTimeMs,
+  fallbackUsed: attemptConfig.fallbackUsed,
+  validationIssues,
+});
+
+const executeAttemptPlan = async ({
+  attempts = [],
+  question,
+  messages,
+  systemPrompt,
+  maxTokens,
+  temperature,
+  retries,
+  nonTaxReply,
+}) => {
+  const results = [];
+  let lastError = null;
+
+  for (const attemptConfig of attempts) {
+    try {
+      const attempt = await buildAttempt({
+        ...attemptConfig,
+        messages,
+        systemPrompt,
+        maxTokens,
+        temperature,
+        retries,
+      });
+
+      const { validation, timedOutByThreshold, valid } = validateAttempt({
+        question,
+        response: attempt.response,
+        responseTimeMs: attempt.responseTimeMs,
+        nonTaxReply,
+      });
+
+      results.push(toAttemptMeta(attempt, attemptConfig, validation.issues));
+
+      if (valid) {
+        return {
+          attempt,
+          attempts: results,
+          validationIssues: validation.issues,
+          fallbackUsed: attemptConfig.fallbackUsed,
+        };
+      }
+
+      lastError = new Error(
+        timedOutByThreshold
+          ? `Model exceeded timeout threshold (${attempt.responseTimeMs}ms)`
+          : `Response validation failed: ${validation.issues.map((issue) => issue.code).join(", ")}`
+      );
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error || "Unknown AI gateway error"));
+      results.push({
+        provider: attemptConfig.provider,
+        model: attemptConfig.preferredModel || "",
+        responseTimeMs: null,
+        fallbackUsed: attemptConfig.fallbackUsed,
+        validationIssues: [{ code: "provider_failure", message: lastError.message }],
+      });
+    }
+  }
+
+  throw Object.assign(lastError || new Error("All AI routes failed"), { attempts: results });
+};
+
+const executeParallelAttemptPlan = async ({
+  primaryAttempt,
+  secondaryAttempts = [],
+  question,
+  messages,
+  systemPrompt,
+  maxTokens,
+  temperature,
+  retries,
+  nonTaxReply,
+}) => {
+  const executions = [primaryAttempt, ...secondaryAttempts].map((attemptConfig) =>
+    buildAttempt({
+      ...attemptConfig,
+      messages,
+      systemPrompt,
+      maxTokens,
+      temperature,
+      retries,
+    })
+      .then((attempt) => ({ status: "fulfilled", attemptConfig, attempt }))
+      .catch((error) => ({ status: "rejected", attemptConfig, error }))
+  );
+
+  const settled = await Promise.all(executions);
+  const attempts = [];
+  let lastError = null;
+
+  for (const item of settled) {
+    if (item.status === "fulfilled") {
+      const { validation, timedOutByThreshold, valid } = validateAttempt({
+        question,
+        response: item.attempt.response,
+        responseTimeMs: item.attempt.responseTimeMs,
+        nonTaxReply,
+      });
+      attempts.push(toAttemptMeta(item.attempt, item.attemptConfig, validation.issues));
+      if (valid) {
+        return {
+          attempt: item.attempt,
+          attempts,
+          validationIssues: validation.issues,
+          fallbackUsed: item.attemptConfig.fallbackUsed,
+        };
+      }
+      lastError = new Error(
+        timedOutByThreshold
+          ? `Model exceeded timeout threshold (${item.attempt.responseTimeMs}ms)`
+          : `Response validation failed: ${validation.issues.map((issue) => issue.code).join(", ")}`
+      );
+    } else {
+      lastError = item.error instanceof Error ? item.error : new Error(String(item.error || "Unknown AI gateway error"));
+      attempts.push({
+        provider: item.attemptConfig.provider,
+        model: item.attemptConfig.preferredModel || "",
+        responseTimeMs: null,
+        fallbackUsed: item.attemptConfig.fallbackUsed,
+        validationIssues: [{ code: "provider_failure", message: lastError.message }],
+      });
+    }
+  }
+
+  throw Object.assign(lastError || new Error("All AI routes failed"), { attempts });
+};
+
+const resolveGatewayRequest = async ({
+  question,
+  messages,
+  systemPrompt,
+  preferredModel,
+  maxTokens,
+  temperature,
+  nonTaxReply,
+  retries,
+}) => {
+  const routePlan = buildRoutePlan({
+    question,
+    preferredModel,
+    openRouterGeminiModel: process.env.OPENROUTER_GEMINI_MODEL || "google/gemini-2.0-flash-001",
+    smallModel: process.env.AI_GATEWAY_SMALL_MODEL || "google/gemini-2.0-flash-001",
+    mediumModel: process.env.AI_GATEWAY_MEDIUM_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
+    largeModel: process.env.AI_GATEWAY_LARGE_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
+    ollamaModel: process.env.AI_GATEWAY_OLLAMA_MODEL || process.env.OLLAMA_MODEL || "",
+    ollamaEnabled: featureFlags.aiGatewayOllamaEnabled,
+  });
+
+  const primaryAttempt = routePlan.attempts[0];
+  const secondaryAttempts = routePlan.attempts.slice(1);
+
+  let execution;
+  try {
+    execution =
+      featureFlags.aiGatewayParallelFallbackEnabled && secondaryAttempts.length > 0
+        ? await executeParallelAttemptPlan({
+            primaryAttempt,
+            secondaryAttempts,
+            question,
+            messages,
+            systemPrompt,
+            maxTokens,
+            temperature,
+            retries,
+            nonTaxReply,
+          })
+        : await executeAttemptPlan({
+            attempts: routePlan.attempts,
+            question,
+            messages,
+            systemPrompt,
+            maxTokens,
+            temperature,
+            retries,
+            nonTaxReply,
+          });
+  } catch (error) {
+    throw Object.assign(error instanceof Error ? error : new Error("All AI routes failed"), {
+      attempts: Array.isArray(error?.attempts) ? error.attempts : [],
+      routeTier: routePlan.tier,
+    });
+  }
+
+  return {
+    ...execution,
+    routePlan,
   };
 };
 
@@ -45,89 +269,125 @@ export const routeChatCompletion = async ({
   retries = 1,
 } = {}) => {
   const startedAt = Date.now();
-  const attempts = [];
-  let lastError = null;
+  const cacheKey = featureFlags.aiGatewayCacheEnabled
+    ? buildAiGatewayCacheKey({ question, messages, preferredModel, systemPrompt })
+    : "";
 
-  const routePlan = buildRoutePlan({
-    question,
-    preferredModel,
-    openRouterGeminiModel: process.env.OPENROUTER_GEMINI_MODEL || "google/gemini-2.0-flash-001",
-    smallModel: process.env.AI_GATEWAY_SMALL_MODEL || "google/gemini-2.0-flash-001",
-    mediumModel: process.env.AI_GATEWAY_MEDIUM_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
-    largeModel: process.env.AI_GATEWAY_LARGE_MODEL || process.env.OPENROUTER_MODEL || "anthropic/claude-3.5-sonnet",
-  });
-
-  for (const attemptConfig of routePlan.attempts) {
-    try {
-      const attempt = await buildAttempt({
-        ...attemptConfig,
-        messages,
-        systemPrompt,
-        maxTokens,
-        temperature,
-        retries,
+  if (featureFlags.aiGatewayCacheEnabled) {
+    const cached = getCachedGatewayResponse(cacheKey);
+    if (cached) {
+      await recordAiGatewayExecution({
+        routeTier: cached.routeTier || "medium",
+        provider: cached.provider || "cache",
+        latencyMs: 0,
+        attempts: 0,
+        failed: false,
+        cacheHit: true,
       });
+      return {
+        ...cached,
+        cached: true,
+      };
+    }
 
-      const validation = validateChatbotResponse({
-        question,
-        response: attempt.response,
-        nonTaxReply,
-      });
-      const timedOutByThreshold = attempt.responseTimeMs > PRIMARY_TIMEOUT_THRESHOLD_MS;
-
-      attempts.push({
-        provider: attempt.provider,
-        model: attempt.model,
-        responseTimeMs: attempt.responseTimeMs,
-        fallbackUsed: attemptConfig.fallbackUsed,
-        validationIssues: validation.issues,
-      });
-
-      if (validation.valid && !timedOutByThreshold) {
-        await recordAiGatewayExecution({
-          routeTier: routePlan.tier,
-          provider: attempt.provider,
-          latencyMs: Date.now() - startedAt,
-          attempts: attempts.length,
-          failed: false,
-        });
-
-        return {
-          ...attempt,
-          fallbackUsed: attemptConfig.fallbackUsed,
-          validationIssues: validation.issues,
-          attempts,
-          routeTier: routePlan.tier,
-        };
-      }
-
-      lastError = new Error(
-        timedOutByThreshold
-          ? `Model exceeded timeout threshold (${attempt.responseTimeMs}ms)`
-          : `Response validation failed: ${validation.issues.map((issue) => issue.code).join(", ")}`
-      );
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error || "Unknown AI gateway error"));
-      attempts.push({
-        provider: attemptConfig.provider,
-        model: attemptConfig.preferredModel || "",
-        responseTimeMs: null,
-        fallbackUsed: attemptConfig.fallbackUsed,
-        validationIssues: [{ code: "provider_failure", message: lastError.message }],
-      });
+    const inFlight = getInFlightGatewayRequest(cacheKey);
+    if (inFlight) {
+      return inFlight;
     }
   }
 
-  await recordAiGatewayExecution({
-    routeTier: routePlan.tier,
-    provider: attempts[attempts.length - 1]?.provider || "",
-    latencyMs: Date.now() - startedAt,
-    attempts: attempts.length,
-    failed: true,
-  });
+  const executionPromise = (async () => {
+    try {
+      const { attempt, attempts, validationIssues, fallbackUsed, routePlan } = await resolveGatewayRequest({
+        question,
+        messages,
+        systemPrompt,
+        preferredModel,
+        maxTokens,
+        temperature,
+        nonTaxReply,
+        retries,
+      });
 
-  throw Object.assign(lastError || new Error("All AI routes failed"), {
-    attempts,
-    routeTier: routePlan.tier,
-  });
+      const result = {
+        ...attempt,
+        fallbackUsed,
+        validationIssues,
+        attempts,
+        routeTier: routePlan.tier,
+      };
+
+      await recordAiGatewayExecution({
+        routeTier: routePlan.tier,
+        provider: attempt.provider,
+        latencyMs: Date.now() - startedAt,
+        attempts: attempts.length,
+        failed: false,
+      });
+
+      if (featureFlags.aiGatewayCacheEnabled && cacheKey) {
+        setCachedGatewayResponse(cacheKey, result);
+      }
+
+      return result;
+    } catch (error) {
+      const attempts = Array.isArray(error?.attempts) ? error.attempts : [];
+      const routeTier = error?.routeTier || "medium";
+
+      await recordAiGatewayExecution({
+        routeTier,
+        provider: attempts[attempts.length - 1]?.provider || "",
+        latencyMs: Date.now() - startedAt,
+        attempts: attempts.length,
+        failed: true,
+      });
+
+      throw Object.assign(error instanceof Error ? error : new Error("All AI routes failed"), {
+        attempts,
+        routeTier,
+      });
+    } finally {
+      if (featureFlags.aiGatewayCacheEnabled && cacheKey) {
+        clearInFlightGatewayRequest(cacheKey);
+      }
+    }
+  })();
+
+  if (featureFlags.aiGatewayCacheEnabled && cacheKey) {
+    setInFlightGatewayRequest(cacheKey, executionPromise);
+  }
+
+  return executionPromise;
+};
+
+export const routeChatCompletionStream = async (params = {}) => {
+  const response = await routeChatCompletion(params);
+  const requestId = `aigw_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const chunks = buildStreamingPreviewChunks(response.response || "");
+
+  return {
+    ...response,
+    requestId,
+    sseMessages: [
+      ...chunks.map((chunk) =>
+        createSseEnvelope({
+          requestId,
+          routeTier: response.routeTier,
+          provider: response.provider,
+          chunk,
+          done: false,
+        })
+      ),
+      createSseEnvelope({
+        requestId,
+        routeTier: response.routeTier,
+        provider: response.provider,
+        chunk: "",
+        done: true,
+        meta: {
+          cached: Boolean(response.cached),
+        },
+      }),
+    ],
+  };
 };

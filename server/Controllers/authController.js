@@ -10,9 +10,12 @@ import { getSubscriptionSummary, normalizeUserSubscriptionState } from "../Utils
 const PROFILE_LANGUAGES = new Set(["english", "hindi", "tamil", "indonesian"]);
 const PROFILE_IMAGE_DATA_URL_PATTERN = /^data:image\/(?:png|jpe?g|webp|gif);base64,[a-z0-9+/=]+$/i;
 const MAX_PROFILE_IMAGE_LENGTH = 2_800_000;
+const CURRENT_POLICY_VERSION = process.env.CURRENT_POLICY_VERSION || "2026-05-terms-privacy";
 
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 const sanitizeEmail = (value) => sanitizeString(value).toLowerCase();
+const parseBoolean = (value) => value === true || value === "true" || value === "1" || value === 1;
+const getRequestIp = (req) => sanitizeString(req.headers["x-forwarded-for"]?.split?.(",")?.[0]) || sanitizeString(req.ip) || sanitizeString(req.socket?.remoteAddress);
 const APPLE_ISSUER = "https://appleid.apple.com";
 const APPLE_KEYS_ENDPOINT = "https://appleid.apple.com/auth/keys";
 const APPLE_TOKEN_ENDPOINT = "https://appleid.apple.com/auth/token";
@@ -265,7 +268,7 @@ const buildFrontendAuthRedirect = (frontendOrigin, params = {}) => {
   return redirectUrl.toString();
 };
 
-const completeLinkedInLogin = async ({ code, redirectUri }) => {
+const completeLinkedInLogin = async ({ code, redirectUri, termsContext = null }) => {
   const tokenResponse = await exchangeLinkedInAuthorizationCode({ code, redirectUri });
   const accessToken = sanitizeString(tokenResponse?.access_token);
 
@@ -298,12 +301,19 @@ const completeLinkedInLogin = async ({ code, redirectUri }) => {
   const isNewUser = !user;
 
   if (!user) {
+    if (!termsContext?.termsAccepted) {
+      throw new Error("TERMS_ACCEPTANCE_REQUIRED");
+    }
     user = await User.create({
       name: name || "LinkedIn User",
       email: email || `linkedin_${linkedinId}@users.nritax.ai`,
       linkedinId,
       profileImage: picture,
       provider: "linkedin",
+      termsAccepted: true,
+      acceptedAt: new Date(),
+      policyVersion: termsContext.policyVersion || CURRENT_POLICY_VERSION,
+      acceptedIp: termsContext.acceptedIp || "",
     });
   } else {
     let changed = false;
@@ -454,6 +464,30 @@ const ensureWelcomeEmailSent = async (userDoc) => {
   }
 };
 
+const buildTermsAcceptance = (req) => ({
+  termsAccepted: true,
+  acceptedAt: new Date(),
+  policyVersion: sanitizeString(req.body?.policyVersion) || CURRENT_POLICY_VERSION,
+  acceptedIp: getRequestIp(req),
+});
+
+const hasTermsAcceptancePayload = (req) => parseBoolean(req.body?.termsAccepted);
+
+const applyTermsAcceptance = (userDoc, req) => {
+  const acceptance = buildTermsAcceptance(req);
+  userDoc.termsAccepted = acceptance.termsAccepted;
+  userDoc.acceptedAt = acceptance.acceptedAt;
+  userDoc.policyVersion = acceptance.policyVersion;
+  userDoc.acceptedIp = acceptance.acceptedIp;
+};
+
+const rejectMissingTerms = (res) =>
+  res.status(400).json({
+    success: false,
+    code: "TERMS_ACCEPTANCE_REQUIRED",
+    message: "You must accept the Terms & Conditions and Privacy Policy to continue.",
+  });
+
 const toSafeUser = (userDoc) => {
   if (!userDoc) return null;
   normalizeUserSubscriptionState(userDoc);
@@ -470,6 +504,9 @@ const toSafeUser = (userDoc) => {
     bio: user.bio || "",
     linkedinProfile: user.linkedinProfile || "",
     provider: user.provider || "local",
+    termsAccepted: Boolean(user.termsAccepted),
+    acceptedAt: user.acceptedAt || null,
+    policyVersion: user.policyVersion || "",
     plan: user.plan || subscriptionSummary.plan,
     subscriptionStatus: user.subscriptionStatus || subscriptionSummary.subscriptionStatus,
     subscriptionStartDate: user.subscriptionStartDate || subscriptionSummary.subscriptionStartDate,
@@ -495,6 +532,9 @@ const toAppleAuthResponseUser = (userDoc) => {
     _id: safeUser._id,
     provider: safeUser.provider,
     profileImage: safeUser.profileImage,
+    termsAccepted: safeUser.termsAccepted,
+    acceptedAt: safeUser.acceptedAt,
+    policyVersion: safeUser.policyVersion,
   };
 };
 
@@ -575,6 +615,9 @@ export const googleLogin = async (req, res) => {
     const isNewUser = !user;
 
     if (!user) {
+      if (!hasTermsAcceptancePayload(req)) {
+        return rejectMissingTerms(res);
+      }
       // Create new Google user
       user = await User.create({
         name,
@@ -582,6 +625,7 @@ export const googleLogin = async (req, res) => {
         googleId: sub,
         profileImage: picture,
         provider: "google",
+        ...buildTermsAcceptance(req),
       });
     } else {
       let changed = false;
@@ -660,12 +704,16 @@ export const googleNativeLogin = async (req, res) => {
     const isNewUser = !user;
 
     if (!user) {
+      if (!hasTermsAcceptancePayload(req)) {
+        return rejectMissingTerms(res);
+      }
       user = await User.create({
         name,
         email: normalizedEmail,
         googleId: sub,
         profileImage: picture,
         provider: "google",
+        ...buildTermsAcceptance(req),
       });
     } else {
       let changed = false;
@@ -745,6 +793,9 @@ export const appleLogin = async (req, res) => {
     const isNewUser = !user;
 
     if (!user) {
+      if (!hasTermsAcceptancePayload(req)) {
+        return rejectMissingTerms(res);
+      }
       const parsedFirstName = sanitizeString(fullName?.firstName);
       const parsedLastName = sanitizeString(fullName?.lastName);
       const providedName = sanitizeString(req.body?.name);
@@ -755,6 +806,7 @@ export const appleLogin = async (req, res) => {
         email: email || `apple_${appleId}@privaterelay.appleid.com`,
         appleId,
         provider: "apple",
+        ...buildTermsAcceptance(req),
       });
     } else if (!user.appleId) {
       user.appleId = appleId;
@@ -832,7 +884,18 @@ export const registerUser = async (req, res) => {
       });
     }
 
-    const newUser = new User({ name, email, password, linkedinProfile, provider: "local" });
+    if (!hasTermsAcceptancePayload(req)) {
+      return rejectMissingTerms(res);
+    }
+
+    const newUser = new User({
+      name,
+      email,
+      password,
+      linkedinProfile,
+      provider: "local",
+      ...buildTermsAcceptance(req),
+    });
     await newUser.save();
     await ensureWelcomeEmailSent(newUser);
 
@@ -983,7 +1046,17 @@ export const startLinkedInAuth = async (req, res) => {
     const mode = sanitizeString(req.query?.mode) === "signup" ? "signup" : "login";
     const frontendOrigin = resolveFrontendOrigin(req.query?.origin);
     const redirectUri = getLinkedInCallbackUri(req);
-    const state = encodeLinkedInState({ mode, frontendOrigin });
+    const termsContext = mode === "signup" && parseBoolean(req.query?.termsAccepted)
+      ? {
+          termsAccepted: true,
+          policyVersion: sanitizeString(req.query?.policyVersion) || CURRENT_POLICY_VERSION,
+          acceptedIp: getRequestIp(req),
+        }
+      : null;
+    if (mode === "signup" && !termsContext) {
+      return rejectMissingTerms(res);
+    }
+    const state = encodeLinkedInState({ mode, frontendOrigin, termsContext });
     const authUrl = new URL("https://www.linkedin.com/oauth/v2/authorization");
     authUrl.searchParams.set("response_type", "code");
     authUrl.searchParams.set("client_id", clientId);
@@ -1023,7 +1096,11 @@ export const linkedinCallback = async (req, res) => {
     }
 
     const redirectUri = getLinkedInCallbackUri(req);
-    const { token, user } = await completeLinkedInLogin({ code, redirectUri });
+    const { token, user } = await completeLinkedInLogin({
+      code,
+      redirectUri,
+      termsContext: statePayload?.termsContext || null,
+    });
 
     return res.redirect(
       buildFrontendAuthRedirect(frontendOrigin, {
@@ -1057,7 +1134,8 @@ export const linkedinLogin = async (req, res) => {
       });
     }
 
-    const { token, user } = await completeLinkedInLogin({ code, redirectUri });
+    const termsContext = hasTermsAcceptancePayload(req) ? buildTermsAcceptance(req) : null;
+    const { token, user } = await completeLinkedInLogin({ code, redirectUri, termsContext });
 
     return res.status(200).json({
       success: true,
@@ -1071,6 +1149,37 @@ export const linkedinLogin = async (req, res) => {
       success: false,
       message: "LinkedIn authentication failed",
       error: error?.message || "Unknown LinkedIn authentication error",
+    });
+  }
+};
+
+export const acceptTerms = async (req, res) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    if (!hasTermsAcceptancePayload(req)) {
+      return rejectMissingTerms(res);
+    }
+
+    applyTermsAcceptance(req.user, req);
+    await req.user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Terms accepted successfully.",
+      user: toSafeUser(req.user),
+      data: toSafeUser(req.user),
+    });
+  } catch (error) {
+    logAuthError("accept-terms", error, { userId: req.user?._id || null });
+    return res.status(500).json({
+      success: false,
+      message: "Unable to save terms acceptance.",
     });
   }
 };

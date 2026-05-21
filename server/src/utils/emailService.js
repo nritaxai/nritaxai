@@ -1,9 +1,9 @@
 import nodemailer from "nodemailer";
+import { COMPANY_SHORT_NAME, DEFAULT_FROM_EMAIL } from "../../Config/branding.js";
 
 let cachedTransporter = null;
 
 const RESEND_API_URL = "https://api.resend.com/emails";
-const DEFAULT_FROM_EMAIL = "NRITAX <noreply@mail.nritax.ai>";
 
 const sanitizeEnv = (value) => String(value || "").trim();
 const sanitizePassword = (value) => sanitizeEnv(value).replace(/\s+/g, "");
@@ -42,7 +42,7 @@ const getResendConfig = () => {
 
   if (/@resend\.dev>?$/i.test(from)) {
     throw new Error(
-      "RESEND_FROM_EMAIL is using Resend's test domain. Verify your domain in Resend and use a sender like NRITAX <noreply@your-domain.com>."
+      `RESEND_FROM_EMAIL is using Resend's test domain. Verify your domain in Resend and use a sender like ${COMPANY_SHORT_NAME} <noreply@your-domain.com>.`
     );
   }
 

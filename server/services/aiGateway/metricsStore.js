@@ -18,7 +18,9 @@ const defaultMetrics = () => ({
     openrouter: 0,
     gemini: 0,
     "gemini-direct": 0,
+    ollama: 0,
   },
+  cacheHits: 0,
   averageLatencyMs: 0,
   averageAttempts: 0,
   lastUpdatedAt: null,
@@ -62,6 +64,7 @@ export const recordAiGatewayExecution = async ({
   latencyMs = 0,
   attempts = 1,
   failed = false,
+  cacheHit = false,
 } = {}) =>
   enqueueWrite(async () => {
     const metrics = await readMetrics();
@@ -74,6 +77,7 @@ export const recordAiGatewayExecution = async ({
     metrics.routeCounts = metrics.routeCounts || defaultMetrics().routeCounts;
     metrics.providerCounts = metrics.providerCounts || defaultMetrics().providerCounts;
     metrics.routeCounts[routeTier] = Number(metrics.routeCounts[routeTier] || 0) + 1;
+    metrics.cacheHits = Number(metrics.cacheHits || 0) + (cacheHit ? 1 : 0);
     if (provider) {
       metrics.providerCounts[provider] = Number(metrics.providerCounts[provider] || 0) + 1;
     }

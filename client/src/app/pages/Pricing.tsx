@@ -10,6 +10,7 @@ import { GSTIN, IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import { getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { CLIENT_PLAN_CONFIG, CLIENT_PLAN_ORDER, getPlanLabel, isCurrentPlan, type PlanKey, type SubscriptionMe } from "../../utils/subscription";
+import { COMPANY_LEGAL_NAME, buildSupportMailto, applyDocumentMetadata } from "../../config/branding";
 
 type BillingCycle = "monthly" | "yearly";
 
@@ -28,6 +29,10 @@ export function Pricing({ onRequireLogin }: PricingProps) {
   const [currencyOverride, setCurrencyOverride] = useState<string>(
     () => localStorage.getItem("pricing_currency_override") || "INR"
   );
+
+  useEffect(() => {
+    applyDocumentMetadata(`Pricing | ${COMPANY_LEGAL_NAME}`);
+  }, []);
 
   const plans = CLIENT_PLAN_ORDER.map((planKey) => {
     const config = CLIENT_PLAN_CONFIG[planKey];
@@ -120,7 +125,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       return;
     }
 
-    window.location.href = "mailto:ask@nritax.ai?subject=Enterprise%20Plan%20Inquiry%20-%20NRITAX.AI";
+    window.location.href = buildSupportMailto("Enterprise Plan Inquiry");
   };
 
   const handleRestoreSubscription = async () => {
@@ -407,7 +412,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
           <h2 className="mb-4 text-2xl font-bold md:text-3xl">Need help choosing a plan?</h2>
           <p className="mb-8 text-lg text-blue-100 md:text-xl">Our team can help you select the right option.</p>
           <a
-            href="mailto:ask@nritax.ai?subject=Pricing%20Inquiry%20-%20NRITAX.AI"
+            href={buildSupportMailto("Pricing Inquiry")}
             className="inline-block rounded-md bg-white px-8 py-4 text-lg font-semibold text-blue-700 transition-all hover:bg-gray-50"
           >
             Talk to Support

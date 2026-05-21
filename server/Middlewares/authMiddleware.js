@@ -49,3 +49,19 @@ export const optionalProtect = async (req, _res, next) => {
 
   next();
 }
+
+export const requireTermsAcceptance = (req, res, next) => {
+  if (!req.user) {
+    return next();
+  }
+
+  if (req.user.termsAccepted && req.user.acceptedAt) {
+    return next();
+  }
+
+  return res.status(403).json({
+    success: false,
+    code: "TERMS_ACCEPTANCE_REQUIRED",
+    message: "Please accept the Terms & Conditions and Privacy Policy to continue.",
+  });
+}

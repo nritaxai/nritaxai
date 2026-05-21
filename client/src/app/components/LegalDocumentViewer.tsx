@@ -1,9 +1,10 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 
 import { ExternalLink, Download } from "lucide-react";
 
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card";
+import { COMPANY_LEGAL_NAME, DEFAULT_META_DESCRIPTION, applyDocumentMetadata } from "../../config/branding";
 
 type LegalDocumentViewerProps = {
   title: string;
@@ -11,6 +12,7 @@ type LegalDocumentViewerProps = {
   pdfPath: string;
   summary: string;
   footer?: ReactNode;
+  metadataDescription?: string;
 };
 
 export function LegalDocumentViewer({
@@ -19,7 +21,12 @@ export function LegalDocumentViewer({
   pdfPath,
   summary,
   footer,
+  metadataDescription = DEFAULT_META_DESCRIPTION,
 }: LegalDocumentViewerProps) {
+  useEffect(() => {
+    applyDocumentMetadata(`${title} | ${COMPANY_LEGAL_NAME}`, metadataDescription);
+  }, [metadataDescription, title]);
+
   return (
     <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]">

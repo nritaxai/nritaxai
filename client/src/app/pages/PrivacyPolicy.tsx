@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { LegalDocumentViewer } from "../components/LegalDocumentViewer";
 import { Button } from "../components/ui/button";
+import { COMPANY_LEGAL_NAME, LEGAL_PDF_PATHS } from "../../config/branding";
 
 type PrivacyLocationState = {
   fromHero?: boolean;
@@ -28,9 +29,10 @@ export function PrivacyPolicy() {
   return (
     <LegalDocumentViewer
       title="Privacy Policy"
-      subtitle="Official NRITaxAI privacy policy document"
-      pdfPath="/legal/nritaxai-privacy-policy.pdf"
-      summary="The uploaded privacy policy PDF is shown below and is also available to open in a new tab or download."
+      subtitle={`Official privacy policy for ${COMPANY_LEGAL_NAME}`}
+      pdfPath={LEGAL_PDF_PATHS.privacy}
+      summary={`The official privacy policy for ${COMPANY_LEGAL_NAME} is shown below and is also available to open in a new tab or download.`}
+      metadataDescription={`Review the official privacy policy for ${COMPANY_LEGAL_NAME}.`}
       footer={
         isFromHero ? (
           <>

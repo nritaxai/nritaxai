@@ -1,7 +1,8 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { resetPassword } from "../../utils/api";
+import { COMPANY_LEGAL_NAME, applyDocumentMetadata } from "../../config/branding";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
@@ -14,6 +15,10 @@ export function ResetPassword() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
+
+  useEffect(() => {
+    applyDocumentMetadata(`Reset Password | ${COMPANY_LEGAL_NAME}`);
+  }, []);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -51,7 +56,7 @@ export function ResetPassword() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Reset Password</CardTitle>
-          <CardDescription>Choose a new password for your NRITAX account.</CardDescription>
+          <CardDescription>Choose a new password for your {COMPANY_LEGAL_NAME} account.</CardDescription>
         </CardHeader>
         <CardContent>
           {!token ? (

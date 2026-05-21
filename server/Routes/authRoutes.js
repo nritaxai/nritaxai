@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  acceptTerms,
   appleAuthController,
   changePassword,
   deleteAccount,
@@ -35,6 +36,7 @@ router.post("/apple", authRateLimiter, appleAuthController);
 router.post("/linkedin", authRateLimiter, linkedinLogin);
 router.get("/linkedin", authRateLimiter, startLinkedInAuth);
 router.get("/linkedin/callback", linkedinCallback);
+router.post("/accept-terms", protect, acceptTerms);
 
 router.get("/profile", protect, getUserProfile);
 

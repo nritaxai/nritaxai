@@ -1,4 +1,5 @@
-﻿import { sendEmail } from "../emailService.js";
+import { COMPANY_SUPPORT_TEAM_NAME } from "../../../Config/branding.js";
+import { sendEmail } from "../emailService.js";
 
 const normalize = (value, fallback = "") => {
   const trimmed = typeof value === "string" ? value.trim() : "";
@@ -31,7 +32,7 @@ export const sendConsultationConfirmationEmail = async ({
       <p><strong>Timezone:</strong> ${safeTimezone}</p>
       <p>We will contact you shortly.</p>
       <br/>
-      <p>Regards,<br/>NRITAX Team</p>
+      <p>Regards,<br/>${COMPANY_SUPPORT_TEAM_NAME}</p>
     `,
   });
 

@@ -100,8 +100,11 @@ export const resetPassword = async (payload: {
   return postRequest("/api/auth/reset-password", payload);
 };
 
-export const googleLoginUser = async (credential: string) => {
-  return postRequest("/api/auth/google-login", { credential });
+export const googleLoginUser = async (credential: string | { credential: string; termsAccepted?: boolean; policyVersion?: string }) => {
+  return postRequest(
+    "/api/auth/google-login",
+    typeof credential === "string" ? { credential } : credential
+  );
 };
 
 export const appleLoginUser = async (payload: {
@@ -112,6 +115,8 @@ export const appleLoginUser = async (payload: {
   identityToken?: string;
   idToken?: string;
   fullName?: { firstName?: string; lastName?: string };
+  termsAccepted?: boolean;
+  policyVersion?: string;
 }) => {
   return postRequest("/api/auth/apple", payload);
 };
@@ -119,8 +124,14 @@ export const appleLoginUser = async (payload: {
 export const linkedinLoginUser = async (payload: {
   code: string;
   redirectUri: string;
+  termsAccepted?: boolean;
+  policyVersion?: string;
 }) => {
   return postRequest("/api/auth/linkedin", payload);
+};
+
+export const acceptTerms = async (payload: { termsAccepted: boolean; policyVersion?: string }) => {
+  return postRequest("/api/auth/accept-terms", payload);
 };
 
 export const submitYuktiGrievance = async (payload: {

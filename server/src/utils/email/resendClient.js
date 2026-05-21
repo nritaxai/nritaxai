@@ -1,4 +1,5 @@
-﻿import { sendEmail } from "../emailService.js";
+import { DEFAULT_FROM_EMAIL } from "../../../Config/branding.js";
+import { sendEmail } from "../emailService.js";
 
 // Compatibility shim: legacy imports may call this module.
 // No Resend dependency is used.
@@ -15,4 +16,4 @@ export const getResendClient = () => ({
 export const getResendFromAddress = () =>
   process.env.RESEND_FROM_EMAIL
     ? String(process.env.RESEND_FROM_EMAIL).trim()
-    : "NRITAX <noreply@mail.nritax.ai>";
+    : DEFAULT_FROM_EMAIL;

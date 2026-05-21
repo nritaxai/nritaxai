@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "motion/react";
 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { COMPANY_COPYRIGHT_NAME, COMPANY_LEGAL_NAME, PLATFORM_TAGLINE } from "../../config/branding";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { fadeUp, staggerContainer } from "../utils/motion";
 
@@ -80,6 +81,8 @@ const footerLinkClass =
   "text-sm font-normal text-slate-400 transition-colors duration-200 hover:text-white hover:underline";
 
 export function Footer() {
+  const currentYear = new Date().getFullYear();
+
   return (
     <motion.footer
       initial="hidden"
@@ -134,11 +137,11 @@ export function Footer() {
 
         <div className="flex flex-col gap-6 pt-8 md:flex-row md:items-center md:justify-between">
           <div className="flex flex-col gap-4">
-            <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
-              <img src="/logo-transparent.png" alt="NRITAX logo" className="h-14 w-auto object-contain" />
+            <Link to="/home" className="inline-flex items-center" aria-label={`${COMPANY_LEGAL_NAME} home`}>
+              <img src="/logo-transparent.png" alt={`${COMPANY_LEGAL_NAME} logo`} className="h-14 w-auto object-contain" />
             </Link>
             <p className="text-sm font-normal text-slate-400">
-              © 2026 NRITAX. {renderTextWithShortForms("AI-powered tax guidance for global NRIs.")}
+              © {currentYear} {COMPANY_COPYRIGHT_NAME}. {renderTextWithShortForms(PLATFORM_TAGLINE)}
             </p>
           </div>
 

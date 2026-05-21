@@ -19,6 +19,7 @@ import {
   normalizeConsultationTime,
   postConsultationWebhook,
 } from "../utils/consultationWorkflow";
+import { COMPANY_LEGAL_NAME } from "../../config/branding";
 
 type FieldErrors = {
   date?: string;
@@ -116,7 +117,7 @@ export function Reschedule() {
               <div>
                 <CardTitle className="text-3xl text-[#0F172A]">Reschedule Consultation</CardTitle>
                 <CardDescription className="mt-1 text-base text-[#475569]">
-                  Choose a new date and time for your NRITAX CPA consultation.
+                  Choose a new date and time for your {COMPANY_LEGAL_NAME} CPA consultation.
                 </CardDescription>
               </div>
             </div>

@@ -1,13 +1,21 @@
+import { useEffect } from "react";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { COMPANY_LEGAL_NAME, applyDocumentMetadata } from "../../config/branding";
 
 export function AboutUs() {
+  useEffect(() => {
+    applyDocumentMetadata(`About Us | ${COMPANY_LEGAL_NAME}`);
+  }, []);
+
   return (
     <main className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
       <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]">
         <CardHeader>
           <CardTitle className="text-3xl text-[#0F172A] sm:text-4xl">About Us</CardTitle>
           <CardDescription className="text-base text-[#0F172A]">
-            NRITAX.AI is built with a single purpose: to simplify tax decision-making for Non-Resident Indians living and earning across borders.
+            {COMPANY_LEGAL_NAME} is built with a single purpose: to simplify tax decision-making for Non-Resident Indians
+            living and earning across borders.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 text-sm leading-7 text-[#0F172A]">
@@ -18,7 +26,8 @@ export function AboutUs() {
             hard to navigate.
           </p>
           <p>
-            That is why we created NRITAX.AI, a smarter and more intuitive way to approach cross-border taxation.
+            That is why we created {COMPANY_LEGAL_NAME}, a smarter and more intuitive way to approach cross-border
+            taxation.
           </p>
           <p>
             Our platform combines advanced AI-driven insights with practical, easy-to-follow workflows. Instead of just
@@ -44,14 +53,12 @@ export function AboutUs() {
 
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-[#0F172A]">Transparency</h2>
-            <p>
-              No hidden complexity, no unnecessary jargon. Just clear guidance you can trust.
-            </p>
+            <p>No hidden complexity, no unnecessary jargon. Just clear guidance you can trust.</p>
           </div>
 
           <p>
             Whether you are earning income in India and abroad, investing across markets, or preparing for annual tax
-            filings, NRITAX.AI is designed to support your journey end-to-end.
+            filings, {COMPANY_LEGAL_NAME} is designed to support your journey end-to-end.
           </p>
           <p>
             We are not just building a tool, we are building a smarter way for NRIs to manage taxes with confidence,
@@ -61,8 +68,8 @@ export function AboutUs() {
           <div className="space-y-3">
             <h2 className="text-lg font-semibold text-[#0F172A]">Our Vision</h2>
             <p>
-              To become the most trusted digital tax companion for NRIs worldwide, making cross-border taxation effortless
-              and accessible.
+              To become the most trusted digital tax companion for NRIs worldwide, making cross-border taxation
+              effortless and accessible.
             </p>
           </div>
 
@@ -78,5 +85,3 @@ export function AboutUs() {
     </main>
   );
 }
-
-

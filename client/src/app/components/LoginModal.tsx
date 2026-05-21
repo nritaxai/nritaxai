@@ -27,6 +27,8 @@ import {
 } from "../../config/appConfig";
 import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
+import { CURRENT_POLICY_VERSION } from "../../config/legal";
+import { COMPANY_LEGAL_NAME } from "../../config/branding";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -48,6 +50,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     linkedinProfile: "",
     password: "",
     confirmPassword: "",
+    termsAccepted: false,
   });
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
@@ -67,6 +70,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const canUseLinkedInAuth =
     Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
   const canUseAppleAuth = APPLE_AUTH_CONFIG.isConfigured;
+  const signupCanContinue = signupData.termsAccepted;
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -78,6 +82,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const handleLinkedInAuth = (mode: "login" | "signup") => {
     try {
+      if (mode === "signup" && !signupCanContinue) {
+        setSignupError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+        return;
+      }
       if (!LINKEDIN_AUTH_CONFIG.authBaseUrl) {
         throw new Error("LinkedIn Sign-In configuration is missing.");
       }
@@ -85,6 +93,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       const authUrl = new URL("/auth/linkedin", `${LINKEDIN_AUTH_CONFIG.authBaseUrl}/`);
       authUrl.searchParams.set("mode", mode);
       authUrl.searchParams.set("origin", window.location.origin);
+      if (mode === "signup") {
+        authUrl.searchParams.set("termsAccepted", "true");
+        authUrl.searchParams.set("policyVersion", CURRENT_POLICY_VERSION);
+      }
 
       console.info("[auth] starting LinkedIn auth", {
         mode,
@@ -209,6 +221,11 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       return;
     }
 
+    if (!signupData.termsAccepted) {
+      setSignupError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+      return;
+    }
+
     setLoading(true);
     try {
       const response = await signupUser({
@@ -217,6 +234,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         linkedinProfile: signupData.linkedinProfile.trim(),
         password: signupData.password,
         confirmPassword: signupData.confirmPassword,
+        termsAccepted: signupData.termsAccepted,
+        policyVersion: CURRENT_POLICY_VERSION,
       });
       const user = resolveAuthUser(response);
       handleAuthSuccess(response, `Account created successfully! WELCOME ${user?.name || "User"}`);
@@ -235,6 +254,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   };
 
   const handleAppleLogin = async (mode: "login" | "signup") => {
+    if (mode === "signup" && !signupCanContinue) {
+      setSignupError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+      return;
+    }
     setLoginError(null);
     setSignupError(null);
     setLoading(true);
@@ -246,6 +269,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         identityToken: appleResponse?.authorization?.id_token,
         user: appleResponse?.user,
         fullName: appleResponse?.user?.name,
+        termsAccepted: mode === "signup" ? true : undefined,
+        policyVersion: mode === "signup" ? CURRENT_POLICY_VERSION : undefined,
       });
       const user = resolveAuthUser(response);
       handleAuthSuccess(
@@ -290,7 +315,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle>Welcome to NRITAX.AI</CardTitle>
+              <CardTitle>Welcome to {COMPANY_LEGAL_NAME}</CardTitle>
               <CardDescription>Login or create an account to continue</CardDescription>
             </div>
             {!disableClose ? (
@@ -538,7 +563,28 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
                 <p className="text-xs text-[#0F172A]">Use at least 6 characters for a secure password.</p>
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <label className="flex items-start gap-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={signupData.termsAccepted}
+                      onChange={(e) => setSignupData({ ...signupData, termsAccepted: e.target.checked })}
+                      className="mt-1"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <a href="/terms-and-conditions" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
+                        Terms & Conditions
+                      </a>{" "}
+                      and{" "}
+                      <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
+                        Privacy Policy
+                      </a>
+                    </span>
+                  </label>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading || !signupCanContinue}>
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="size-4 animate-spin" />
@@ -560,7 +606,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
                 <div className="grid grid-cols-1 gap-4">
                   {canUseAppleAuth ? (
-                    <Button type="button" variant="outline" className="w-full" onClick={() => void handleAppleLogin("signup")}>
+                    <Button type="button" variant="outline" className="w-full" disabled={!signupCanContinue} onClick={() => void handleAppleLogin("signup")}>
                       Sign up with Apple
                     </Button>
                   ) : null}
@@ -570,39 +616,50 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                       variant="outline"
                       className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
                       onClick={() => handleLinkedInAuth("signup")}
+                      disabled={!signupCanContinue}
                     >
                       Sign up with LinkedIn
                     </Button>
                   ) : null}
                   {canUseGoogleAuth ? (
                     <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
-                      <GoogleLogin
-                        text="signup_with"
-                        {...googleButtonProps}
-                        onSuccess={async (credentialResponse) => {
-                          try {
-                            if (!credentialResponse.credential) {
-                              throw new Error("Missing Google credential.");
+                      {signupCanContinue ? (
+                        <GoogleLogin
+                          text="signup_with"
+                          {...googleButtonProps}
+                          onSuccess={async (credentialResponse) => {
+                            try {
+                              if (!credentialResponse.credential) {
+                                throw new Error("Missing Google credential.");
+                              }
+                              const response = await googleLoginUser({
+                                credential: credentialResponse.credential,
+                                termsAccepted: true,
+                                policyVersion: CURRENT_POLICY_VERSION,
+                              });
+                              const user = resolveAuthUser(response);
+                              handleAuthSuccess(
+                                response,
+                                `Account created successfully! WELCOME ${user?.name || "User"}`
+                              );
+                            } catch (error: any) {
+                              const message = getApiErrorMessage(error, "Google signup failed.");
+                              console.error("[auth] google signup failed", { message });
+                              setSignupError(message);
+                              showPopup(message, "error");
                             }
-                            const response = await googleLoginUser(credentialResponse.credential);
-                            const user = resolveAuthUser(response);
-                            handleAuthSuccess(
-                              response,
-                              `Account created successfully! WELCOME ${user?.name || "User"}`
-                            );
-                          } catch (error: any) {
-                            const message = getApiErrorMessage(error, "Google signup failed.");
-                            console.error("[auth] google signup failed", { message });
+                          }}
+                          onError={() => {
+                            const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setSignupError(message);
-                            showPopup(message, "error");
-                          }
-                        }}
-                        onError={() => {
-                          const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
-                          setSignupError(message);
-                          showPopup(message, "error", 4000);
-                        }}
-                      />
+                            showPopup(message, "error", 4000);
+                          }}
+                        />
+                      ) : (
+                        <Button type="button" variant="outline" className="w-full" disabled>
+                          Sign up with Google
+                        </Button>
+                      )}
                     </div>
                   ) : null}
                 </div>

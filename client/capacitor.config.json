@@ -1,7 +1,10 @@
 {
-  "appId": "com.straitsparters.nritaxai",
+  "appId": "com.nritaxai.app",
   "appName": "Nritaxai",
   "webDir": "dist",
+  "android": {
+    "path": "android"
+  },
   "server": {
     "androidScheme": "https",
     "iosScheme": "https",

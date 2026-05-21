@@ -6,6 +6,7 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { CheckCircle2, CreditCard, Lock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { COMPANY_LEGAL_NAME, applyDocumentMetadata } from "../../config/branding";
 
 interface SubscribeProps {
   selectedPlan?: string;
@@ -22,6 +23,10 @@ export function Subscribe({ selectedPlan: initialPlan }: SubscribeProps) {
   const [selectedPlan, setSelectedPlan] = useState(initialPlan || "pro");
   const [subscribed, setSubscribed] = useState(false);
   const [email, setEmail] = useState("");
+
+  useEffect(() => {
+    applyDocumentMetadata(`Subscribe | ${COMPANY_LEGAL_NAME}`);
+  }, []);
 
   const plans = {
     pro: { name: "Pro", price: 29 },
@@ -60,7 +65,7 @@ export function Subscribe({ selectedPlan: initialPlan }: SubscribeProps) {
         key: orderResp.key, // Razorpay Key from backend
         amount: orderResp.amount,
         currency: orderResp.currency,
-        name: "NRITAX.AI",
+        name: COMPANY_LEGAL_NAME,
         description: `${plans[selectedPlan as keyof typeof plans].name} Plan`,
         order_id: orderResp.id,
         handler: async function (response: any) {
@@ -100,7 +105,7 @@ export function Subscribe({ selectedPlan: initialPlan }: SubscribeProps) {
             </div>
             <CardTitle className="text-2xl">Subscription Successful!</CardTitle>
             <CardDescription>
-              Welcome to NRITAX.AI {plans[selectedPlan as keyof typeof plans].name} plan
+              Welcome to {COMPANY_LEGAL_NAME} {plans[selectedPlan as keyof typeof plans].name} plan
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

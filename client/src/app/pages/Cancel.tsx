@@ -9,6 +9,7 @@ import {
   getConsultationIdentifierFromSearchParams,
   postConsultationWebhook,
 } from "../utils/consultationWorkflow";
+import { COMPANY_LEGAL_NAME } from "../../config/branding";
 
 export function Cancel() {
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export function Cancel() {
               <div>
                 <CardTitle className="text-3xl text-[#0F172A]">Cancel Consultation</CardTitle>
                 <CardDescription className="mt-1 text-base text-[#475569]">
-                  Confirm cancellation of your NRITAX CPA consultation booking.
+                  Confirm cancellation of your {COMPANY_LEGAL_NAME} CPA consultation booking.
                 </CardDescription>
               </div>
             </div>

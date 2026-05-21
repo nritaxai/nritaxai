@@ -1,4 +1,4 @@
-package www.nritaxai.com;
+package com.nritaxai.app;
 
 import com.getcapacitor.BridgeActivity;
 

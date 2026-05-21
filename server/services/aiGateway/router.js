@@ -43,6 +43,8 @@ export const buildRoutePlan = ({
   largeModel = "",
   mediumModel = "",
   smallModel = "",
+  ollamaModel = "",
+  ollamaEnabled = false,
 } = {}) => {
   const tier = classifyRouteTier({ question, preferredModel });
 
@@ -50,7 +52,8 @@ export const buildRoutePlan = ({
     return {
       tier,
       attempts: [
-        { provider: "openrouter", preferredModel: smallModel || openRouterGeminiModel, fallbackUsed: false },
+        ...(ollamaEnabled ? [{ provider: "ollama", preferredModel: ollamaModel, fallbackUsed: false }] : []),
+        { provider: "openrouter", preferredModel: smallModel || openRouterGeminiModel, fallbackUsed: !ollamaEnabled },
         { provider: "gemini-direct", preferredModel: process.env.GEMINI_MODEL || "", fallbackUsed: true },
       ],
     };
@@ -70,6 +73,7 @@ export const buildRoutePlan = ({
     tier,
     attempts: [
       { provider: "openrouter", preferredModel: preferredModel || mediumModel, fallbackUsed: false },
+      ...(ollamaEnabled ? [{ provider: "ollama", preferredModel: ollamaModel, fallbackUsed: true }] : []),
       { provider: "openrouter", preferredModel: openRouterGeminiModel, fallbackUsed: true },
       { provider: "gemini-direct", preferredModel: process.env.GEMINI_MODEL || "", fallbackUsed: true },
     ],
