@@ -62,7 +62,7 @@ export function ExpertCouncil() {
   const shouldReduceMotion = useReducedMotion();
 
   return (
-    <section className="bg-gray-50 py-16 md:py-24">
+    <section className="bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_22%,#ffffff_100%)] py-16 md:py-20">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <motion.div
           initial="hidden"
@@ -71,9 +71,9 @@ export function ExpertCouncil() {
           variants={fadeUp}
           className="mb-12 text-center"
         >
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-blue-600">Expert Council</p>
-          <h2 className="mb-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Meet Your Expert Council</h2>
-          <p className="text-base font-normal text-slate-500">Certified professionals with decades of cross-border tax expertise</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">Expert Council</p>
+          <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-slate-950 md:text-4xl">Meet the specialists behind the platform</h2>
+          <p className="mx-auto max-w-2xl text-base leading-7 text-slate-600">Certified professionals with decades of cross-border tax, FEMA, and NRI advisory experience.</p>
         </motion.div>
 
         <motion.div
@@ -81,7 +81,7 @@ export function ExpertCouncil() {
           whileInView="visible"
           viewport={{ once: true, amount: 0.2 }}
           variants={staggerContainer(0.08, 0.08)}
-          className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"
+          className="grid auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4"
         >
           {expertTeam.map((expert) => (
             <motion.div
@@ -93,9 +93,9 @@ export function ExpertCouncil() {
                   : { y: -5, boxShadow: "0 20px 36px rgba(15, 23, 42, 0.10)" }
               }
               transition={{ duration: 0.28, ease: PREMIUM_EASE }}
-              className="rounded-lg border border-gray-200 bg-white p-6 text-center shadow-sm"
+              className="flex h-full flex-col rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(246,248,252,0.98))] p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
             >
-              <img src={expert.imageUrl} alt={expert.name} className="mx-auto mb-4 h-24 w-24 rounded-full object-cover" />
+              <img src={expert.imageUrl} alt={expert.name} className="mx-auto mb-4 h-24 w-24 rounded-full border-4 border-white object-cover shadow-[0_18px_30px_rgba(15,23,42,0.14)]" />
               <h3 className="mb-1 text-lg font-semibold text-slate-900">{expert.name}</h3>
               <p className="mb-2 text-sm font-medium text-blue-600">{expert.role}</p>
               <p className="mb-3 text-sm font-normal leading-7 text-slate-600">{expert.specialization}</p>
@@ -106,8 +106,8 @@ export function ExpertCouncil() {
                   </span>
                 ))}
               </div>
-              <p className="mb-4 text-xs font-normal text-slate-500">{expert.experience} experience</p>
-              <a href={expert.linkedinUrl} className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800">
+              <p className="mb-4 mt-auto text-xs font-normal text-slate-500">{expert.experience} experience</p>
+              <a href={expert.linkedinUrl} className="inline-flex items-center justify-center gap-2 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800">
                 <Linkedin className="size-4" />
                 Connect
               </a>
@@ -120,18 +120,18 @@ export function ExpertCouncil() {
           whileInView="visible"
           viewport={{ once: true, amount: 0.35 }}
           variants={fadeUp}
-          className="mt-10 rounded-2xl border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-sm md:p-8"
+          className="mt-10 rounded-[1.9rem] border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)] md:p-8"
         >
-          <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">Join Our Team</p>
-          <h3 className="mt-3 text-3xl font-bold tracking-tight text-slate-900 md:text-4xl">Join Our Expert Team</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-base font-normal text-slate-500">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">Join Our Team</p>
+          <h3 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 md:text-4xl">Join the NRITAX expert network</h3>
+          <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-slate-600">
             Are you a Chartered Accountant or cross-border tax specialist? Apply to support NRI users with tax,
             compliance, and advisory services.
           </p>
           <motion.button
             type="button"
             onClick={() => navigate("/join-as-expert")}
-            className="mt-6 inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:bg-blue-700"
+            className="mt-6 inline-flex items-center justify-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(37,99,235,0.22)] transition-all hover:bg-blue-700"
             whileHover={
               shouldReduceMotion
                 ? undefined
