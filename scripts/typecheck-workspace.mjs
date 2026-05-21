@@ -31,5 +31,5 @@ const runIfDefined = async (packageDir, scriptName) => {
   await run("npm", ["--prefix", packageDir, "run", scriptName]);
 };
 
-await runIfDefined("client", "lint");
-await runIfDefined("server", "lint");
+await runIfDefined("client", "typecheck");
+await runIfDefined("server", "typecheck");

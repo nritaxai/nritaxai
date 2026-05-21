@@ -23,7 +23,7 @@
     "test": "node ./scripts/test-workspace.mjs",
     "test:server": "npm --prefix server run test -- --test-isolation=none",
     "lint": "node ./scripts/lint-workspace.mjs",
-    "typecheck": "npm --prefix client run typecheck && npm --prefix server run typecheck",
+    "typecheck": "node ./scripts/typecheck-workspace.mjs",
     "ci:verify": "npm run lint && npm run typecheck && npm run test && npm run build:validate"
   },
   "engines": {
