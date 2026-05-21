@@ -25,6 +25,11 @@ export const createRateLimiter = ({
     recent.push(currentTime);
     stores.set(key, recent);
 
+    const remaining = Math.max(maxRequests - recent.length, 0);
+    res.setHeader("x-ratelimit-limit", String(maxRequests));
+    res.setHeader("x-ratelimit-remaining", String(remaining));
+    res.setHeader("x-ratelimit-reset", String(Math.ceil((recent[0] + windowMs) / 1000)));
+
     if (recent.length > maxRequests) {
       return res.status(429).json({
         success: false,

@@ -82,6 +82,7 @@ const chatHistorySchema = new mongoose.Schema(
 );
 
 chatHistorySchema.index({ user: 1, language: 1, knowledgeSource: 1 }, { unique: true });
+chatHistorySchema.index({ updatedAt: -1 });
 
 const ChatHistory = mongoose.model("ChatHistory", chatHistorySchema);
 export default ChatHistory;

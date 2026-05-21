@@ -25,5 +25,9 @@ const consultationRequestSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+consultationRequestSchema.index({ status: 1, createdAt: -1 });
+consultationRequestSchema.index({ notificationStatus: 1, createdAt: -1 });
+consultationRequestSchema.index({ email: 1, createdAt: -1 });
+
 const ConsultationRequest = mongoose.model("ConsultationRequest", consultationRequestSchema);
 export default ConsultationRequest;

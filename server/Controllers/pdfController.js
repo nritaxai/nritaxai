@@ -1,16 +1,21 @@
 import fs from "fs";
 import path from "path";
-import pdfParse from "pdf-parse";
 import OpenAI from "openai";
+import {
+  ensurePdfStorage,
+  getPdfDir,
+  loadPdfIndex,
+  sanitizePdfFilename,
+  savePdfIndex,
+} from "../services/pdfIndexService.js";
+import { enqueuePdfIndexJob, enqueuePdfReindexJob } from "../services/queueFacade.js";
 
 const client = new OpenAI({
   apiKey: process.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
 });
 
-const STORAGE_DIR = path.resolve("storage");
-const PDF_DIR = path.join(STORAGE_DIR, "pdfs");
-const INDEX_PATH = path.join(STORAGE_DIR, "pdf_index.json");
+const PDF_DIR = getPdfDir();
 const TOP_K = 5;
 const MIN_SCORE = 2;
 
@@ -23,112 +28,12 @@ Do not use outside knowledge.
 Always cite sources like [file.pdf p.12].
 `;
 
-const ensureStorage = () => {
-  if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR, { recursive: true });
-  if (!fs.existsSync(PDF_DIR)) fs.mkdirSync(PDF_DIR, { recursive: true });
-  if (!fs.existsSync(INDEX_PATH)) fs.writeFileSync(INDEX_PATH, JSON.stringify([], null, 2), "utf8");
-};
-
-const loadIndex = () => {
-  ensureStorage();
-  try {
-    const raw = fs.readFileSync(INDEX_PATH, "utf8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
-const saveIndex = (rows) => {
-  ensureStorage();
-  fs.writeFileSync(INDEX_PATH, JSON.stringify(rows, null, 2), "utf8");
-};
-
-const sanitizeFilename = (name = "") =>
-  path
-    .basename(name)
-    .replace(/[^\w.\- ]/g, "_")
-    .trim();
-
 const tokenize = (text = "") =>
   text
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, " ")
     .split(/\s+/)
     .filter((w) => w.length > 1);
-
-const chunkText = (text, size = 900, overlap = 150) => {
-  const chunks = [];
-  let start = 0;
-
-  while (start < text.length) {
-    const end = Math.min(start + size, text.length);
-    chunks.push(text.slice(start, end));
-    start += Math.max(1, size - overlap);
-  }
-  return chunks;
-};
-
-const indexPdfBuffer = async (buffer, fileName) => {
-  const pageTexts = await extractPageTexts(buffer);
-  const rows = [];
-
-  pageTexts.forEach(({ page, text }) => {
-    const chunks = chunkText(text);
-    chunks.forEach((chunk, i) => {
-      rows.push({
-        id: `${fileName}-${page}-${i}`,
-        file: fileName,
-        page,
-        text: chunk,
-      });
-    });
-  });
-
-  return rows;
-};
-
-const rebuildIndexFromStoredPdfs = async () => {
-  ensureStorage();
-
-  const pdfFiles = fs
-    .readdirSync(PDF_DIR, { withFileTypes: true })
-    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"))
-    .map((entry) => entry.name)
-    .sort();
-
-  const rebuiltIndex = [];
-  const fileStats = [];
-
-  for (const fileName of pdfFiles) {
-    const absPath = path.join(PDF_DIR, fileName);
-    const buffer = fs.readFileSync(absPath);
-    const rows = await indexPdfBuffer(buffer, fileName);
-    rebuiltIndex.push(...rows);
-    fileStats.push({ file: fileName, chunks: rows.length });
-  }
-
-  saveIndex(rebuiltIndex);
-  return { files: fileStats, totalChunks: rebuiltIndex.length, totalFiles: pdfFiles.length };
-};
-
-const extractPageTexts = async (buffer) => {
-  const pageTexts = [];
-  let pageCounter = 0;
-
-  await pdfParse(buffer, {
-    pagerender: async (pageData) => {
-      pageCounter += 1;
-      const textContent = await pageData.getTextContent();
-      const text = textContent.items.map((item) => item.str).join(" ").replace(/\s+/g, " ").trim();
-      if (text) pageTexts.push({ page: pageCounter, text });
-      return text;
-    },
-  });
-
-  return pageTexts;
-};
 
 const searchChunks = (question, chunks) => {
   const qTokens = tokenize(question);
@@ -160,19 +65,17 @@ const searchChunks = (question, chunks) => {
 
 export const uploadPdfs = async (req, res) => {
   try {
-    ensureStorage();
+    ensurePdfStorage();
     const files = req.files || [];
 
     if (!files.length) {
       return res.status(400).json({ error: "No files uploaded." });
     }
 
-    let index = loadIndex();
     const result = [];
-    let totalChunks = 0;
 
     for (const file of files) {
-      const safeName = sanitizeFilename(file.originalname);
+      const safeName = sanitizePdfFilename(file.originalname);
       if (!safeName.toLowerCase().endsWith(".pdf")) {
         result.push({ file: file.originalname, status: "skipped (not pdf)" });
         continue;
@@ -180,18 +83,15 @@ export const uploadPdfs = async (req, res) => {
 
       const targetPath = path.join(PDF_DIR, safeName);
       fs.writeFileSync(targetPath, file.buffer);
+      const job = await enqueuePdfIndexJob({ fileName: safeName });
 
-      index = index.filter((row) => row.file !== safeName);
-      const fileRows = await indexPdfBuffer(file.buffer, safeName);
-      const fileChunkCount = fileRows.length;
-      index.push(...fileRows);
-
-      totalChunks += fileChunkCount;
-      result.push({ file: safeName, status: "indexed", chunks: fileChunkCount });
+      if (job.inline && job.result) {
+        result.push({ file: safeName, status: "indexed", chunks: job.result.chunks, queued: false });
+      } else {
+        result.push({ file: safeName, status: "queued", chunks: null, queued: true, jobId: job.jobId });
+      }
     }
-
-    saveIndex(index);
-    return res.status(200).json({ files: result, totalNewChunks: totalChunks });
+    return res.status(200).json({ files: result, queued: result.some((item) => item.queued) });
   } catch (error) {
     console.error("uploadPdfs error:", error);
     return res.status(500).json({ error: "Failed to upload PDFs." });
@@ -200,10 +100,20 @@ export const uploadPdfs = async (req, res) => {
 
 export const reindexPdfs = async (_req, res) => {
   try {
-    const result = await rebuildIndexFromStoredPdfs();
+    const job = await enqueuePdfReindexJob();
+    if (job.inline && job.result) {
+      const result = job.result;
+      return res.status(200).json({
+        message: "PDF index rebuilt successfully.",
+        queued: false,
+        ...result,
+      });
+    }
+
     return res.status(200).json({
-      message: "PDF index rebuilt successfully.",
-      ...result,
+      message: "PDF reindex job queued successfully.",
+      queued: true,
+      jobId: job.jobId,
     });
   } catch (error) {
     console.error("reindexPdfs error:", error);
@@ -213,14 +123,14 @@ export const reindexPdfs = async (_req, res) => {
 
 export const listPdfs = (_req, res) => {
   try {
-    ensureStorage();
+    ensurePdfStorage();
     const files = fs
       .readdirSync(PDF_DIR, { withFileTypes: true })
       .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"))
       .map((entry) => entry.name)
       .sort();
 
-    const index = loadIndex();
+    const index = loadPdfIndex();
     const chunkCountByFile = index.reduce((acc, row) => {
       acc[row.file] = (acc[row.file] || 0) + 1;
       return acc;
@@ -238,9 +148,9 @@ export const listPdfs = (_req, res) => {
 
 export const deletePdf = (req, res) => {
   try {
-    ensureStorage();
+    ensurePdfStorage();
     const rawName = req.params.name || "";
-    const safeName = sanitizeFilename(rawName);
+    const safeName = sanitizePdfFilename(rawName);
 
     if (!safeName.toLowerCase().endsWith(".pdf")) {
       return res.status(400).json({ error: "Only .pdf files are supported." });
@@ -252,8 +162,8 @@ export const deletePdf = (req, res) => {
     }
 
     fs.unlinkSync(targetPath);
-    const index = loadIndex().filter((row) => row.file !== safeName);
-    saveIndex(index);
+    const index = loadPdfIndex().filter((row) => row.file !== safeName);
+    savePdfIndex(index);
 
     return res.status(200).json({ deleted: safeName });
   } catch (error) {
@@ -269,7 +179,7 @@ export const askPdf = async (req, res) => {
       return res.status(400).json({ error: "Question is required." });
     }
 
-    const index = loadIndex();
+    const index = loadPdfIndex();
     const matches = searchChunks(question, index);
 
     if (!matches.length || matches[0].score < MIN_SCORE) {

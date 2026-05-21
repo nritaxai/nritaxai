@@ -1,21 +1,42 @@
-import dns from 'node:dns/promises';  // or just 'dns' if using CommonJS
+import dns from "node:dns/promises";
+import mongoose from "mongoose";
 
-// Force reliable public DNS servers
-dns.setServers(['1.1.1.1', '8.8.8.8']);
+dns.setServers(["1.1.1.1", "8.8.8.8"]);
+console.log("DNS servers forced to:", dns.getServers());
 
-// Optional: log to confirm (remove later if you want)
-console.log('DNS servers forced to:', dns.getServers());
-
-import mongoose from 'mongoose';
+let connectionPromise = null;
 
 const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGO_URI);
-    console.log(`MongoDB connected Successfully✅`);
-  } catch (error) {
-    console.error(`MongoDB connection failed ❌`, error.message);
-    process.exit(1)
+  if (mongoose.connection.readyState === 1) {
+    return mongoose.connection;
   }
+
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
+  connectionPromise = mongoose
+    .connect(process.env.MONGO_URI, {
+      maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE || 20),
+      minPoolSize: Number(process.env.MONGO_MIN_POOL_SIZE || 2),
+      maxIdleTimeMS: Number(process.env.MONGO_MAX_IDLE_TIME_MS || 30000),
+      serverSelectionTimeoutMS: Number(process.env.MONGO_SERVER_SELECTION_TIMEOUT_MS || 5000),
+      socketTimeoutMS: Number(process.env.MONGO_SOCKET_TIMEOUT_MS || 20000),
+      heartbeatFrequencyMS: Number(process.env.MONGO_HEARTBEAT_FREQUENCY_MS || 10000),
+      retryWrites: String(process.env.MONGO_RETRY_WRITES || "true").toLowerCase() !== "false",
+      readPreference: String(process.env.MONGO_READ_PREFERENCE || "primaryPreferred").trim(),
+    })
+    .then((connection) => {
+      console.log("MongoDB connected successfully");
+      return connection.connection;
+    })
+    .catch((error) => {
+      connectionPromise = null;
+      console.error("MongoDB connection failed", error.message);
+      throw error;
+    });
+
+  return connectionPromise;
 };
 
 export default connectDB;
