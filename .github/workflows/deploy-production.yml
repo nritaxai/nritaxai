@@ -42,6 +42,22 @@ jobs:
 
       - uses: azure/setup-kubectl@v4
 
+      - name: Resolve image coordinates
+        id: image-coordinates
+        env:
+          SECRET_REGISTRY: ${{ secrets.REGISTRY }}
+          SECRET_IMAGE_REPOSITORY: ${{ secrets.IMAGE_REPOSITORY }}
+          SECRET_WORKER_IMAGE_REPOSITORY: ${{ secrets.WORKER_IMAGE_REPOSITORY }}
+        run: |
+          REGISTRY="${SECRET_REGISTRY:-ghcr.io}"
+          REPO_SLUG="${GITHUB_REPOSITORY,,}"
+          API_REPOSITORY="${SECRET_IMAGE_REPOSITORY:-${REPO_SLUG}/api}"
+          WORKER_REPOSITORY="${SECRET_WORKER_IMAGE_REPOSITORY:-${REPO_SLUG}/worker}"
+
+          echo "registry=$REGISTRY" >> "$GITHUB_OUTPUT"
+          echo "api_repository=$API_REPOSITORY" >> "$GITHUB_OUTPUT"
+          echo "worker_repository=$WORKER_REPOSITORY" >> "$GITHUB_OUTPUT"
+
       - name: Preflight deployment inputs
         env:
           DEPLOY_ENVIRONMENT: production
@@ -67,7 +83,7 @@ jobs:
           echo "$KUBE_CONFIG_DATA" | base64 -d > "$HOME/.kube/config"
 
       - name: Start API canary
-        run: kubectl argo rollouts set image rollout/nritax-api api=${{ secrets.REGISTRY }}/${{ secrets.IMAGE_REPOSITORY }}:${{ inputs.image_tag }} -n nritax-production
+        run: kubectl argo rollouts set image rollout/nritax-api api=${{ steps.image-coordinates.outputs.registry }}/${{ steps.image-coordinates.outputs.api_repository }}:${{ inputs.image_tag }} -n nritax-production
 
       - name: Wait for canary steps
         run: kubectl argo rollouts get rollout nritax-api -n nritax-production --watch --timeout 300s
@@ -89,7 +105,7 @@ jobs:
 
       - name: Roll out worker image after API promotion
         if: ${{ inputs.auto_promote }}
-        run: kubectl set image deployment/nritax-worker worker=${{ secrets.REGISTRY }}/${{ secrets.WORKER_IMAGE_REPOSITORY }}:${{ inputs.image_tag }} -n nritax-production
+        run: kubectl set image deployment/nritax-worker worker=${{ steps.image-coordinates.outputs.registry }}/${{ steps.image-coordinates.outputs.worker_repository }}:${{ inputs.image_tag }} -n nritax-production
 
       - name: Wait for worker rollout
         if: ${{ inputs.auto_promote }}
