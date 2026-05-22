@@ -12,10 +12,10 @@ export const SITE_URL = String(import.meta.env.VITE_SITE_URL || "https://www.nri
 export const SUPPORT_EMAIL = String(import.meta.env.VITE_CONTACT_EMAIL || "ask@nritax.ai").trim();
 
 export const LEGAL_PDF_PATHS = {
-  privacy: "/legal/billion-dollar-technologies-privacy-policy.pdf",
-  terms: "/legal/billion-dollar-technologies-terms-of-service.pdf",
-  disclaimer: "/legal/billion-dollar-technologies-disclaimer.pdf",
-  refund: "/legal/billion-dollar-technologies-refund-policy.pdf",
+  privacy: "/legal/nritaxai-privacy-policy.pdf",
+  terms: "/legal/nritaxai-terms-of-service.pdf",
+  disclaimer: "/legal/nritaxai-disclaimer.pdf",
+  refund: "/legal/nritaxai-refund-policy.pdf",
 } as const;
 
 export const buildSupportMailto = (subject: string) =>
