@@ -323,17 +323,20 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     logo_alignment: "left" as const,
   };
 
+  const fieldClassName =
+    "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2563eb] focus-visible:ring-[#2563eb]/20";
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-6 sm:items-center">
-      <Card className="w-full max-w-lg max-h-[92dvh] overflow-y-auto">
+      <Card className="max-h-[92dvh] w-full max-w-lg overflow-y-auto border-slate-200 bg-white text-slate-900">
         <CardHeader>
           <div className="flex items-center justify-between gap-3">
             <div>
-              <CardTitle>Welcome to {COMPANY_LEGAL_NAME}</CardTitle>
-              <CardDescription>Login or create an account to continue</CardDescription>
+              <CardTitle className="text-slate-900">Welcome to {COMPANY_LEGAL_NAME}</CardTitle>
+              <CardDescription className="text-slate-600">Login or create an account to continue</CardDescription>
             </div>
             {!disableClose ? (
-              <Button variant="ghost" size="icon" onClick={onClose}>
+              <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-700 hover:bg-slate-100 hover:text-slate-900">
                 <X className="size-5" />
               </Button>
             ) : null}
@@ -352,16 +355,21 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
             }}
             className="w-full"
           >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 bg-slate-100 text-slate-600">
+              <TabsTrigger value="login" className="data-[state=active]:bg-[#1d2b53] data-[state=active]:text-white text-slate-700">
+                Login
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="data-[state=active]:bg-[#1d2b53] data-[state=active]:text-white text-slate-700">
+                Sign Up
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label className="text-slate-800">Email</Label>
                   <Input
+                    className={fieldClassName}
                     type="email"
                     required
                     autoCapitalize="none"
@@ -373,8 +381,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="relative space-y-2">
-                  <Label>Password</Label>
+                  <Label className="text-slate-800">Password</Label>
                   <Input
+                    className={fieldClassName}
                     type={showLoginPassword ? "text" : "password"}
                     required
                     placeholder="........"
@@ -408,8 +417,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 {forgotPasswordMode ? (
                   <div className="space-y-3 rounded-lg border border-[#E2E8F0] bg-[#F7FAFC] p-4">
                     <div className="space-y-2">
-                      <Label htmlFor="forgot-password-email">Reset Email</Label>
+                      <Label htmlFor="forgot-password-email" className="text-slate-800">Reset Email</Label>
                       <Input
+                        className={fieldClassName}
                         id="forgot-password-email"
                         type="email"
                         placeholder="your.email@example.com"
@@ -444,10 +454,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
+                    <span className="w-full border-t border-slate-200" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-[#F7FAFC] px-2 text-slate-500">Or continue with</span>
+                    <span className="bg-white px-2 text-slate-500">Or continue with</span>
                   </div>
                 </div>
 
@@ -503,8 +513,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
             <TabsContent value="signup">
               <form onSubmit={handleSignup} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Full Name</Label>
+                  <Label className="text-slate-800">Full Name</Label>
                   <Input
+                    className={fieldClassName}
                     required
                     value={signupData.name}
                     placeholder="Your full name"
@@ -513,8 +524,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Email</Label>
+                  <Label className="text-slate-800">Email</Label>
                   <Input
+                    className={fieldClassName}
                     type="email"
                     required
                     autoCapitalize="none"
@@ -526,8 +538,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="space-y-2">
-                  <Label>LinkedIn Profile (optional)</Label>
+                  <Label className="text-slate-800">LinkedIn Profile (optional)</Label>
                   <Input
+                    className={fieldClassName}
                     type="url"
                     placeholder="https://www.linkedin.com/in/your-profile"
                     value={signupData.linkedinProfile}
@@ -536,12 +549,12 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Country of Residence</Label>
+                  <Label className="text-slate-800">Country of Residence</Label>
                   <select
                     required
                     value={signupData.countryCode}
                     onChange={(e) => setSignupData({ ...signupData, countryCode: e.target.value })}
-                    className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-background"
                   >
                     <option value="">Select your country</option>
                     {COUNTRY_OPTIONS.map((country) => (
@@ -556,8 +569,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="relative space-y-2">
-                  <Label>Password</Label>
+                  <Label className="text-slate-800">Password</Label>
                   <Input
+                    className={fieldClassName}
                     type={showSignupPassword ? "text" : "password"}
                     required
                     placeholder="........"
@@ -575,8 +589,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="relative space-y-2">
-                  <Label>Confirm Password</Label>
+                  <Label className="text-slate-800">Confirm Password</Label>
                   <Input
+                    className={fieldClassName}
                     type={showConfirmPassword ? "text" : "password"}
                     required
                     placeholder="........"
@@ -631,10 +646,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
                 <div className="relative">
                   <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
+                    <span className="w-full border-t border-slate-200" />
                   </div>
                   <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-[#F7FAFC] px-2 text-slate-500">Or continue with</span>
+                    <span className="bg-white px-2 text-slate-500">Or continue with</span>
                   </div>
                 </div>
 
