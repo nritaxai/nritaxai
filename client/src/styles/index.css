@@ -62,8 +62,131 @@ body {
   color: inherit;
 }
 
+*,
+*::before,
+*::after {
+  color: inherit;
+}
+
 nav a {
   color: #111827;
+}
+
+nav a[aria-current="page"],
+nav a[class*="active"] {
+  color: #2563eb;
+}
+
+[class*="hero-dark"],
+[class*="banner-dark"],
+section[class*="dark"],
+[class*="marquee"],
+[class*="ticker"],
+[class*="alert-bar"] {
+  color: #f9fafb;
+}
+
+[class*="card"],
+[class*="feature-card"],
+[class*="plan-card"],
+[data-slot="card"] {
+  color: #111827;
+}
+
+[class*="section-label"],
+[class*="eyebrow"],
+[class*="overline"],
+[class*="stat-label"],
+[class*="update-meta"],
+[class*="article-meta"] {
+  color: #6b7280;
+}
+
+[class*="section-title"],
+[class*="section-heading"],
+[class*="stat-number"],
+[class*="stat-value"],
+[class*="feature-title"],
+[class*="update-title"],
+[class*="article-title"],
+[class*="expert-name"] {
+  color: #111827;
+}
+
+[class*="section-subtitle"],
+[class*="section-desc"],
+[class*="feature-desc"],
+[class*="feature-body"],
+[class*="expert-title"],
+[class*="expert-role"],
+[class*="privacy"] p,
+[class*="trust"] p {
+  color: #4b5563;
+}
+
+[class*="expert-badge"],
+[class*="credential"] {
+  color: #374151;
+  background-color: #f3f4f6;
+}
+
+[class*="badge-blue"],
+[class*="tag-blue"] {
+  color: #1d4ed8;
+  background-color: #eff6ff;
+}
+
+[class*="badge-green"],
+[class*="tag-green"] {
+  color: #065f46;
+  background-color: #ecfdf5;
+}
+
+[class*="badge-orange"],
+[class*="tag-orange"] {
+  color: #92400e;
+  background-color: #fffbeb;
+}
+
+a {
+  color: #2563eb;
+}
+
+a:hover {
+  color: #1d4ed8;
+}
+
+button[class*="primary"],
+a[class*="primary"],
+.btn-primary {
+  color: #ffffff !important;
+  background-color: #2563eb;
+}
+
+button[class*="secondary"],
+a[class*="secondary"],
+.btn-secondary,
+button[class*="outline"] {
+  color: #111827;
+  background-color: #ffffff;
+  border-color: #d1d5db;
+}
+
+button[class*="ghost"],
+a[class*="ghost"] {
+  color: #374151;
+}
+
+input,
+textarea,
+select {
+  color: #111827;
+  background-color: #ffffff;
+}
+
+::placeholder {
+  color: #9ca3af;
+  opacity: 1;
 }
 
 footer {
@@ -71,8 +194,23 @@ footer {
   background-color: #111827;
 }
 
-footer :where(a, p, span, h1, h2, h3, h4, h5, h6, li) {
-  color: inherit;
+footer,
+footer * {
+  color: #d1d5db !important;
+}
+
+footer h3,
+footer h4,
+[class*="footer-heading"] {
+  color: #f9fafb !important;
+}
+
+footer a:hover {
+  color: #ffffff !important;
+}
+
+footer [class*="copyright"] {
+  color: #9ca3af !important;
 }
 
 body::before,
