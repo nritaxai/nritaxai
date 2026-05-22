@@ -82,8 +82,42 @@ nav a[class*="active"] {
 section[class*="dark"],
 [class*="marquee"],
 [class*="ticker"],
-[class*="alert-bar"] {
-  color: #f9fafb;
+[class*="news-bar"],
+[class*="alert-bar"],
+[class*="announcement"] {
+  color: #f8fafc !important;
+  background-color: #0f172a !important;
+}
+
+[class*="marquee"] [class*="badge"],
+[class*="marquee"] [class*="pill"],
+[class*="marquee"] [class*="tag"],
+[class*="ticker"] [class*="badge"],
+[class*="ticker"] span[class*="alert"],
+[class*="ticker"] span[class*="label"] {
+  color: #ffffff !important;
+  background-color: #1e3a8a !important;
+  border: 1px solid #3b82f6 !important;
+  font-weight: 600 !important;
+}
+
+[class*="ticker"] [class*="country"],
+[class*="ticker"] [class*="region"],
+[class*="marquee"] [class*="country"] {
+  color: #dbeafe !important;
+  background-color: #1e40af !important;
+}
+
+[class*="ticker"] [class*="title"],
+[class*="ticker"] [class*="text"],
+[class*="marquee"] p,
+[class*="marquee"] span:not([class*="badge"]):not([class*="tag"]) {
+  color: #e2e8f0 !important;
+}
+
+[class*="ticker"] [class*="date"],
+[class*="marquee"] [class*="date"] {
+  color: #94a3b8 !important;
 }
 
 [class*="card"],
@@ -96,6 +130,15 @@ section[class*="dark"],
 [class*="section-label"],
 [class*="eyebrow"],
 [class*="overline"],
+[class*="section-tag"],
+[class*="section-pill"] {
+  color: #ffffff !important;
+  background-color: #1e3a8a !important;
+  border-radius: 999px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+}
+
 [class*="stat-label"],
 [class*="update-meta"],
 [class*="article-meta"] {
@@ -130,6 +173,77 @@ section[class*="dark"],
   background-color: #f3f4f6;
 }
 
+[class*="tag-dark"],
+[class*="badge-dark"],
+[class*="chip-dark"],
+[class*="label-dark"] {
+  color: #f9fafb !important;
+  background-color: #1f2937 !important;
+}
+
+[class*="compliance"],
+[class*="validated"],
+[class*="authoritative"],
+[class*="advisory"],
+[class*="category-tag"],
+[class*="update-tag"],
+[class*="article-tag"],
+[class*="news-tag"],
+[class*="credential-badge"],
+[class*="cert-badge"],
+[class*="qualification-badge"] {
+  color: #dbeafe !important;
+  background-color: #1e3a8a !important;
+}
+
+[class*="source-tag"],
+[class*="source-badge"],
+[class*="experience-badge"],
+[class*="years-badge"],
+[class*="message-count"],
+[class*="usage-badge"],
+[class*="limit-badge"] {
+  color: #e5e7eb !important;
+  background-color: #374151 !important;
+}
+
+[class*="plan-tag"],
+[class*="current-plan-badge"],
+[class*="plan-badge"],
+[class*="subscription-badge"],
+[class*="plan-chip"],
+[class*="plan-label"],
+span[class*="starter"],
+span[class*="plan-name"] {
+  color: #ffffff !important;
+  background-color: #1e3a8a !important;
+  border: 1px solid #3b82f6 !important;
+}
+
+[class*="status-badge"],
+[class*="ready-badge"],
+[class*="privacy-badge"],
+[class*="trust-badge"],
+[class*="security-badge"] {
+  color: #6ee7b7 !important;
+  background-color: #064e3b !important;
+}
+
+[class*="usage-box"],
+[class*="stats-box"] {
+  color: #1f2937 !important;
+  background-color: #f8fafc !important;
+  border: 1px solid #e2e8f0 !important;
+}
+
+[class*="most-popular"],
+[class*="popular-badge"],
+[class*="recommended-badge"] {
+  color: #ffffff !important;
+  background-color: #2563eb !important;
+  font-weight: 700 !important;
+}
+
 [class*="badge-blue"],
 [class*="tag-blue"] {
   color: #1d4ed8;
@@ -146,6 +260,14 @@ section[class*="dark"],
 [class*="tag-orange"] {
   color: #92400e;
   background-color: #fffbeb;
+}
+
+[style*="background-color: #0"],
+[style*="background-color: rgb(0"],
+[style*="background-color: rgb(1"],
+[style*="background-color: rgb(2"],
+[style*="background-color: rgb(3"] {
+  color: #f9fafb !important;
 }
 
 a {
