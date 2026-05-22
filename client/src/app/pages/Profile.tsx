@@ -22,13 +22,12 @@ import {
 import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
 import {
   changePassword,
+  acceptTerms,
   clearStoredAuth,
   deleteAccount,
   getMySubscription,
-  getUserPrivacyStatus,
   getUserProfile,
   requestCountryChange,
-  updatePrivacyConsent,
   updateUserProfile,
 } from "../../utils/api";
 import { CURRENT_POLICY_VERSION } from "../../config/legal";
@@ -446,15 +445,11 @@ export function Profile() {
     setSuccessMessage("");
 
     try {
-      await updatePrivacyConsent({
-        acceptTerms: true,
-        acceptPrivacyPolicy: true,
+      const response = await acceptTerms({
+        termsAccepted: true,
         policyVersion: CURRENT_POLICY_VERSION,
-        consentSource: "profile_gate",
       });
-
-      const refreshed = await getUserPrivacyStatus();
-      const nextUser = refreshed?.data?.user;
+      const nextUser = response?.user || response?.data;
       if (nextUser) {
         setProfile(nextUser);
         const storedUserRaw = localStorage.getItem("user");
@@ -772,8 +767,9 @@ export function Profile() {
             {successMessage}
           </p>
         )}
-        {!profile?.termsAccepted ? (
+        {(!profile?.termsAccepted || !profile?.acceptedAt) ? (
           <LegalAcceptanceGate
+            variant="inline"
             onAccept={handleAcceptLegal}
             loading={acceptingLegal}
             title="Finish legal acceptance before using chat and Yukti"

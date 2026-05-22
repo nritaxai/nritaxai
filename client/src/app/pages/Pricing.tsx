@@ -207,12 +207,12 @@ export function Pricing({ onRequireLogin }: PricingProps) {
         <div className="mx-auto mt-4 max-w-xs text-left">
           <p className="mb-2 text-sm text-[#0F172A]">Display Currency</p>
           <Select value={currencyOverride} onValueChange={handleCurrencyOverrideChange}>
-            <SelectTrigger className="bg-white border-gray-300">
+            <SelectTrigger className="border-gray-300 bg-white text-[#0F172A] data-[placeholder]:text-[#64748B] [&_svg]:text-[#64748B]">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="border-gray-200 bg-white text-[#0F172A]">
               {SUPPORTED_CURRENCIES.map((code) => (
-                <SelectItem key={code} value={code}>
+                <SelectItem key={code} value={code} className="text-[#0F172A] focus:bg-[#EFF6FF] focus:text-[#0F172A] [&_svg]:text-[#2563eb]">
                   {code}
                 </SelectItem>
               ))}

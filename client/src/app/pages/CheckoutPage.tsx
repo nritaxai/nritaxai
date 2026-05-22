@@ -635,12 +635,12 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
             <div className="mb-4">
               <p className="mb-2 text-sm text-[#0F172A]">Display Currency</p>
               <Select value={currencyOverride} onValueChange={handleCurrencyOverrideChange}>
-                <SelectTrigger className="bg-[#F7FAFC] border-[#E2E8F0]">
+                <SelectTrigger className="border-[#E2E8F0] bg-[#F7FAFC] text-[#0F172A] data-[placeholder]:text-[#64748B] [&_svg]:text-[#64748B]">
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="border-[#E2E8F0] bg-white text-[#0F172A]">
                   {SUPPORTED_CURRENCIES.map((code) => (
-                    <SelectItem key={code} value={code}>
+                    <SelectItem key={code} value={code} className="text-[#0F172A] focus:bg-[#EFF6FF] focus:text-[#0F172A] [&_svg]:text-[#2563eb]">
                       {code}
                     </SelectItem>
                   ))}

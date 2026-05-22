@@ -1272,14 +1272,22 @@ export const acceptTerms = async (req, res) => {
       return rejectMissingTerms(res);
     }
 
-    applyTermsAcceptance(req.user, req);
-    await req.user.save();
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    applyTermsAcceptance(user, req);
+    await user.save();
 
     return res.status(200).json({
       success: true,
       message: "Terms accepted successfully.",
-      user: toSafeUser(req.user),
-      data: toSafeUser(req.user),
+      user: toSafeUser(user),
+      data: toSafeUser(user),
     });
   } catch (error) {
     logAuthError("accept-terms", error, { userId: req.user?._id || null });
