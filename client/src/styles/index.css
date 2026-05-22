@@ -37,6 +37,7 @@ body,
 body {
   margin: 0;
   position: relative;
+  color: #111827;
   background: var(--ambient-bg);
   background-size: 220% 220%;
   animation: premiumGradientShift 18s ease-in-out infinite;
