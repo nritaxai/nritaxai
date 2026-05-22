@@ -544,7 +544,6 @@ export default function App() {
         <Suspense fallback={null}>
           <LoginModal
             onClose={() => setShowLoginModal(false)}
-            disableClose={requiresHomeLoginGate}
           />
         </Suspense>
       )}

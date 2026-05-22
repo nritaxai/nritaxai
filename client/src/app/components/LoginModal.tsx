@@ -71,7 +71,6 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
   const canUseLinkedInAuth =
     Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
-  const canUseAppleAuth = APPLE_AUTH_CONFIG.isConfigured;
   const selectedSignupCountry = COUNTRY_OPTIONS.find((country) => country.code === signupData.countryCode);
   const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
 
@@ -462,11 +461,14 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                  {canUseAppleAuth ? (
-                    <Button type="button" variant="outline" className="w-full" onClick={() => void handleAppleLogin("login")}>
-                      Sign in with Apple
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
+                    onClick={() => void handleAppleLogin("login")}
+                  >
+                    Sign in with Apple
+                  </Button>
                   {canUseLinkedInAuth ? (
                     <Button
                       type="button"
@@ -654,11 +656,15 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
-                  {canUseAppleAuth ? (
-                    <Button type="button" variant="outline" className="w-full" disabled={!signupCanContinue} onClick={() => void handleAppleLogin("signup")}>
-                      Sign up with Apple
-                    </Button>
-                  ) : null}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
+                    disabled={!signupCanContinue}
+                    onClick={() => void handleAppleLogin("signup")}
+                  >
+                    Sign up with Apple
+                  </Button>
                   {canUseLinkedInAuth ? (
                     <Button
                       type="button"
