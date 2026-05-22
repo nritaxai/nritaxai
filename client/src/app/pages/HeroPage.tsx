@@ -28,11 +28,11 @@ export function HeroPage() {
       <div className="pointer-events-none absolute -top-24 -left-24 h-72 w-72 rounded-full bg-[#2563eb]/16 blur-3xl" />
       <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-[#1D4ED8]/18 blur-3xl" />
 
-      <div className="relative -translate-y-10 flex w-full max-w-5xl flex-col items-center px-6 text-center sm:-translate-y-12">
+      <div className="relative -translate-y-6 flex w-full max-w-5xl flex-col items-center px-6 text-center sm:-translate-y-8">
         <img
           src="/logo-transparent.png"
           alt="NRITAX logo"
-          className="-ml-2 -mb-8 h-32 w-auto object-contain sm:-ml-3 sm:-mb-10 sm:h-40 lg:-ml-4 lg:-mb-12 lg:h-48"
+          className="mb-4 h-24 w-auto object-contain sm:mb-5 sm:h-28 lg:mb-6 lg:h-32"
         />
         <p className="mb-3 rounded-full border border-[#BFDBFE] bg-white/70 px-4 py-1 text-xs tracking-[0.24em] text-[#2563EB]">
           AI TAX PLATFORM FOR NRIS

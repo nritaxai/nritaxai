@@ -1,14 +1,10 @@
 import { Button } from "./ui/button";
 import {
   ChevronLeft,
-  Globe,
-  Lock,
   Menu,
-  User as UserIcon,
-  Shield,
-  Users,
   LogIn,
   LogOut,
+  User as UserIcon,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -63,13 +59,6 @@ export function Header({ onLogin }: HeaderProps) {
     { to: "/chat", label: "AI Chat" },
     { to: "/pricing", label: "Pricing" },
     { to: "/calculators", label: "Tax Calculator" },
-  ] as const;
-
-  const trustItems = [
-    { icon: Shield, label: "256-bit SSL Encrypted", title: "Bank-grade encryption for all data" },
-    { icon: Globe, label: "DTAA Compliant", title: "Double Taxation Avoidance compliance" },
-    { icon: Lock, label: "SOC 2 Standards", title: "Enterprise security compliance" },
-    { icon: Users, label: "500+ NRIs Served", title: "Trusted by global NRI professionals" },
   ] as const;
 
   const isNavItemActive = (to: string) => {
@@ -218,25 +207,6 @@ export function Header({ onLogin }: HeaderProps) {
         </div>
       </div>
 
-      <div className="border-b border-slate-800 bg-slate-950">
-        <div className="h-10 overflow-x-auto">
-          <div className="mx-auto flex h-full min-w-max max-w-6xl items-center justify-start gap-7 px-4 sm:justify-center">
-            {trustItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <div
-                  key={item.label}
-                  className="group inline-flex cursor-default items-center gap-2.5 whitespace-nowrap text-sm font-medium text-slate-200 transition-colors duration-200 hover:text-white"
-                  title={item.title}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  <span>{renderTextWithShortForms(item.label)}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
       <motion.div
         animate={{
           backgroundColor: hasScrolled ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.68)",
