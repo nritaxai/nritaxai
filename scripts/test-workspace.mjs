@@ -13,4 +13,4 @@ const run = (command, args, cwd) =>
     });
   });
 
-await run("node", ["--test", "--test-isolation=none"], new URL("../server", import.meta.url));
+await run("node", ["--test"], new URL("../server", import.meta.url));
