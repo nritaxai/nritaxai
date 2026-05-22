@@ -10,6 +10,12 @@ body,
   overflow-x: hidden;
 }
 
+html {
+  color: #111827;
+  color-scheme: light;
+  background-color: #ffffff;
+}
+
 :root {
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);
@@ -37,10 +43,36 @@ body,
 body {
   margin: 0;
   position: relative;
-  color: #111827;
+  color: #111827 !important;
+  background-color: #ffffff;
   background: var(--ambient-bg);
   background-size: 220% 220%;
   animation: premiumGradientShift 18s ease-in-out infinite;
+}
+
+.app-shell {
+  color: #111827;
+}
+
+.app-shell :where(main, section, article, [data-slot="card"], [data-slot="card-header"], [data-slot="card-content"], [data-slot="card-footer"]) {
+  color: #111827;
+}
+
+.app-shell :where(p, h1, h2, h3, h4, h5, h6, span, div, li, td, th, label, input, textarea, select):not(footer *) {
+  color: inherit;
+}
+
+nav a {
+  color: #111827;
+}
+
+footer {
+  color: #f9fafb;
+  background-color: #111827;
+}
+
+footer :where(a, p, span, h1, h2, h3, h4, h5, h6, li) {
+  color: inherit;
 }
 
 body::before,
