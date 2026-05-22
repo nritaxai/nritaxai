@@ -31,13 +31,13 @@ html {
 }
 
 .dark {
-  --ambient-bg: #f7fafc;
-  --ambient-layer: linear-gradient(120deg, rgba(247, 250, 252, 0.7), rgba(0, 255, 255, 0.06), rgba(247, 250, 252, 0.7));
-  --glass-card-start: #ffffff;
-  --glass-card-mid: #ffffff;
-  --glass-card-end: #ffffff;
-  --glass-border: #e2e8f0;
-  --glass-shadow: rgba(15, 23, 42, 0.06);
+  --ambient-bg: #0a1628;
+  --ambient-layer: linear-gradient(120deg, rgba(10, 22, 40, 0.85), rgba(37, 99, 235, 0.12), rgba(10, 22, 40, 0.85));
+  --glass-card-start: #132040;
+  --glass-card-mid: #132040;
+  --glass-card-end: #0f1e35;
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-shadow: rgba(0, 0, 0, 0.28);
 }
 
 body {
