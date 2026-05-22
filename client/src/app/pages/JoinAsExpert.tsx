@@ -1,6 +1,6 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Paperclip, X } from "lucide-react";
+import { ArrowLeft, CheckCircle2, ChevronDown, Paperclip, X } from "lucide-react";
 import ReCAPTCHA from "react-google-recaptcha";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -70,6 +70,14 @@ const debugLog = (message: string, details?: unknown) => {
 
 const resolveSelectedValue = (value: string, customValue: string) =>
   value === "Other" ? customValue.trim() : value.trim();
+
+const formFieldClassName =
+  "min-h-[44px] w-full rounded-[6px] border border-[#D1D5DB] bg-white px-4 py-3 text-sm text-[#0F172A] placeholder:text-[#9CA3AF] outline-none transition focus-visible:border-[#3B82F6] focus-visible:ring-[3px] focus-visible:ring-[rgba(59,130,246,0.15)]";
+
+const formSelectClassName =
+  "min-h-[44px] w-full appearance-none rounded-[6px] border border-[#D1D5DB] bg-white px-4 py-3 pr-11 text-sm text-[#0F172A] outline-none transition focus-visible:border-[#3B82F6] focus-visible:ring-[3px] focus-visible:ring-[rgba(59,130,246,0.15)]";
+
+const requiredAsterisk = <span className="text-red-500">*</span>;
 
 export function JoinAsExpertPage() {
   const navigate = useNavigate();
@@ -405,7 +413,7 @@ export function JoinAsExpertPage() {
                 <form onSubmit={handleSubmit} className={IS_IOS_NATIVE_APP ? "w-full max-w-full space-y-5" : "space-y-6"} noValidate>
               <div className={IS_IOS_NATIVE_APP ? "grid w-full max-w-full grid-cols-1 gap-4" : "grid gap-5 md:grid-cols-2"}>
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-sm font-medium text-[#0F172A]">Full Name *</Label>
+                  <Label htmlFor="fullName" className="text-sm font-medium text-[#0F172A]">Full Name {requiredAsterisk}</Label>
                   <Input
                     id="fullName"
                     name="fullName"
@@ -414,12 +422,13 @@ export function JoinAsExpertPage() {
                     onChange={handleChange}
                     aria-invalid={errors.fullName ? true : undefined}
                     placeholder="Enter your full name"
+                    className={formFieldClassName}
                   />
                   {errors.fullName ? <p className="text-sm text-red-600">{errors.fullName}</p> : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-sm font-medium text-[#0F172A]">Email *</Label>
+                  <Label htmlFor="email" className="text-sm font-medium text-[#0F172A]">Email {requiredAsterisk}</Label>
                   <Input
                     id="email"
                     name="email"
@@ -429,12 +438,13 @@ export function JoinAsExpertPage() {
                     onChange={handleChange}
                     aria-invalid={errors.email ? true : undefined}
                     placeholder="Enter your email address"
+                    className={formFieldClassName}
                   />
                   {errors.email ? <p className="text-sm text-red-600">{errors.email}</p> : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="pincode" className="text-sm font-medium text-[#0F172A]">Pincode *</Label>
+                  <Label htmlFor="pincode" className="text-sm font-medium text-[#0F172A]">Pincode {requiredAsterisk}</Label>
                   <Input
                     id="pincode"
                     name="pincode"
@@ -445,12 +455,13 @@ export function JoinAsExpertPage() {
                     onChange={handleChange}
                     aria-invalid={errors.pincode ? true : undefined}
                     placeholder="Enter your 6-digit pincode"
+                    className={formFieldClassName}
                   />
                   {errors.pincode ? <p className="text-sm text-red-600">{errors.pincode}</p> : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="membershipNumber" className="text-sm font-medium text-[#0F172A]">Membership Number *</Label>
+                  <Label htmlFor="membershipNumber" className="text-sm font-medium text-[#0F172A]">Membership Number {requiredAsterisk}</Label>
                   <Input
                     id="membershipNumber"
                     name="membershipNumber"
@@ -459,6 +470,7 @@ export function JoinAsExpertPage() {
                     onChange={handleChange}
                     aria-invalid={errors.membershipNumber ? true : undefined}
                     placeholder="Enter your membership number"
+                    className={formFieldClassName}
                   />
                   {errors.membershipNumber ? (
                     <p className="text-sm text-red-600">{errors.membershipNumber}</p>
@@ -466,44 +478,50 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="cop" className="text-sm font-medium text-[#0F172A]">COP *</Label>
-                  <select
-                    id="cop"
-                    name="cop"
-                    required
-                    value={values.cop}
-                    onChange={handleChange}
-                    aria-invalid={errors.cop ? true : undefined}
-                    className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    disabled={loading}
-                  >
-                    <option value="">Select COP status</option>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                    <option value="Not Applicable">Not Applicable</option>
-                  </select>
+                  <Label htmlFor="cop" className="text-sm font-medium text-[#0F172A]">COP {requiredAsterisk}</Label>
+                  <div className="relative">
+                    <select
+                      id="cop"
+                      name="cop"
+                      required
+                      value={values.cop}
+                      onChange={handleChange}
+                      aria-invalid={errors.cop ? true : undefined}
+                      className={formSelectClassName}
+                      disabled={loading}
+                    >
+                      <option value="">Select COP status</option>
+                      <option value="Active">Active</option>
+                      <option value="Inactive">Inactive</option>
+                      <option value="Not Applicable">Not Applicable</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-[#6B7280]" />
+                  </div>
                   {errors.cop ? <p className="text-sm text-red-600">{errors.cop}</p> : null}
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="qualification" className="text-sm font-medium text-[#0F172A]">Qualification *</Label>
-                  <select
-                    id="qualification"
-                    name="qualification"
-                    required
-                    value={values.qualification}
-                    onChange={handleChange}
-                    aria-invalid={errors.qualification ? true : undefined}
-                    className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    disabled={loading}
-                  >
-                    <option value="">Select qualification</option>
-                    <option value="Chartered Accountant (CA)">Chartered Accountant (CA)</option>
-                    <option value="CPA">CPA</option>
-                    <option value="Tax Advisor">Tax Advisor</option>
-                    <option value="Lawyer">Lawyer</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  <Label htmlFor="qualification" className="text-sm font-medium text-[#0F172A]">Qualification {requiredAsterisk}</Label>
+                  <div className="relative">
+                    <select
+                      id="qualification"
+                      name="qualification"
+                      required
+                      value={values.qualification}
+                      onChange={handleChange}
+                      aria-invalid={errors.qualification ? true : undefined}
+                      className={formSelectClassName}
+                      disabled={loading}
+                    >
+                      <option value="">Select qualification</option>
+                      <option value="Chartered Accountant (CA)">Chartered Accountant (CA)</option>
+                      <option value="CPA">CPA</option>
+                      <option value="Tax Advisor">Tax Advisor</option>
+                      <option value="Lawyer">Lawyer</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-[#6B7280]" />
+                  </div>
                   {values.qualification === "Other" ? (
                     <Input
                       id="customQualification"
@@ -513,33 +531,37 @@ export function JoinAsExpertPage() {
                       aria-invalid={errors.qualification ? true : undefined}
                       placeholder="Enter your qualification"
                       disabled={loading}
+                      className={formFieldClassName}
                     />
                   ) : null}
                   {errors.qualification ? <p className="text-sm text-red-600">{errors.qualification}</p> : null}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
-                  <Label htmlFor="areaOfExpertise" className="text-sm font-medium text-[#0F172A]">Area of Expertise *</Label>
-                  <select
-                    id="areaOfExpertise"
-                    name="areaOfExpertise"
-                    required
-                    value={values.areaOfExpertise}
-                    onChange={handleChange}
-                    aria-invalid={errors.areaOfExpertise ? true : undefined}
-                    className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                    disabled={loading}
-                  >
-                    <option value="">Select area of expertise</option>
-                    <option value="DTAA">DTAA</option>
-                    <option value="FEMA">FEMA</option>
-                    <option value="NRI Tax Filing">NRI Tax Filing</option>
-                    <option value="Capital Gains">Capital Gains</option>
-                    <option value="Property Tax">Property Tax</option>
-                    <option value="TDS Refund">TDS Refund</option>
-                    <option value="Compliance">Compliance</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  <Label htmlFor="areaOfExpertise" className="text-sm font-medium text-[#0F172A]">Area of Expertise {requiredAsterisk}</Label>
+                  <div className="relative">
+                    <select
+                      id="areaOfExpertise"
+                      name="areaOfExpertise"
+                      required
+                      value={values.areaOfExpertise}
+                      onChange={handleChange}
+                      aria-invalid={errors.areaOfExpertise ? true : undefined}
+                      className={formSelectClassName}
+                      disabled={loading}
+                    >
+                      <option value="">Select area of expertise</option>
+                      <option value="DTAA">DTAA</option>
+                      <option value="FEMA">FEMA</option>
+                      <option value="NRI Tax Filing">NRI Tax Filing</option>
+                      <option value="Capital Gains">Capital Gains</option>
+                      <option value="Property Tax">Property Tax</option>
+                      <option value="TDS Refund">TDS Refund</option>
+                      <option value="Compliance">Compliance</option>
+                      <option value="Other">Other</option>
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-[#6B7280]" />
+                  </div>
                   {values.areaOfExpertise === "Other" ? (
                     <Input
                       id="customAreaOfExpertise"
@@ -549,6 +571,7 @@ export function JoinAsExpertPage() {
                       aria-invalid={errors.areaOfExpertise ? true : undefined}
                       placeholder="Enter your area of expertise"
                       disabled={loading}
+                      className={formFieldClassName}
                     />
                   ) : null}
                   {errors.areaOfExpertise ? (
@@ -557,12 +580,12 @@ export function JoinAsExpertPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="profile" className="text-sm font-medium text-[#0F172A]">Profile *</Label>
-                  <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4">
+                  <Label htmlFor="profile" className="text-sm font-medium text-[#0F172A]">Profile {requiredAsterisk}</Label>
+                  <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4 transition hover:bg-[#F9FAFB]">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-medium text-[#0F172A]">Upload profile from desktop</p>
-                        <p className="text-xs text-[#0F172A]/70">Accepted formats: PDF, DOC, DOCX</p>
+                        <p className="text-xs text-[#0F172A]/70">Accepted formats: PDF, DOC, DOCX up to 10 MB</p>
                       </div>
                       <Button
                         type="button"

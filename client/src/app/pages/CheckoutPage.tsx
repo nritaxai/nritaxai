@@ -1,10 +1,19 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "../components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "../components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { CheckCircle2, CreditCard, Lock, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
+import { Check, CheckCircle2, ChevronsUpDown, CreditCard, Lock, ReceiptText, ShieldCheck, Sparkles } from "lucide-react";
 import { buildApiUrl, clearStoredAuth } from "../../utils/api";
 import {
   convertInrToCurrency,
@@ -71,6 +80,33 @@ const COUNTRY_CODE_OPTIONS = [
   { code: "+971", label: "UAE (+971)" },
 ];
 
+const LOCALE_REGION_PATTERN = /[-_]([A-Z]{2})\b/;
+
+const detectBrowserCountryCode = () => {
+  if (typeof window === "undefined") return "";
+
+  const locales = [navigator.language, ...(Array.isArray(navigator.languages) ? navigator.languages : [])];
+  for (const locale of locales) {
+    const region = String(locale || "").toUpperCase().match(LOCALE_REGION_PATTERN)?.[1];
+    if (!region) continue;
+    if (region === "IN") return "+91";
+    if (region === "US" || region === "CA") return "+1";
+    if (region === "SG") return "+65";
+    if (region === "ID") return "+62";
+    if (region === "GB" || region === "UK") return "+44";
+    if (region === "AE") return "+971";
+  }
+
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (timeZone === "Asia/Kolkata") return "+91";
+  if (timeZone.startsWith("America/")) return "+1";
+  if (timeZone === "Asia/Singapore") return "+65";
+  if (timeZone === "Asia/Jakarta") return "+62";
+  if (timeZone === "Europe/London") return "+44";
+  if (timeZone === "Asia/Dubai") return "+971";
+  return "";
+};
+
 const resolveCountryCodeByCountry = (country: string) => {
   const key = normalizeGeoKey(country);
   if (["india", "in", "bharat"].includes(key)) return "+91";
@@ -125,7 +161,8 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [fullName, setFullName] = useState<string>("");
   const [phone, setPhone] = useState<string>("");
   const [company, setCompany] = useState<string>("");
-  const [countryCode, setCountryCode] = useState<string>("auto");
+  const [countryCode, setCountryCode] = useState<string>(() => detectBrowserCountryCode() || "auto");
+  const [countryCodePickerOpen, setCountryCodePickerOpen] = useState(false);
   const [gstNumber, setGstNumber] = useState<string>("");
   const [referralUserCode, setReferralUserCode] = useState<string>("");
   const [billingCountry, setBillingCountry] = useState<string>("");
@@ -144,6 +181,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const [currencyOverride, setCurrencyOverride] = useState<string>(
     () => resolveStoredCheckoutCurrency(currencyFromQuery || localStorage.getItem("pricing_currency_override"))
   );
+  const [browserCountryCode] = useState(() => detectBrowserCountryCode());
 
   React.useEffect(() => {
     applyDocumentMetadata(`Checkout | ${COMPANY_LEGAL_NAME}`);
@@ -168,7 +206,21 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   const displayCurrency = resolveCurrencyByCode(currencyOverride || countryCurrency.code);
   const isIndiaBilling = isIndiaCountry(billingCountry);
   const autoCountryCode = resolveCountryCodeByCountry(billingCountry || userCountry);
-  const selectedCountryCode = countryCode === "auto" ? autoCountryCode : countryCode;
+  const resolvedAutoCountryCode = autoCountryCode || browserCountryCode;
+  const selectedCountryCode = countryCode === "auto" ? resolvedAutoCountryCode : countryCode;
+  const selectedCountryCodeLabel =
+    countryCode === "auto"
+      ? resolvedAutoCountryCode
+        ? `Auto (${resolvedAutoCountryCode})`
+        : "Auto (based on browser or billing country)"
+      : COUNTRY_CODE_OPTIONS.find((item) => item.code === countryCode)?.label || countryCode;
+  const countryCodeSearchOptions = useMemo(
+    () => [
+      { code: "auto", label: selectedCountryCodeLabel },
+      ...COUNTRY_CODE_OPTIONS,
+    ],
+    [selectedCountryCodeLabel]
+  );
   const formatDisplayAmount = (inrValue: number) =>
     formatCurrency(convertInrToCurrency(inrValue, displayCurrency), displayCurrency);
   const displayCurrencyHeadline =
@@ -663,9 +715,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
                 <span>Total</span>
                 <span className="text-[#2563eb]">{formatDisplayAmount(finalTotal)}</span>
               </div>
-              {displayCurrency.code !== "INR" && (
-                <p className="text-xs text-[#0F172A] text-right">Charged in INR: {formatInr(finalTotal)}</p>
-              )}
+              <p className="text-xs text-[#0F172A] text-right">Charged in INR: {formatInr(finalTotal)}</p>
             </div>
 
             <div className="mt-5 space-y-2 text-sm text-[#0F172A]">
@@ -749,21 +799,41 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
               <div className="grid sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-[#0F172A] mb-1.5">Country Code *</label>
-                  <Select value={countryCode} onValueChange={setCountryCode}>
-                    <SelectTrigger className="bg-[#F7FAFC] border-[#E2E8F0] h-11">
-                      <SelectValue placeholder="Select country code" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">
-                        {autoCountryCode ? `Auto (${autoCountryCode})` : "Auto (based on Billing Country)"}
-                      </SelectItem>
-                      {COUNTRY_CODE_OPTIONS.map((item) => (
-                        <SelectItem key={item.code} value={item.code}>
-                          {item.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={countryCodePickerOpen} onOpenChange={setCountryCodePickerOpen}>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="flex h-11 w-full items-center justify-between rounded-lg border border-[#E2E8F0] bg-[#F7FAFC] px-3.5 text-left text-sm text-[#0F172A] outline-none transition focus-visible:border-[#2563eb] focus-visible:ring-2 focus-visible:ring-[#2563eb]/20"
+                      >
+                        <span className="truncate">{selectedCountryCodeLabel}</span>
+                        <ChevronsUpDown className="size-4 shrink-0 text-[#64748B]" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] border-[#E2E8F0] bg-white p-0 text-[#0F172A]">
+                      <Command className="bg-white text-[#0F172A]">
+                        <CommandInput placeholder="Search country code" className="h-11 text-sm" />
+                        <CommandList>
+                          <CommandEmpty>No country code found.</CommandEmpty>
+                          <CommandGroup>
+                            {countryCodeSearchOptions.map((item) => (
+                              <CommandItem
+                                key={item.code}
+                                value={`${item.label} ${item.code}`}
+                                onSelect={() => {
+                                  setCountryCode(item.code);
+                                  setCountryCodePickerOpen(false);
+                                }}
+                                className="px-3 py-2 text-sm"
+                              >
+                                <Check className={`size-4 ${countryCode === item.code ? "opacity-100" : "opacity-0"}`} />
+                                <span>{item.label}</span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-[#0F172A] mb-1.5">

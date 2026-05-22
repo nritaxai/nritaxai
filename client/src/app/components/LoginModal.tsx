@@ -45,6 +45,7 @@ const getApiErrorMessage = (error: any, fallback: string) =>
 
 export function LoginModal({ onClose, disableClose = false, initialMode = "login" }: LoginModalProps) {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const [loginTermsAccepted, setLoginTermsAccepted] = useState(false);
   const [signupData, setSignupData] = useState({
     name: "",
     email: "",
@@ -72,7 +73,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const canUseLinkedInAuth =
     Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
   const selectedSignupCountry = COUNTRY_OPTIONS.find((country) => country.code === signupData.countryCode);
+  const termsErrorMessage = "You must agree to the Terms & Conditions to continue.";
   const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
+  const loginCanContinue = loginTermsAccepted;
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -84,6 +87,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const handleLinkedInAuth = (mode: "login" | "signup") => {
     try {
+      if (mode === "login" && !loginTermsAccepted) {
+        setLoginError(termsErrorMessage);
+        return;
+      }
       if (mode === "signup" && !signupCanContinue) {
         setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
         return;
@@ -164,6 +171,11 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     e.preventDefault();
     setLoginError(null);
 
+    if (!loginTermsAccepted) {
+      setLoginError(termsErrorMessage);
+      return;
+    }
+
     if (!loginData.email.trim() || !loginData.password.trim()) {
       setLoginError("Please enter both email and password.");
       return;
@@ -226,7 +238,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     }
 
     if (!signupData.termsAccepted) {
-      setSignupError("Please accept the Terms & Conditions and Privacy Policy to continue.");
+      setSignupError(termsErrorMessage);
       return;
     }
 
@@ -265,6 +277,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   };
 
   const handleAppleLogin = async (mode: "login" | "signup") => {
+    if (mode === "login" && !loginTermsAccepted) {
+      setLoginError(termsErrorMessage);
+      return;
+    }
     if (mode === "signup" && !signupCanContinue) {
       setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
       return;
@@ -438,9 +454,35 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   </div>
                 ) : null}
 
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <label className="flex items-start gap-3 text-sm text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={loginTermsAccepted}
+                      onChange={(e) => {
+                        setLoginTermsAccepted(e.target.checked);
+                        if (e.target.checked && loginError === termsErrorMessage) {
+                          setLoginError(null);
+                        }
+                      }}
+                      className="mt-1"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <a href="/terms-and-conditions" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
+                        Terms & Conditions
+                      </a>{" "}
+                      and{" "}
+                      <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
+                        Privacy Policy
+                      </a>
+                    </span>
+                  </label>
+                </div>
+
                 {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
 
-                <Button type="submit" className="w-full" disabled={loading}>
+                <Button type="submit" className="w-full" disabled={loading || !loginCanContinue}>
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="size-4 animate-spin" />
@@ -465,6 +507,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     type="button"
                     variant="outline"
                     className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
+                    disabled={!loginCanContinue || loading}
                     onClick={() => void handleAppleLogin("login")}
                   >
                     Sign in with Apple
@@ -474,6 +517,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                       type="button"
                       variant="outline"
                       className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
+                      disabled={!loginCanContinue || loading}
                       onClick={() => handleLinkedInAuth("login")}
                     >
                       Sign in with LinkedIn
@@ -481,30 +525,36 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   ) : null}
                   {canUseGoogleAuth ? (
                     <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
-                      <GoogleLogin
-                        text="signin_with"
-                        {...googleButtonProps}
-                        onSuccess={async (credentialResponse) => {
-                          try {
-                            if (!credentialResponse.credential) {
-                              throw new Error("Missing Google credential.");
+                      {loginCanContinue ? (
+                        <GoogleLogin
+                          text="signin_with"
+                          {...googleButtonProps}
+                          onSuccess={async (credentialResponse) => {
+                            try {
+                              if (!credentialResponse.credential) {
+                                throw new Error("Missing Google credential.");
+                              }
+                              const response = await googleLoginUser(credentialResponse.credential);
+                              const user = resolveAuthUser(response);
+                              handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
+                            } catch (error: any) {
+                              const message = getApiErrorMessage(error, "Google login failed.");
+                              console.error("[auth] google login failed", { message });
+                              setLoginError(message);
+                              showPopup(message, "error");
                             }
-                            const response = await googleLoginUser(credentialResponse.credential);
-                            const user = resolveAuthUser(response);
-                            handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
-                          } catch (error: any) {
-                            const message = getApiErrorMessage(error, "Google login failed.");
-                            console.error("[auth] google login failed", { message });
+                          }}
+                          onError={() => {
+                            const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setLoginError(message);
-                            showPopup(message, "error");
-                          }
-                        }}
-                        onError={() => {
-                          const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
-                          setLoginError(message);
-                          showPopup(message, "error", 4000);
-                        }}
-                      />
+                            showPopup(message, "error", 4000);
+                          }}
+                        />
+                      ) : (
+                        <Button type="button" variant="outline" className="w-full" disabled>
+                          Sign in with Google
+                        </Button>
+                      )}
                     </div>
                   ) : null}
                 </div>
@@ -619,7 +669,12 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     <input
                       type="checkbox"
                       checked={signupData.termsAccepted}
-                      onChange={(e) => setSignupData({ ...signupData, termsAccepted: e.target.checked })}
+                      onChange={(e) => {
+                        setSignupData({ ...signupData, termsAccepted: e.target.checked });
+                        if (e.target.checked && signupError === termsErrorMessage) {
+                          setSignupError(null);
+                        }
+                      }}
                       className="mt-1"
                     />
                     <span>
