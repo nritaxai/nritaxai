@@ -459,7 +459,7 @@ export default function App() {
   const requiresAuthentication = protectedPaths.has(location.pathname);
   const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
   const isAuthRoute = location.pathname === "/login";
-  const hasSiteHeader = !isIosNativeApp && !isStandaloneRoute && isAuthenticated;
+  const hasSiteHeader = !isIosNativeApp && !isStandaloneRoute;
   const shouldShowNewsTicker = !isIosNativeApp && location.pathname === "/home";
   const nativeHomeRoute = isIosNativeApp ? <IOSHomePage /> : <HeroPage />;
   const nativeHomeScreen = isIosNativeApp
