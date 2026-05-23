@@ -1100,7 +1100,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <Card
-              className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[82dvh] min-h-[700px] max-h-[920px] flex-col overflow-hidden rounded-[1.9rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_24px_56px_rgba(15,23,42,0.08)]"}
+              className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[86dvh] min-h-[760px] max-h-[980px] flex-col overflow-hidden rounded-[1.9rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_24px_56px_rgba(15,23,42,0.08)]"}
             >
               <CardHeader
                 className={isIosNativeApp ? "flex-shrink-0 cursor-pointer bg-white p-3" : "flex-shrink-0 border-b border-[#E2E8F0] bg-white/85 px-6 py-5 backdrop-blur-md"}
@@ -1206,16 +1206,16 @@ export function Chat({ onRequireLogin }: ChatProps) {
               </CardHeader>
 
               <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
-                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : "min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10"}>
+                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : "min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-8 lg:px-12"}>
                   {messages.map((message, index) => (
                     <div
                       id={!isIosNativeApp ? `chat-message-${index}` : undefined}
                       key={index}
                       className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      <div className={`flex w-full max-w-5xl ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div className={`flex w-full max-w-6xl ${message.role === "user" ? "justify-end" : "justify-start"}`}>
                         {message.role === "ai" ? (
-                          <div className="flex w-full max-w-[92%] gap-3 lg:max-w-[88%]">
+                          <div className="flex w-full max-w-[96%] gap-3 lg:max-w-[92%]">
                             <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
                               <Bot className="size-5 text-[#0F172A]" />
                             </div>
@@ -1242,7 +1242,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                             </div>
                           </div>
                         ) : (
-                          <div className="max-w-[92%] rounded-[1.6rem] bg-[#2563eb] px-5 py-4 text-white shadow-[0_18px_34px_rgba(37,99,235,0.28)] sm:max-w-[84%] lg:max-w-[78%]">
+                          <div className="max-w-[94%] rounded-[1.6rem] bg-[#2563eb] px-5 py-4 text-white shadow-[0_18px_34px_rgba(37,99,235,0.28)] sm:max-w-[88%] lg:max-w-[82%]">
                             {message.content}
                           </div>
                         )}
@@ -1252,7 +1252,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   
                   {isTyping && (
                     <div className="flex justify-start">
-                      <div className="flex max-w-[92%] gap-3 lg:max-w-[88%]">
+                      <div className="flex max-w-[96%] gap-3 lg:max-w-[92%]">
                         <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
                           <Bot className="size-5 text-[#0F172A]" />
                         </div>
@@ -1263,33 +1263,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     </div>
                   )}
                 </CardContent>
-
-                {!isIosNativeApp ? (
-                  <div className="border-t border-[#E2E8F0] bg-[#F8FBFF]/92 px-4 py-4 sm:px-6 lg:px-10">
-                    <div className="mb-3 flex items-center justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-[#0F172A]">Starter Questions</p>
-                        <p className="text-xs text-slate-500">Use these to jump into common NRI tax conversations.</p>
-                      </div>
-                      <span className="rounded-full border border-[#D9E2F0] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Quick Start
-                      </span>
-                    </div>
-                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                      {starterQuestions.map((q, i) => (
-                        <Button
-                          key={i}
-                          type="button"
-                          variant="outline"
-                          className="h-auto justify-start rounded-2xl border-[#D9E2F0] bg-white px-4 py-3 text-left text-sm font-medium leading-6 text-[#0F172A] hover:bg-[#F2F7FF]"
-                          onClick={() => handleStarterQuestionSelect(q)}
-                        >
-                          {q}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </div>
 
               <CardFooter className={isIosNativeApp ? "flex-shrink-0 border-t border-[#E2E8F0] bg-white p-2" : "flex-shrink-0 border-t border-[#E2E8F0] bg-white/96 px-4 py-4 backdrop-blur sm:px-6 lg:px-10"}>
@@ -1338,6 +1311,32 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   )}
                 </form>
               </CardFooter>
+              {!isIosNativeApp ? (
+                <div className="border-t border-[#E2E8F0] bg-[#F8FBFF]/96 px-4 py-4 sm:px-6 lg:px-10">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[#0F172A]">Starter Questions</p>
+                      <p className="text-xs text-slate-500">Use these to jump into common NRI tax conversations.</p>
+                    </div>
+                    <span className="rounded-full border border-[#D9E2F0] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Quick Start
+                    </span>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                    {starterQuestions.map((q, i) => (
+                      <Button
+                        key={i}
+                        type="button"
+                        variant="outline"
+                        className="h-auto justify-start rounded-2xl border-[#D9E2F0] bg-white px-4 py-3 text-left text-sm font-medium leading-6 text-[#0F172A] hover:bg-[#F2F7FF]"
+                        onClick={() => handleStarterQuestionSelect(q)}
+                      >
+                        {q}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {starterLimitReached ? (
                 <div className="border-t border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
                   {IOS_EXTERNAL_PURCHASES_DISABLED
