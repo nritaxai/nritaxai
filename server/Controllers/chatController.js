@@ -843,6 +843,7 @@ const isGreetingMessage = (text) => {
 
 const toAssistantRole = (role) => (role === "user" ? "user" : "assistant");
 const toClientRole = (role) => (role === "user" ? "user" : "ai");
+const DEFAULT_CONVERSATION_ID = "default";
 
 const normalizeStoredMessages = (messages = []) =>
   messages
@@ -859,12 +860,29 @@ const normalizeStoredMessages = (messages = []) =>
       taxRuleTimelines: Array.isArray(msg.taxRuleTimelines) ? msg.taxRuleTimelines : [],
     }));
 
-const loadPersistedMessages = async (userId, language, knowledgeSource) => {
+const normalizeConversationId = (value) => {
+  const normalized = typeof value === "string" ? value.trim() : "";
+  return normalized || DEFAULT_CONVERSATION_ID;
+};
+
+const buildConversationTitle = (messages = []) => {
+  const firstUserMessage = messages.find((message) => message?.role === "user" && String(message?.content || "").trim());
+  if (!firstUserMessage) return "New Chat";
+
+  return sanitizeAiReply(String(firstUserMessage.content || ""))
+    .replace(/[#>*`_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 80) || "New Chat";
+};
+
+const loadPersistedMessages = async (userId, language, knowledgeSource, conversationId = DEFAULT_CONVERSATION_ID) => {
   if (!userId || userId === "guest") return [];
   const history = await ChatHistory.findOne({
     user: userId,
     language,
     knowledgeSource,
+    conversationId: normalizeConversationId(conversationId),
   })
     .lean()
     .exec();
@@ -872,14 +890,26 @@ const loadPersistedMessages = async (userId, language, knowledgeSource) => {
   return normalizeStoredMessages(history?.messages || []);
 };
 
-const savePersistedMessages = async (userId, language, knowledgeSource, messages) => {
+const savePersistedMessages = async (
+  userId,
+  language,
+  knowledgeSource,
+  conversationId = DEFAULT_CONVERSATION_ID,
+  messages
+) => {
   if (!userId || userId === "guest") return;
 
   const normalized = normalizeStoredMessages(messages).slice(-MAX_STORED_MESSAGES);
   await ChatHistory.findOneAndUpdate(
-    { user: userId, language, knowledgeSource },
+    {
+      user: userId,
+      language,
+      knowledgeSource,
+      conversationId: normalizeConversationId(conversationId),
+    },
     {
       $set: {
+        title: buildConversationTitle(normalized),
         messages: normalized,
       },
     },
@@ -918,6 +948,7 @@ const syncSessionStores = async ({
   userId,
   language,
   knowledgeSource,
+  conversationId,
   sessionKey,
   messages,
 }) => {
@@ -930,7 +961,7 @@ const syncSessionStores = async ({
       content: msg.content,
     }))
   );
-  await savePersistedMessages(userId, language, knowledgeSource, normalized);
+  await savePersistedMessages(userId, language, knowledgeSource, conversationId, normalized);
 };
 
 const syncSessionStoresAsync = (payload) => {
@@ -981,12 +1012,13 @@ const loadSessionMessages = async ({
   userId,
   language,
   knowledgeSource,
+  conversationId,
   sessionKey,
 }) => {
   const cached = getCachedSessionMessages(sessionKey);
   if (cached.length) return cached;
 
-  const persistedMessages = await loadPersistedMessages(userId, language, knowledgeSource);
+  const persistedMessages = await loadPersistedMessages(userId, language, knowledgeSource, conversationId);
   const memoryMessages = getMemoryMessages(sessionKey);
   const merged = mergeSessionMessages(persistedMessages, memoryMessages);
 
@@ -1002,6 +1034,27 @@ const loadSessionMessages = async ({
   }
 
   return merged;
+};
+
+const listPersistedConversations = async (userId, language, knowledgeSource) => {
+  if (!userId || userId === "guest" || userId.startsWith("guest:")) return [];
+
+  const rows = await ChatHistory.find({
+    user: userId,
+    language,
+    knowledgeSource,
+  })
+    .sort({ updatedAt: -1 })
+    .select("conversationId title updatedAt messages")
+    .lean()
+    .exec();
+
+  return rows.map((row) => ({
+    conversationId: normalizeConversationId(row?.conversationId),
+    title: String(row?.title || "").trim() || buildConversationTitle(row?.messages || []),
+    updatedAt: row?.updatedAt || null,
+    messageCount: Array.isArray(row?.messages) ? row.messages.filter((message) => message?.role === "user").length : 0,
+  }));
 };
 
 const generateGeneralTaxReply = async ({ model, selectedLanguage, contextualMessages, hiddenContext = "" }) => {
@@ -1083,13 +1136,15 @@ export const getChatHistory = async (req, res) => {
     const rawKnowledgeSource =
       typeof req.query?.knowledgeSource === "string" ? req.query.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "general" ? "general" : "dtaa";
+    const conversationId = normalizeConversationId(req.query?.conversationId);
     const userId = getSessionActorId(req);
-    const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
+    const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}:${conversationId}`;
 
     const messages = await loadSessionMessages({
       userId,
       language: rawLanguage,
       knowledgeSource,
+      conversationId,
       sessionKey,
     });
     return res.status(200).json({ messages });
@@ -1099,23 +1154,40 @@ export const getChatHistory = async (req, res) => {
   }
 };
 
+export const getChatConversations = async (req, res) => {
+  try {
+    const rawLanguage = typeof req.query?.language === "string" ? req.query.language.toLowerCase() : "english";
+    const rawKnowledgeSource =
+      typeof req.query?.knowledgeSource === "string" ? req.query.knowledgeSource.toLowerCase() : "dtaa";
+    const knowledgeSource = rawKnowledgeSource === "general" ? "general" : "dtaa";
+    const userId = getSessionActorId(req);
+    const conversations = await listPersistedConversations(userId, rawLanguage, knowledgeSource);
+
+    return res.status(200).json({ conversations });
+  } catch (error) {
+    console.error("getChatConversations error:", error);
+    return res.status(500).json({ error: "Failed to load chat conversations." });
+  }
+};
+
 export const clearChatHistory = async (req, res) => {
   try {
     const rawLanguage = typeof req.body?.language === "string" ? req.body.language.toLowerCase() : "english";
     const rawKnowledgeSource =
       typeof req.body?.knowledgeSource === "string" ? req.body.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "general" ? "general" : "dtaa";
+    const conversationId = normalizeConversationId(req.body?.conversationId);
     const userId = getSessionActorId(req);
 
     if (!userId.startsWith("guest:")) {
       await ChatHistory.findOneAndUpdate(
-        { user: userId, language: rawLanguage, knowledgeSource },
-        { $set: { messages: [] } },
+        { user: userId, language: rawLanguage, knowledgeSource, conversationId },
+        { $set: { messages: [], title: "New Chat" } },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
     }
 
-    const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
+    const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}:${conversationId}`;
     chatSessionMemory.delete(sessionKey);
     chatSessionStore.delete(sessionKey);
     clearClarificationState(sessionKey);
@@ -1136,9 +1208,10 @@ export const chatWithAI = async (req, res) => {
     const rawKnowledgeSource =
       typeof req.body?.knowledgeSource === "string" ? req.body.knowledgeSource.toLowerCase() : "dtaa";
     const knowledgeSource = rawKnowledgeSource === "dtaa" ? "dtaa" : "general";
+    const conversationId = normalizeConversationId(req.body?.conversationId);
     let model = DEFAULT_CHAT_MODEL;
     const userId = getSessionActorId(req);
-    const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}`;
+    const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}:${conversationId}`;
     const providedClarificationContext = mergeClarificationContext(req.body?.clarificationContext);
     const activeClarificationState = getClarificationState(sessionKey);
 
@@ -1175,6 +1248,7 @@ export const chatWithAI = async (req, res) => {
         userId,
         language: rawLanguage,
         knowledgeSource,
+        conversationId,
         sessionKey,
       });
       const greetingReplyMap = {
@@ -1194,6 +1268,7 @@ export const chatWithAI = async (req, res) => {
         userId,
         language: rawLanguage,
         knowledgeSource,
+        conversationId,
         sessionKey,
         messages: updatedContext,
       });
@@ -1214,6 +1289,7 @@ export const chatWithAI = async (req, res) => {
         userId,
         language: rawLanguage,
         knowledgeSource,
+        conversationId,
         sessionKey,
       }),
       User.findById(req.user?._id).select(
@@ -1297,6 +1373,7 @@ export const chatWithAI = async (req, res) => {
         userId,
         language: rawLanguage,
         knowledgeSource,
+        conversationId,
         sessionKey,
         messages: clarificationMessages.slice(-MAX_STORED_MESSAGES),
       });
@@ -1398,6 +1475,7 @@ export const chatWithAI = async (req, res) => {
         userId,
         language: rawLanguage,
         knowledgeSource,
+        conversationId,
         sessionKey,
         messages: updatedContext,
       });
@@ -1433,6 +1511,7 @@ export const chatWithAI = async (req, res) => {
       userId,
       language: rawLanguage,
       knowledgeSource,
+      conversationId,
       sessionKey,
       messages: persistedUpdatedContext,
     });

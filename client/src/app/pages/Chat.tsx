@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "motion/react";
@@ -165,10 +165,19 @@ const getMessagePreview = (content: string) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const createConversationId = () => `chat-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
 type ChatMessage = {
   role: "user" | "ai";
   content: string;
   taxRuleTimelines?: TaxRuleTimelineItem[];
+};
+
+type ConversationSummary = {
+  conversationId: string;
+  title: string;
+  updatedAt?: string | null;
+  messageCount?: number;
 };
 
 const normalizeMessage = (message: unknown): ChatMessage | null => {
@@ -188,6 +197,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const [question, setQuestion] = useState("");
   const [language, setLanguage] = useState("english");
   const knowledgeSource = "dtaa";
+  const [currentConversationId, setCurrentConversationId] = useState(() => createConversationId());
+  const [conversationList, setConversationList] = useState<ConversationSummary[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
   const welcomeByLanguage: Record<string, string> = {
     english: `Hi${userName ? ` ${userName}` : ""}! I am your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
@@ -228,21 +239,49 @@ export function Chat({ onRequireLogin }: ChatProps) {
     startY: number;
     startBounds: PopupBounds;
   } | null>(null);
+  const pendingConversationIdRef = useRef<string | null>(null);
 
   const getWelcomeMessage = () => welcomeByLanguage[language] || welcomeByLanguage.english;
-  const conversationHistory = useMemo(
-    () =>
-      messages
-        .map((message, index) => ({ message, index }))
-        .filter(({ message }) => message.role === "user")
-        .map(({ message, index }, historyIndex) => ({
-          id: `chat-message-${index}`,
-          label: getMessagePreview(message.content).slice(0, 70) || `Question ${historyIndex + 1}`,
-          index,
-        }))
-        .reverse(),
-    [messages]
-  );
+  const hasCurrentConversationMessages = messages.some((message) => message.role === "user");
+
+  const loadConversations = async (preferredConversationId?: string | null) => {
+    if (!isAuthenticated) {
+      setConversationList([]);
+      return [];
+    }
+
+    const response = await axios.get(buildApiUrl("/api/chat/conversations"), {
+      params: { language, knowledgeSource },
+      headers: getChatRequestHeaders(),
+    });
+
+    const conversations = Array.isArray(response.data?.conversations) ? response.data.conversations : [];
+    const normalizedConversations = conversations
+      .map((item: any) => ({
+        conversationId: typeof item?.conversationId === "string" ? item.conversationId : "",
+        title:
+          typeof item?.title === "string" && item.title.trim()
+            ? item.title.trim()
+            : "New Chat",
+        updatedAt: typeof item?.updatedAt === "string" ? item.updatedAt : null,
+        messageCount: typeof item?.messageCount === "number" ? item.messageCount : 0,
+      }))
+      .filter((item: ConversationSummary) => item.conversationId);
+
+    setConversationList(normalizedConversations);
+
+    if (normalizedConversations.length) {
+      const preferredId = preferredConversationId || pendingConversationIdRef.current;
+      if (preferredId && normalizedConversations.some((item: ConversationSummary) => item.conversationId === preferredId)) {
+        setCurrentConversationId(preferredId);
+      } else if (!pendingConversationIdRef.current && !normalizedConversations.some((item: ConversationSummary) => item.conversationId === currentConversationId)) {
+        setCurrentConversationId(normalizedConversations[0].conversationId);
+      }
+    }
+
+    pendingConversationIdRef.current = null;
+    return normalizedConversations;
+  };
 
   const downloadChatTranscript = () => {
     if (!messages.length) return;
@@ -276,13 +315,20 @@ export function Chat({ onRequireLogin }: ChatProps) {
     try {
       await axios.post(
         buildApiUrl("/api/chat/clear"),
-        { language, knowledgeSource },
+        { language, knowledgeSource, conversationId: currentConversationId },
         { headers: getChatRequestHeaders() }
       );
     } catch {
     }
 
     setMessages([{ role: "ai", content: welcomeMessage }]);
+    setConversationList((prev) =>
+      prev.map((item) =>
+        item.conversationId === currentConversationId
+          ? { ...item, title: "New Chat", messageCount: 0 }
+          : item
+      )
+    );
   };
   const isAuthenticated = Boolean(typeof window !== "undefined" && getStoredAuthToken());
   const hasActivePaidSubscription =
@@ -291,6 +337,18 @@ export function Chat({ onRequireLogin }: ChatProps) {
     subscription?.plan === PLAN_KEYS.STARTER &&
     subscription?.remaining?.chatMessages !== null &&
     Number(subscription?.remaining?.chatMessages || 0) <= 0;
+
+  const handleStartNewChat = () => {
+    activeRequestControllerRef.current?.abort();
+    activeRequestControllerRef.current = null;
+    activeRequestIdRef.current += 1;
+    setIsTyping(false);
+    setProviderWarning("");
+    setQuestion("");
+    pendingConversationIdRef.current = null;
+    setCurrentConversationId(createConversationId());
+    setMessages([{ role: "ai", content: getWelcomeMessage() }]);
+  };
 
   useEffect(() => {
     const syncUser = () => setUserName(getStoredUserName());
@@ -404,9 +462,40 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      setConversationList([]);
+      pendingConversationIdRef.current = null;
+      setCurrentConversationId(createConversationId());
       setMessages([{ role: "ai", content: getWelcomeMessage() }]);
       return;
     }
+
+    let isCancelled = false;
+
+    const syncConversations = async () => {
+      try {
+        const conversations = await loadConversations();
+        if (isCancelled) return;
+
+        if (!conversations.length) {
+          pendingConversationIdRef.current = null;
+          setCurrentConversationId(createConversationId());
+          setMessages([{ role: "ai", content: getWelcomeMessage() }]);
+        }
+      } catch {
+        if (!isCancelled) {
+          setConversationList([]);
+        }
+      }
+    };
+
+    void syncConversations();
+    return () => {
+      isCancelled = true;
+    };
+  }, [isAuthenticated, language, knowledgeSource]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
     const welcomeMessage = getWelcomeMessage();
 
@@ -414,7 +503,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
     const loadHistory = async () => {
       try {
         const response = await axios.get(buildApiUrl("/api/chat/history"), {
-          params: { language, knowledgeSource },
+          params: { language, knowledgeSource, conversationId: currentConversationId },
           headers: getChatRequestHeaders(),
         });
 
@@ -440,7 +529,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
     return () => {
       isCancelled = true;
     };
-  }, [language, knowledgeSource, userName]);
+  }, [currentConversationId, isAuthenticated, language, knowledgeSource, userName]);
 
   const submitQuestion = async (forcedQuestion?: string) => {
     if (!isAuthenticated) {
@@ -468,7 +557,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
     try {
       const response = await axios.post(
         buildApiUrl("/api/chat"),
-        { message: userMessage, language, knowledgeSource },
+        { message: userMessage, language, knowledgeSource, conversationId: currentConversationId },
         { headers: getChatRequestHeaders(), signal: controller.signal }
       );
       if (activeRequestIdRef.current !== requestId) return;
@@ -485,6 +574,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
           taxRuleTimelines: Array.isArray(response.data?.taxRuleTimelines) ? response.data.taxRuleTimelines : [],
         },
       ]);
+      pendingConversationIdRef.current = currentConversationId;
+      void loadConversations(currentConversationId);
     } catch (error: any) {
       if (axios.isCancel(error) || error?.code === "ERR_CANCELED") {
         return;
@@ -544,9 +635,15 @@ export function Chat({ onRequireLogin }: ChatProps) {
     void submitQuestion(selectedQuestion);
   };
 
-  const handleScrollToMessage = (messageId: string) => {
-    const target = document.getElementById(messageId);
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  const handleSelectConversation = (conversationId: string) => {
+    if (!conversationId || conversationId === currentConversationId) return;
+    activeRequestControllerRef.current?.abort();
+    activeRequestControllerRef.current = null;
+    activeRequestIdRef.current += 1;
+    setIsTyping(false);
+    setProviderWarning("");
+    setQuestion("");
+    setCurrentConversationId(conversationId);
   };
 
   const handleOpenPopup = () => {
@@ -742,7 +839,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   }
 
   const isIosNativeApp = IS_IOS_NATIVE_APP;
-  const hasUserMessages = conversationHistory.length > 0;
+  const hasUserMessages = hasCurrentConversationMessages;
   const isDesktopLandingState = !isIosNativeApp && !hasUserMessages && !isTyping;
 
   if (isIosNativeApp) {
@@ -1050,12 +1147,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     <div>
                       <CardTitle className="text-[#0F172A]">History</CardTitle>
                       <CardDescription className="text-slate-600">
-                        Browse recent prompts from this conversation
+                        Browse saved conversations and reopen any thread
                       </CardDescription>
                     </div>
                   </div>
                   <div className="mt-4 grid gap-2">
-                    <Button type="button" className="justify-start rounded-2xl bg-[#0F172A] px-4 py-6 text-white hover:bg-[#111c33]" onClick={clearChat}>
+                    <Button type="button" className="justify-start rounded-2xl bg-[#0F172A] px-4 py-6 text-white hover:bg-[#111c33]" onClick={handleStartNewChat}>
                       <Trash2 className="mr-2 size-4" />
                       Start New Chat
                     </Button>
@@ -1067,25 +1164,29 @@ export function Chat({ onRequireLogin }: ChatProps) {
                 </CardHeader>
                 <CardContent className="min-h-0 flex-1 overflow-y-auto p-3">
                   <div className="space-y-2">
-                    {conversationHistory.length ? (
-                      conversationHistory.map((item, itemIndex) => (
+                    {conversationList.length ? (
+                      conversationList.map((item) => (
                         <button
-                          key={item.id}
+                          key={item.conversationId}
                           type="button"
-                          onClick={() => handleScrollToMessage(item.id)}
-                          className="flex w-full flex-col rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-left transition hover:border-[#93C5FD] hover:bg-[#F8FBFF]"
+                          onClick={() => handleSelectConversation(item.conversationId)}
+                          className={`flex w-full flex-col rounded-2xl border px-4 py-3 text-left transition ${
+                            item.conversationId === currentConversationId
+                              ? "border-[#93C5FD] bg-[#F2F7FF]"
+                              : "border-[#E2E8F0] bg-white hover:border-[#93C5FD] hover:bg-[#F8FBFF]"
+                          }`}
                         >
                           <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                            Question {conversationHistory.length - itemIndex}
+                            {item.messageCount ? `${item.messageCount} question${item.messageCount === 1 ? "" : "s"}` : "New chat"}
                           </span>
                           <span className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-[#0F172A]">
-                            {item.label}
+                            {item.title}
                           </span>
                         </button>
                       ))
                     ) : (
                       <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white/80 px-4 py-5 text-sm leading-6 text-slate-500">
-                        Your conversation history will appear here as soon as you send a question.
+                        Your saved chats will appear here after you send the first question in each new thread.
                       </div>
                     )}
                   </div>

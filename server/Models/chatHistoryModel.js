@@ -73,6 +73,17 @@ const chatHistorySchema = new mongoose.Schema(
       trim: true,
       default: "dtaa",
     },
+    conversationId: {
+      type: String,
+      required: true,
+      trim: true,
+      default: "default",
+    },
+    title: {
+      type: String,
+      trim: true,
+      default: "New Chat",
+    },
     messages: {
       type: [chatMessageSchema],
       default: [],
@@ -81,7 +92,7 @@ const chatHistorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-chatHistorySchema.index({ user: 1, language: 1, knowledgeSource: 1 }, { unique: true });
+chatHistorySchema.index({ user: 1, language: 1, knowledgeSource: 1, conversationId: 1 }, { unique: true });
 chatHistorySchema.index({ updatedAt: -1 });
 
 const ChatHistory = mongoose.model("ChatHistory", chatHistorySchema);
