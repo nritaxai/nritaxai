@@ -21,6 +21,7 @@ test("buildRuntimeConfig provides production-safe defaults and centralized fallb
   assert.equal(config.payments.razorpay.keyId, "rzp_key");
   assert.deepEqual(config.country.checkoutDisplayCurrencyMatrix.US, ["USD", "INR"]);
   assert.equal(config.features.aiGatewayEnabled, true);
+  assert.equal(config.features.yuktiSmartClarificationEnabled, true);
 });
 
 test("validateRuntimeConfig reports missing operational secrets without hardcoding callers", () => {

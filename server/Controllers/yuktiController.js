@@ -144,6 +144,7 @@ export const askYukti = async (req, res) => {
       {
         workflow: "yukti_clarification",
         route: clarificationState.routing.route,
+        category: clarificationState.category || clarificationState.routing.route,
         confidence: clarificationState.routing.confidence,
         missingFields: clarificationState.missingFields,
       },
@@ -163,14 +164,33 @@ export const askYukti = async (req, res) => {
       });
     }
 
-    const knowledge = await retrieveKnowledgeContext(question, {
+    const resolvedQuestion = sanitizeText(clarificationState.resolvedQuestion || question) || question;
+
+    req.logger?.info?.(
+      {
+        workflow: "yukti_retrieval",
+        route: clarificationState.routing.route,
+        category: clarificationState.category || clarificationState.routing.route,
+        contextFields: Object.keys(clarificationState.context || {}),
+      },
+      "triggering yukti retrieval"
+    );
+
+    const knowledge = await retrieveKnowledgeContext(resolvedQuestion, {
       sourceTypes: ["dtaa_pdf", "tax_law", "fema_doc", "tds_rule", "capital_gains", "nri_compliance", "other_pdf"],
       context: clarificationState.context,
     }).catch(() => ({ context: "", sources: [], confidence: 0, insufficientContext: true }));
 
     const payload = {
-      question,
-      ...(clarificationState.context.currentCountry ? { country: clarificationState.context.currentCountry } : country ? { country } : {}),
+      question: resolvedQuestion,
+      latestUserMessage: question,
+      ...(clarificationState.context.residenceCountry
+        ? { country: clarificationState.context.residenceCountry }
+        : clarificationState.context.currentCountry
+          ? { country: clarificationState.context.currentCountry }
+          : country
+            ? { country }
+            : {}),
       ...(clarificationState.context.financialYear ? { taxYear: clarificationState.context.financialYear } : taxYear ? { taxYear } : {}),
       ...(clarificationState.context.residencyStatus
         ? { residentialStatus: clarificationState.context.residencyStatus }

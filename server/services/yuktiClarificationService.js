@@ -1,5 +1,15 @@
-import { getCachedValue, setCachedValue } from "./cacheService.js";
+import { featureFlags } from "../Config/featureFlags.js";
 import { classifyTaxQuery } from "./queryRouterService.js";
+import { getCachedValue, setCachedValue } from "./cacheService.js";
+import {
+  buildClarificationPrompt,
+  resolveClarificationTurn,
+} from "./ai/clarificationEngine.js";
+import {
+  clearClarificationSession,
+  loadClarificationSession,
+  saveClarificationSession,
+} from "./ai/sessionMemory.js";
 
 const SESSION_TTL_SECONDS = Math.max(Number(process.env.YUKTI_CONTEXT_TTL_SECONDS || 1800), 300);
 
@@ -81,11 +91,27 @@ const buildFollowUpQuestions = ({ missingFields = [], context = {}, question = "
 };
 
 export const loadYuktiSessionContext = async ({ userId = "", sessionId = "" } = {}) => {
+  if (featureFlags.yuktiSmartClarificationEnabled) {
+    const state = await loadClarificationSession({ userId, sessionId, scope: "yukti" });
+    return state?.context || {};
+  }
   const key = getSessionKey({ userId, sessionId });
   return (await getCachedValue({ layer: "yukti_session_context", key })) || {};
 };
 
 export const saveYuktiSessionContext = async ({ userId = "", sessionId = "", context = {}, lastQuestion = "" } = {}) => {
+  if (featureFlags.yuktiSmartClarificationEnabled) {
+    const previous = (await loadClarificationSession({ userId, sessionId, scope: "yukti" })) || {};
+    const nextState = {
+      ...previous,
+      active: Boolean(previous?.active),
+      originalQuestion: previous?.originalQuestion || sanitizeText(lastQuestion),
+      context,
+      updatedAt: new Date().toISOString(),
+    };
+    await saveClarificationSession({ userId, sessionId, scope: "yukti", state: nextState });
+    return nextState;
+  }
   const key = getSessionKey({ userId, sessionId });
   const payload = {
     ...context,
@@ -104,6 +130,46 @@ export const saveYuktiSessionContext = async ({ userId = "", sessionId = "", con
 };
 
 export const resolveYuktiClarificationState = async ({ question = "", payload = {}, userId = "", sessionId = "" } = {}) => {
+  if (featureFlags.yuktiSmartClarificationEnabled) {
+    const sessionState = await loadClarificationSession({ userId, sessionId, scope: "yukti" });
+    const resolved = resolveClarificationTurn({
+      question,
+      knowledgeSource: "dtaa",
+      payloadContext: {
+        residenceCountry: payload.currentCountry || payload.country,
+        relevantCountry: payload.relevantCountry || payload.countryRelevantToQuery,
+        financialYear: payload.financialYear || payload.taxYear,
+        incomeType: payload.incomeType,
+        maritalStatus: payload.maritalStatus,
+        dependents: payload.dependents ?? payload.numberOfChildren ?? payload.children,
+      },
+      sessionState,
+    });
+
+    if (resolved.shouldClarify) {
+      await saveClarificationSession({ userId, sessionId, scope: "yukti", state: resolved.state });
+    } else {
+      await saveClarificationSession({ userId, sessionId, scope: "yukti", state: resolved.state });
+      if (!resolved.state.active) {
+        await clearClarificationSession({ userId, sessionId, scope: "yukti" });
+      }
+    }
+
+    return {
+      routing: {
+        route: resolved.routing.category,
+        confidence: resolved.routing.confidence,
+        reasons: resolved.routing.reasons,
+      },
+      context: resolved.context,
+      missingFields: resolved.pendingFields,
+      shouldClarify: resolved.shouldClarify,
+      followUpQuestion: buildClarificationPrompt({ state: resolved.state }),
+      resolvedQuestion: resolved.resolvedQuestion,
+      category: resolved.routing.category,
+    };
+  }
+
   const routing = classifyTaxQuery(question);
   const storedContext = await loadYuktiSessionContext({ userId, sessionId });
   const derivedContext = buildInitialContext(payload);

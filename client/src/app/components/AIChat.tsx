@@ -77,11 +77,18 @@ const getClarificationStorageKey = (language: string, knowledgeSource: string) =
 const buildClarificationSummary = (values: Record<string, string>) => {
   const labelMap: Record<string, string> = {
     residencyCountry: "Residency country",
+    residenceCountry: "Residence country",
     targetCountry: "Target country",
+    relevantCountry: "Relevant country",
     financialYear: "Financial year",
     incomeType: "Income type",
     maritalStatus: "Marital status",
     dependentsOrUserCategory: "Dependents or user category",
+    dependents: "Dependents",
+    assetType: "Asset type",
+    purchaseYear: "Purchase year",
+    saleYear: "Sale year",
+    transactionType: "Transaction type",
   };
 
   const lines = Object.entries(values)

@@ -8,6 +8,7 @@ import pdfParse from "pdf-parse";
 import ChatHistory from "../Models/chatHistoryModel.js";
 import User from "../Models/userModel.js";
 import { appConfig } from "../Config/runtimeConfig.js";
+import { featureFlags } from "../Config/featureFlags.js";
 import { CHAT_MODEL_KEYS, PLAN_KEYS } from "../../shared/subscriptionConfig.js";
 import {
   checkAndConsumeChatUsage,
@@ -17,13 +18,12 @@ import {
 import { appendTimelineToAnswer, getTaxRuleTimelinesForQuery } from "../Utils/taxRuleTimelines.js";
 import { buildHiddenContextFromMatches } from "../Utils/chatPromptContext.js";
 import {
-  buildClarificationContextSummary,
   buildClarificationPrompt,
-  buildClarificationQuestions,
-  extractClarificationContextFromText,
-  mergeClarificationContext,
-  shouldAskClarification,
-} from "../Utils/chatClarification.js";
+  buildClarificationResponsePayload,
+  buildClarificationUserMessage,
+  resolveClarificationTurn,
+} from "../services/ai/clarificationEngine.js";
+import { buildContextSummary } from "../services/ai/contextManager.js";
 
 const OPENROUTER_TIMEOUT_MS = appConfig.ai.openRouter.timeoutMs;
 const OPENROUTER_MAX_RETRIES = Number(process.env.OPENROUTER_MAX_RETRIES || 2);
@@ -983,29 +983,14 @@ const setClarificationState = (sessionKey, state = {}) => {
   chatClarificationStore.set(sessionKey, {
     active: true,
     originalQuestion: String(state.originalQuestion || "").trim(),
+    category: String(state.category || "OTHER").trim() || "OTHER",
+    routing: state.routing || null,
     requiredFields: Array.isArray(state.requiredFields) ? state.requiredFields : [],
-    missingFields: Array.isArray(state.missingFields) ? state.missingFields : [],
-    context: mergeClarificationContext(state.context),
+    pendingFields: Array.isArray(state.pendingFields) ? state.pendingFields : [],
+    lastAskedField: String(state.lastAskedField || "").trim(),
+    lastAskedQuestion: String(state.lastAskedQuestion || "").trim(),
+    context: state.context && typeof state.context === "object" ? state.context : {},
   });
-};
-
-const buildClarificationResponsePayload = ({
-  originalQuestion = "",
-  requiredFields = [],
-  missingFields = [],
-  context = {},
-}) => ({
-  originalQuestion,
-  requiredFields,
-  missingFields,
-  context,
-  contextSummary: buildClarificationContextSummary(context),
-  questions: buildClarificationQuestions(missingFields),
-});
-
-const buildClarificationUserMessage = (context = {}) => {
-  const summary = buildClarificationContextSummary(context);
-  return summary ? `Clarification details:\n${summary}` : "";
 };
 
 const loadSessionMessages = async ({
@@ -1212,7 +1197,10 @@ export const chatWithAI = async (req, res) => {
     let model = DEFAULT_CHAT_MODEL;
     const userId = getSessionActorId(req);
     const sessionKey = `${userId}:${rawLanguage}:${knowledgeSource}:${conversationId}`;
-    const providedClarificationContext = mergeClarificationContext(req.body?.clarificationContext);
+    const providedClarificationContext =
+      req.body?.clarificationContext && typeof req.body.clarificationContext === "object"
+        ? req.body.clarificationContext
+        : {};
     const activeClarificationState = getClarificationState(sessionKey);
 
     const languageMap = {
@@ -1322,41 +1310,34 @@ export const chatWithAI = async (req, res) => {
       }
     }
 
-    const shouldResumeClarification =
-      Boolean(activeClarificationState?.active) && Object.keys(providedClarificationContext).length > 0;
-    if (activeClarificationState?.active && !shouldResumeClarification) {
-      clearClarificationState(sessionKey);
-    }
-
-    const effectiveQuestion = shouldResumeClarification
-      ? activeClarificationState?.originalQuestion || message
-      : message;
-    const collectedClarificationContext = shouldResumeClarification
-      ? mergeClarificationContext(activeClarificationState?.context, providedClarificationContext)
-      : mergeClarificationContext(extractClarificationContextFromText(message), providedClarificationContext);
-    const clarificationAssessment = shouldAskClarification({
-      message: effectiveQuestion,
+    const clarificationResult = resolveClarificationTurn({
+      question: message,
       knowledgeSource,
-      context: collectedClarificationContext,
+      payloadContext: providedClarificationContext,
+      sessionState: activeClarificationState,
     });
+    const shouldResumeClarification = Boolean(activeClarificationState?.active) && !clarificationResult.isNewTopic;
+    const effectiveQuestion = clarificationResult.resolvedQuestion || message;
+    const collectedClarificationContext = clarificationResult.context || {};
 
-    if (clarificationAssessment.needsClarification) {
-      const clarificationPayload = buildClarificationResponsePayload({
-        originalQuestion: effectiveQuestion,
-        requiredFields: clarificationAssessment.requiredFields,
-        missingFields: clarificationAssessment.missingFields,
-        context: collectedClarificationContext,
-      });
+    req.logger?.info?.(
+      {
+        workflow: "chat_clarification",
+        category: clarificationResult.routing.category,
+        confidence: clarificationResult.routing.confidence,
+        requiredContext: clarificationResult.requiredFields,
+        missingContext: clarificationResult.pendingFields,
+        askedField: clarificationResult.state.lastAskedField || null,
+      },
+      "resolved chat clarification state"
+    );
+
+    if (clarificationResult.shouldClarify) {
+      const clarificationPayload = buildClarificationResponsePayload(clarificationResult.state);
       const clarificationReply = buildClarificationPrompt({
-        originalQuestion: effectiveQuestion,
-        missingFields: clarificationAssessment.missingFields,
+        state: clarificationResult.state,
       });
-      setClarificationState(sessionKey, {
-        originalQuestion: effectiveQuestion,
-        requiredFields: clarificationAssessment.requiredFields,
-        missingFields: clarificationAssessment.missingFields,
-        context: collectedClarificationContext,
-      });
+      setClarificationState(sessionKey, clarificationResult.state);
 
       const clarificationMessages = [...sessionMessages];
       if (shouldResumeClarification) {
@@ -1387,7 +1368,7 @@ export const chatWithAI = async (req, res) => {
     }
 
     clearClarificationState(sessionKey);
-    const clarificationContextSummary = buildClarificationContextSummary(collectedClarificationContext);
+    const clarificationContextSummary = buildContextSummary(collectedClarificationContext);
     const effectiveQuestionWithContext = clarificationContextSummary
       ? `${effectiveQuestion}\n\nTax context:\n${clarificationContextSummary}`
       : effectiveQuestion;

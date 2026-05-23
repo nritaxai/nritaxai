@@ -71,6 +71,7 @@ const FEATURE_FLAG_DEFAULTS = Object.freeze({
   enterpriseRbacEnabled: false,
   enterpriseTenantHeadersEnabled: false,
   enterpriseEnhancedAuditEnabled: true,
+  yuktiSmartClarificationEnabled: true,
 });
 
 const COMPANY_LEGAL_NAME = "Billion Dollar Technologies Private Limited";
@@ -179,6 +180,10 @@ const buildFeatureFlags = (env) => ({
   enterpriseEnhancedAuditEnabled: parseBoolean(
     env.ENTERPRISE_ENHANCED_AUDIT_ENABLED,
     FEATURE_FLAG_DEFAULTS.enterpriseEnhancedAuditEnabled
+  ),
+  yuktiSmartClarificationEnabled: parseBoolean(
+    env.YUKTI_SMART_CLARIFICATION_ENABLED,
+    FEATURE_FLAG_DEFAULTS.yuktiSmartClarificationEnabled
   ),
 });
 
