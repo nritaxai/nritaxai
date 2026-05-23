@@ -8,6 +8,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { trimValue } from "../utils/consultationWorkflow";
 import { IS_IOS_NATIVE_APP } from "../../config/appConfig";
+import { buildApiUrl } from "../../utils/api";
 
 type ExpertFormData = {
   fullName: string;
@@ -27,6 +28,7 @@ type ExpertFormFieldKey = FieldKey | "profile" | "captcha";
 type ExpertOnboardingResponse = {
   success?: boolean;
   message?: string;
+  fieldErrors?: Partial<Record<ExpertFormFieldKey, string>>;
 };
 
 const initialValues: ExpertFormData = {
@@ -43,7 +45,7 @@ const initialValues: ExpertFormData = {
 
 const SUBMISSION_TIMEOUT_MS = 15000;
 const FALLBACK_SUBMISSION_ERROR = "Submission failed. Please try again.";
-const SUBMIT_URL = "https://n8n.caloganathan.com/webhook/expert-onboarding";
+const SUBMIT_URL = buildApiUrl("/api/expert-onboarding/submit");
 const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
 const REQUIRED_FIELDS: FieldKey[] = [
   "fullName",
@@ -76,6 +78,8 @@ const formFieldClassName =
 
 const formSelectClassName =
   "min-h-[44px] w-full appearance-none rounded-[6px] border border-[#D1D5DB] bg-white px-4 py-3 pr-11 text-sm text-[#0F172A] outline-none transition focus-visible:border-[#3B82F6] focus-visible:ring-[3px] focus-visible:ring-[rgba(59,130,246,0.15)]";
+const invalidFieldClassName = "border-[#DC2626] focus-visible:border-[#DC2626] focus-visible:ring-[rgba(220,38,38,0.15)]";
+const errorMessageClassName = "mt-1 text-[12px] text-[#DC2626]";
 
 const requiredAsterisk = <span className="text-red-500">*</span>;
 
@@ -88,9 +92,11 @@ export function JoinAsExpertPage() {
   const [showErrorBanner, setShowErrorBanner] = useState(false);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [submittedName, setSubmittedName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
+  const fieldRefs = useRef<Partial<Record<ExpertFormFieldKey, HTMLElement | null>>>({});
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -127,10 +133,51 @@ export function JoinAsExpertPage() {
     setErrors((prev) => ({
       ...prev,
       [name]: "",
+      ...(name === "customQualification" ? { qualification: "" } : {}),
+      ...(name === "customAreaOfExpertise" ? { areaOfExpertise: "" } : {}),
     }));
 
     setShowErrorBanner(false);
   };
+
+  const setFieldRef = (field: ExpertFormFieldKey) => (element: HTMLElement | null) => {
+    fieldRefs.current[field] = element;
+  };
+
+  const getFieldErrorId = (field: ExpertFormFieldKey) => `${field}-error`;
+
+  const scrollToFirstInvalidField = (validationErrors: Partial<Record<ExpertFormFieldKey, string>>) => {
+    const orderedFields: ExpertFormFieldKey[] = [
+      "fullName",
+      "email",
+      "pincode",
+      "membershipNumber",
+      "cop",
+      "qualification",
+      "areaOfExpertise",
+      "profile",
+      "captcha",
+    ];
+
+    const firstInvalidField = orderedFields.find((field) => validationErrors[field]);
+    const element = firstInvalidField ? fieldRefs.current[firstInvalidField] : null;
+    if (!element) return;
+
+    element.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+      inline: "nearest",
+    });
+
+    if ("focus" in element && typeof element.focus === "function") {
+      window.setTimeout(() => {
+        element.focus({ preventScroll: true });
+      }, 120);
+    }
+  };
+
+  const getFieldClassName = (field: ExpertFormFieldKey, baseClassName: string) =>
+    errors[field] ? `${baseClassName} ${invalidFieldClassName}` : baseClassName;
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
@@ -146,6 +193,10 @@ export function JoinAsExpertPage() {
   const handleRemoveFile = () => {
     setProfileFile(null);
     setErrorMessage("");
+    setErrors((prev) => ({
+      ...prev,
+      profile: "",
+    }));
     if (resumeInputRef.current) {
       resumeInputRef.current.value = "";
     }
@@ -153,41 +204,48 @@ export function JoinAsExpertPage() {
 
   const validateForm = (formValues: ExpertFormData, file: File | null) => {
     const newErrors: Partial<Record<ExpertFormFieldKey, string>> = {};
+    const email = formValues.email.trim();
+    const qualification = resolveSelectedValue(formValues.qualification, formValues.customQualification);
+    const areaOfExpertise = resolveSelectedValue(formValues.areaOfExpertise, formValues.customAreaOfExpertise);
 
     if (!formValues.fullName || formValues.fullName.trim() === "") {
-      newErrors.fullName = "Full name is required";
+      newErrors.fullName = "Please enter your full name.";
     }
 
-    if (!formValues.email || !/^\S+@\S+\.\S+$/.test(formValues.email.trim())) {
-      newErrors.email = "Enter a valid email address";
+    if (!email) {
+      newErrors.email = "Please enter your email address.";
+    } else if (!/^\S+@\S+\.\S+$/.test(email)) {
+      newErrors.email = "Please enter a valid email address.";
     }
 
-    if (!formValues.pincode || !/^\d{6}$/.test(formValues.pincode.trim())) {
-      newErrors.pincode = "Enter a valid 6-digit pincode";
+    if (!formValues.pincode || formValues.pincode.trim() === "") {
+      newErrors.pincode = "Please enter your pincode.";
+    } else if (!/^\d{6}$/.test(formValues.pincode.trim())) {
+      newErrors.pincode = "Please enter a valid 6-digit pincode.";
     }
 
     if (!formValues.membershipNumber || formValues.membershipNumber.trim() === "") {
-      newErrors.membershipNumber = "Membership number is required";
+      newErrors.membershipNumber = "Please enter your membership number.";
     }
 
     if (!["Active", "Inactive", "Not Applicable"].includes(formValues.cop.trim())) {
-      newErrors.cop = "Please select COP.";
+      newErrors.cop = "Please select your COP status.";
     }
 
-    if (!resolveSelectedValue(formValues.qualification, formValues.customQualification)) {
-      newErrors.qualification = "Please select qualification.";
+    if (!qualification) {
+      newErrors.qualification = "Please select your qualification.";
     }
 
-    if (!resolveSelectedValue(formValues.areaOfExpertise, formValues.customAreaOfExpertise)) {
-      newErrors.areaOfExpertise = "Please select area of expertise.";
+    if (!areaOfExpertise) {
+      newErrors.areaOfExpertise = "Please select your area of expertise.";
     }
 
     if (!file) {
-      newErrors.profile = "Please upload your profile.";
+      newErrors.profile = "Please upload your profile document.";
     }
 
     if (!captchaToken) {
-      newErrors.captcha = "Please complete the CAPTCHA.";
+      newErrors.captcha = "Please complete the security verification.";
     }
 
     return newErrors;
@@ -205,10 +263,9 @@ export function JoinAsExpertPage() {
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
-      setErrorMessage(
-        validationErrors.profile || validationErrors.captcha || "Please fill all required fields."
-      );
-      setShowErrorBanner(true);
+      setShowErrorBanner(false);
+      setErrorMessage("");
+      scrollToFirstInvalidField(validationErrors);
       return;
     }
 
@@ -229,15 +286,15 @@ export function JoinAsExpertPage() {
         normalizedValues.customAreaOfExpertise
       );
 
-      if (!normalizedValues.fullName) throw new Error("Please enter full name.");
-      if (!normalizedValues.email) throw new Error("Please enter email.");
-      if (!normalizedValues.pincode) throw new Error("Please enter pincode.");
-      if (!normalizedValues.membershipNumber) throw new Error("Please enter membership number.");
-      if (!profileFile) throw new Error("Please upload your profile.");
-      if (!resolvedQualification) throw new Error("Please select qualification.");
-      if (!captchaToken) throw new Error("Please complete the CAPTCHA.");
-      if (!normalizedValues.cop) throw new Error("Please select COP.");
-      if (!resolvedAreaOfExpertise) throw new Error("Please select area of expertise.");
+      if (!normalizedValues.fullName) throw new Error("Please enter your full name.");
+      if (!normalizedValues.email) throw new Error("Please enter your email address.");
+      if (!normalizedValues.pincode) throw new Error("Please enter your pincode.");
+      if (!normalizedValues.membershipNumber) throw new Error("Please enter your membership number.");
+      if (!profileFile) throw new Error("Please upload your profile document.");
+      if (!resolvedQualification) throw new Error("Please select your qualification.");
+      if (!captchaToken) throw new Error("Please complete the security verification.");
+      if (!normalizedValues.cop) throw new Error("Please select your COP status.");
+      if (!resolvedAreaOfExpertise) throw new Error("Please select your area of expertise.");
 
       const formData = new FormData();
       formData.append("fullName", normalizedValues.fullName || "");
@@ -296,10 +353,18 @@ export function JoinAsExpertPage() {
       });
 
       if (!response.ok || !data?.success) {
+        if (data?.fieldErrors && Object.keys(data.fieldErrors).length > 0) {
+          setErrors(data.fieldErrors);
+          setShowErrorBanner(false);
+          setErrorMessage("");
+          scrollToFirstInvalidField(data.fieldErrors);
+          return;
+        }
         throw new Error(data?.message || FALLBACK_SUBMISSION_ERROR);
       }
 
       setSuccessMessage(data.message || "Application submitted successfully.");
+      setSubmittedName(normalizedValues.fullName);
       setValues(initialValues);
       setProfileFile(null);
       setCaptchaToken("");
@@ -314,7 +379,7 @@ export function JoinAsExpertPage() {
       debugLog("Expert onboarding submission failed.", error);
       const message = error instanceof Error ? error.message : "Something went wrong.";
       setErrorMessage(message);
-      setShowErrorBanner(true);
+      setShowErrorBanner(Boolean(message));
       setCaptchaToken("");
       recaptchaRef.current?.reset();
     } finally {
@@ -391,13 +456,20 @@ export function JoinAsExpertPage() {
           </CardHeader>
           <CardContent className={IS_IOS_NATIVE_APP ? "px-4 pb-5" : undefined}>
             {successMessage ? (
-              <div className="mb-6 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 text-emerald-800">
+              <div className="mb-6 rounded-[12px] border border-[#A7F3D0] bg-[#ECFDF5] p-6 text-emerald-900">
                 <div className="flex items-start gap-3">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0" />
+                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-[#065F46]" />
                   <div>
-                    <p className="text-sm font-semibold">{successMessage}</p>
-                    <p className="mt-1 text-sm">
-                      Thank you for applying as an expert. Our team will contact you soon.
+                    <p className="text-lg font-semibold text-[#065F46]">Application Submitted Successfully</p>
+                    <p className="mt-3 text-sm leading-6 text-[#065F46]">Hi {submittedName || "there"},</p>
+                    <p className="mt-3 text-sm leading-6 text-emerald-900">
+                      Thank you for showing interest in joining the NRITAX expert team.
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-emerald-900">
+                      Our onboarding team will review your application and contact you soon regarding the next steps.
+                    </p>
+                    <p className="mt-3 text-sm leading-6 text-emerald-900">
+                      We appreciate your interest in working with NRITAX.
                     </p>
                   </div>
                 </div>
@@ -406,7 +478,7 @@ export function JoinAsExpertPage() {
               <>
                 {showErrorBanner && (
                   <div className="mb-6 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                    {errorMessage || "Please fill all required fields."}
+                    {errorMessage || FALLBACK_SUBMISSION_ERROR}
                   </div>
                 )}
 
@@ -417,14 +489,16 @@ export function JoinAsExpertPage() {
                   <Input
                     id="fullName"
                     name="fullName"
+                    ref={setFieldRef("fullName") as never}
                     required
                     value={values.fullName}
                     onChange={handleChange}
                     aria-invalid={errors.fullName ? true : undefined}
+                    aria-describedby={errors.fullName ? getFieldErrorId("fullName") : undefined}
                     placeholder="Enter your full name"
-                    className={formFieldClassName}
+                    className={getFieldClassName("fullName", formFieldClassName)}
                   />
-                  {errors.fullName ? <p className="text-sm text-red-600">{errors.fullName}</p> : null}
+                  {errors.fullName ? <p id={getFieldErrorId("fullName")} className={errorMessageClassName}>{errors.fullName}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -433,14 +507,16 @@ export function JoinAsExpertPage() {
                     id="email"
                     name="email"
                     type="email"
+                    ref={setFieldRef("email") as never}
                     required
                     value={values.email}
                     onChange={handleChange}
                     aria-invalid={errors.email ? true : undefined}
+                    aria-describedby={errors.email ? getFieldErrorId("email") : undefined}
                     placeholder="Enter your email address"
-                    className={formFieldClassName}
+                    className={getFieldClassName("email", formFieldClassName)}
                   />
-                  {errors.email ? <p className="text-sm text-red-600">{errors.email}</p> : null}
+                  {errors.email ? <p id={getFieldErrorId("email")} className={errorMessageClassName}>{errors.email}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -450,14 +526,16 @@ export function JoinAsExpertPage() {
                     name="pincode"
                     type="text"
                     inputMode="numeric"
+                    ref={setFieldRef("pincode") as never}
                     required
                     value={values.pincode}
                     onChange={handleChange}
                     aria-invalid={errors.pincode ? true : undefined}
+                    aria-describedby={errors.pincode ? getFieldErrorId("pincode") : undefined}
                     placeholder="Enter your 6-digit pincode"
-                    className={formFieldClassName}
+                    className={getFieldClassName("pincode", formFieldClassName)}
                   />
-                  {errors.pincode ? <p className="text-sm text-red-600">{errors.pincode}</p> : null}
+                  {errors.pincode ? <p id={getFieldErrorId("pincode")} className={errorMessageClassName}>{errors.pincode}</p> : null}
                 </div>
 
                 <div className="space-y-2">
@@ -465,21 +543,23 @@ export function JoinAsExpertPage() {
                   <Input
                     id="membershipNumber"
                     name="membershipNumber"
+                    ref={setFieldRef("membershipNumber") as never}
                     required
                     value={values.membershipNumber}
                     onChange={handleChange}
                     aria-invalid={errors.membershipNumber ? true : undefined}
+                    aria-describedby={errors.membershipNumber ? getFieldErrorId("membershipNumber") : undefined}
                     placeholder="Enter your membership number"
-                    className={formFieldClassName}
+                    className={getFieldClassName("membershipNumber", formFieldClassName)}
                   />
                   {errors.membershipNumber ? (
-                    <p className="text-sm text-red-600">{errors.membershipNumber}</p>
+                    <p id={getFieldErrorId("membershipNumber")} className={errorMessageClassName}>{errors.membershipNumber}</p>
                   ) : null}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="cop" className="text-sm font-medium text-[#0F172A]">COP {requiredAsterisk}</Label>
-                  <div className="relative">
+                  <div className="relative" ref={setFieldRef("cop") as never}>
                     <select
                       id="cop"
                       name="cop"
@@ -487,7 +567,8 @@ export function JoinAsExpertPage() {
                       value={values.cop}
                       onChange={handleChange}
                       aria-invalid={errors.cop ? true : undefined}
-                      className={formSelectClassName}
+                      aria-describedby={errors.cop ? getFieldErrorId("cop") : undefined}
+                      className={getFieldClassName("cop", formSelectClassName)}
                       disabled={loading}
                     >
                       <option value="">Select COP status</option>
@@ -497,12 +578,12 @@ export function JoinAsExpertPage() {
                     </select>
                     <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-[#6B7280]" />
                   </div>
-                  {errors.cop ? <p className="text-sm text-red-600">{errors.cop}</p> : null}
+                  {errors.cop ? <p id={getFieldErrorId("cop")} className={errorMessageClassName}>{errors.cop}</p> : null}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="qualification" className="text-sm font-medium text-[#0F172A]">Qualification {requiredAsterisk}</Label>
-                  <div className="relative">
+                  <div className="relative" ref={setFieldRef("qualification") as never}>
                     <select
                       id="qualification"
                       name="qualification"
@@ -510,7 +591,8 @@ export function JoinAsExpertPage() {
                       value={values.qualification}
                       onChange={handleChange}
                       aria-invalid={errors.qualification ? true : undefined}
-                      className={formSelectClassName}
+                      aria-describedby={errors.qualification ? getFieldErrorId("qualification") : undefined}
+                      className={getFieldClassName("qualification", formSelectClassName)}
                       disabled={loading}
                     >
                       <option value="">Select qualification</option>
@@ -529,17 +611,18 @@ export function JoinAsExpertPage() {
                       value={values.customQualification}
                       onChange={handleChange}
                       aria-invalid={errors.qualification ? true : undefined}
+                      aria-describedby={errors.qualification ? getFieldErrorId("qualification") : undefined}
                       placeholder="Enter your qualification"
                       disabled={loading}
-                      className={formFieldClassName}
+                      className={getFieldClassName("qualification", formFieldClassName)}
                     />
                   ) : null}
-                  {errors.qualification ? <p className="text-sm text-red-600">{errors.qualification}</p> : null}
+                  {errors.qualification ? <p id={getFieldErrorId("qualification")} className={errorMessageClassName}>{errors.qualification}</p> : null}
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
                   <Label htmlFor="areaOfExpertise" className="text-sm font-medium text-[#0F172A]">Area of Expertise {requiredAsterisk}</Label>
-                  <div className="relative">
+                  <div className="relative" ref={setFieldRef("areaOfExpertise") as never}>
                     <select
                       id="areaOfExpertise"
                       name="areaOfExpertise"
@@ -547,7 +630,8 @@ export function JoinAsExpertPage() {
                       value={values.areaOfExpertise}
                       onChange={handleChange}
                       aria-invalid={errors.areaOfExpertise ? true : undefined}
-                      className={formSelectClassName}
+                      aria-describedby={errors.areaOfExpertise ? getFieldErrorId("areaOfExpertise") : undefined}
+                      className={getFieldClassName("areaOfExpertise", formSelectClassName)}
                       disabled={loading}
                     >
                       <option value="">Select area of expertise</option>
@@ -569,19 +653,23 @@ export function JoinAsExpertPage() {
                       value={values.customAreaOfExpertise}
                       onChange={handleChange}
                       aria-invalid={errors.areaOfExpertise ? true : undefined}
+                      aria-describedby={errors.areaOfExpertise ? getFieldErrorId("areaOfExpertise") : undefined}
                       placeholder="Enter your area of expertise"
                       disabled={loading}
-                      className={formFieldClassName}
+                      className={getFieldClassName("areaOfExpertise", formFieldClassName)}
                     />
                   ) : null}
                   {errors.areaOfExpertise ? (
-                    <p className="text-sm text-red-600">{errors.areaOfExpertise}</p>
+                    <p id={getFieldErrorId("areaOfExpertise")} className={errorMessageClassName}>{errors.areaOfExpertise}</p>
                   ) : null}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="profile" className="text-sm font-medium text-[#0F172A]">Profile {requiredAsterisk}</Label>
-                  <div className="rounded-xl border border-dashed border-[#CBD5E1] bg-white/70 p-4 transition hover:bg-[#F9FAFB]">
+                  <div
+                    ref={setFieldRef("profile") as never}
+                    className={`rounded-xl border border-dashed bg-white/70 p-4 transition hover:bg-[#F9FAFB] ${errors.profile ? "border-[#DC2626]" : "border-[#CBD5E1]"}`}
+                  >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-medium text-[#0F172A]">Upload profile from desktop</p>
@@ -608,6 +696,7 @@ export function JoinAsExpertPage() {
                       className="hidden"
                       onChange={handleFileChange}
                       aria-invalid={errors.profile ? true : undefined}
+                      aria-describedby={errors.profile ? getFieldErrorId("profile") : undefined}
                       disabled={loading}
                     />
                     {profileFile ? (
@@ -624,14 +713,17 @@ export function JoinAsExpertPage() {
                         </button>
                       </div>
                     ) : null}
-                    {errors.profile ? <p className="mt-3 text-sm text-red-600">{errors.profile}</p> : null}
+                    {errors.profile ? <p id={getFieldErrorId("profile")} className={errorMessageClassName}>{errors.profile}</p> : null}
                   </div>
                 </div>
               </div>
 
               <div className="border-t border-[#E2E8F0] pt-5">
                 <div className="mb-4">
-                  <div className="mt-3 rounded-xl border border-[#CBD5E1] bg-white px-4 py-4">
+                  <div
+                    ref={setFieldRef("captcha") as never}
+                    className={`mt-3 rounded-xl border bg-white px-4 py-4 ${errors.captcha ? "border-[#DC2626]" : "border-[#CBD5E1]"}`}
+                  >
                     <div>
                       <div>
                         <p className="text-sm font-medium text-[#0F172A]">Security Verification</p>
@@ -642,6 +734,7 @@ export function JoinAsExpertPage() {
                       <div
                         className="min-h-[78px]"
                         aria-invalid={errors.captcha ? true : undefined}
+                        aria-describedby={errors.captcha ? getFieldErrorId("captcha") : undefined}
                       >
                         <ReCAPTCHA
                           ref={recaptchaRef}
@@ -660,7 +753,7 @@ export function JoinAsExpertPage() {
                       </div>
                     </div>
                   </div>
-                  {errors.captcha ? <p className="mt-3 text-sm text-red-600">{errors.captcha}</p> : null}
+                  {errors.captcha ? <p id={getFieldErrorId("captcha")} className={errorMessageClassName}>{errors.captcha}</p> : null}
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <Button type="submit" className="h-11 px-6" disabled={loading}>

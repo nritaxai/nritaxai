@@ -24,6 +24,8 @@ const challengeStore = new Map();
 
 const clean = (value) => (typeof value === "string" ? value.trim() : "");
 const DEFAULT_MOBILE_PLACEHOLDER = "Not Provided";
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PINCODE_PATTERN = /^\d{6}$/;
 
 const cleanupExpiredChallenges = () => {
   const now = Date.now();
@@ -203,6 +205,18 @@ const validateCaptchaChallenge = ({ challengeId, answer }) => {
   return { ok: true };
 };
 
+const buildFieldErrorResponse = (fieldErrors = {}, fallbackMessage = "Please correct the highlighted fields.") => {
+  const normalizedFieldErrors = Object.fromEntries(
+    Object.entries(fieldErrors).filter(([, value]) => clean(value))
+  );
+
+  return {
+    success: false,
+    message: fallbackMessage,
+    fieldErrors: normalizedFieldErrors,
+  };
+};
+
 export const createExpertOnboardingCaptchaChallenge = async (_req, res) => {
   cleanupExpiredChallenges();
 
@@ -230,21 +244,46 @@ export const submitExpertOnboarding = async (req, res) => {
   try {
     const body = normalizeRequestBody(req.body || {});
     const uploadedFile = req.file || req.files?.resume?.[0] || req.files?.profile?.[0] || null;
+    const fieldErrors = {};
 
     if (!uploadedFile) {
-      return res.status(400).json({
-        success: false,
-        message: "Please upload your profile.",
-      });
+      fieldErrors.profile = "Please upload your profile document.";
     }
 
-    for (const field of REQUIRED_FIELDS) {
-      if (!clean(body[field])) {
-        return res.status(400).json({
-          success: false,
-          message: "Please fill all required fields.",
-        });
-      }
+    if (!clean(body.fullName)) {
+      fieldErrors.fullName = "Please enter your full name.";
+    }
+
+    if (!clean(body.email)) {
+      fieldErrors.email = "Please enter your email address.";
+    } else if (!EMAIL_PATTERN.test(clean(body.email))) {
+      fieldErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!clean(body.pincode)) {
+      fieldErrors.pincode = "Please enter your pincode.";
+    } else if (!PINCODE_PATTERN.test(clean(body.pincode))) {
+      fieldErrors.pincode = "Please enter a valid 6-digit pincode.";
+    }
+
+    if (!clean(body.membershipNumber)) {
+      fieldErrors.membershipNumber = "Please enter your membership number.";
+    }
+
+    if (!clean(body.cop)) {
+      fieldErrors.cop = "Please select your COP status.";
+    }
+
+    if (!clean(body.qualification)) {
+      fieldErrors.qualification = "Please select your qualification.";
+    }
+
+    if (!clean(body.areaOfExpertise)) {
+      fieldErrors.areaOfExpertise = "Please select your area of expertise.";
+    }
+
+    if (Object.keys(fieldErrors).length > 0) {
+      return res.status(400).json(buildFieldErrorResponse(fieldErrors));
     }
 
     const recaptchaToken = body["g-recaptcha-response"];
@@ -253,10 +292,14 @@ export const submitExpertOnboarding = async (req, res) => {
       const recaptchaValidation = await verifyRecaptchaToken(recaptchaToken);
 
       if (!recaptchaValidation.ok) {
-        return res.status(400).json({
-          success: false,
-          message: recaptchaValidation.message,
-        });
+        return res.status(400).json(
+          buildFieldErrorResponse(
+            {
+              captcha: clean(recaptchaValidation.message) || "Please complete the security verification.",
+            },
+            clean(recaptchaValidation.message) || "Please complete the security verification."
+          )
+        );
       }
     } else {
       const challengeId = body.captchaChallengeId;
@@ -267,10 +310,14 @@ export const submitExpertOnboarding = async (req, res) => {
       });
 
       if (!captchaValidation.ok) {
-        return res.status(400).json({
-          success: false,
-          message: captchaValidation.message,
-        });
+        return res.status(400).json(
+          buildFieldErrorResponse(
+            {
+              captcha: clean(captchaValidation.message) || "Please complete the security verification.",
+            },
+            clean(captchaValidation.message) || "Please complete the security verification."
+          )
+        );
       }
     }
 
