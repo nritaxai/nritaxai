@@ -1,5 +1,6 @@
 import { appConfig, assertRuntimeConfig } from "./Config/runtimeConfig.js";
 import app from "./app.js";
+import connectDB from "./Config/db.js";
 import { initObservability, shutdownObservability } from "./services/observability.js";
 import { logger } from "./services/logger.js";
 import { startQueueMonitoring } from "./services/queueMonitoring.js";
@@ -10,6 +11,7 @@ const PORT = appConfig.app.port;
 
 const start = async () => {
   await initObservability();
+  await connectDB();
   const stopQueueMonitoring = startQueueMonitoring();
   const server = app.listen(PORT, () => {
     logger.info({ port: PORT }, "server started");

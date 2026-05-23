@@ -12,6 +12,16 @@ dotenv.config();
 const sanitizeString = (value) => (typeof value === "string" ? value.trim() : "");
 const sanitizeUrl = (value, fallback = "") => sanitizeString(value).replace(/\/+$/, "") || fallback;
 const unique = (values = []) => Array.from(new Set(values.filter(Boolean)));
+const extractMongoDbName = (mongoUri = "") => {
+  const normalized = sanitizeString(mongoUri);
+  if (!normalized) return "";
+  const withoutScheme = normalized.replace(/^mongodb(?:\+srv)?:\/\//i, "");
+  const withoutCredentials = withoutScheme.includes("@") ? withoutScheme.split("@").slice(-1)[0] : withoutScheme;
+  const [authorityAndPath = ""] = withoutCredentials.split("?");
+  const slashIndex = authorityAndPath.indexOf("/");
+  if (slashIndex < 0) return "";
+  return decodeURIComponent(authorityAndPath.slice(slashIndex + 1).split("/")[0] || "").trim();
+};
 
 const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
   "https://nritaxai-cw9w.vercel.app",
@@ -354,6 +364,8 @@ export const validateRuntimeConfig = (config) => {
 
   if (!sanitizeString(process.env.MONGO_URI)) {
     warnings.push("MONGO_URI is missing; database connectivity will fail.");
+  } else if (!extractMongoDbName(process.env.MONGO_URI) && !sanitizeString(process.env.MONGO_DB_NAME)) {
+    warnings.push('MONGO_URI does not include a database name; set MONGO_DB_NAME or use a URI like ".../nritax".');
   }
 
   if (!sanitizeString(config?.ai?.openRouter?.apiKey) && !sanitizeString(config?.ai?.gemini?.apiKey)) {
