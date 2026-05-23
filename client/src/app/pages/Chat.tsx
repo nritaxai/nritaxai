@@ -153,6 +153,12 @@ const starterQuestions = [
   "What documents do I need for Tax Residency Certificate?",
 ];
 
+const chatLandingPrompts = [
+  "What is DTAA and how does it help NRIs?",
+  "Do I need to file ITR as an NRI?",
+  "How to claim India-USA DTAA benefits?",
+];
+
 const getMessagePreview = (content: string) =>
   ensureVisibleReply(content)
     .replace(/[#>*`_-]/g, " ")
@@ -237,6 +243,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
         .reverse(),
     [messages]
   );
+  const hasUserMessages = conversationHistory.length > 0;
+  const isDesktopLandingState = !isIosNativeApp && !hasUserMessages && !isTyping;
 
   const downloadChatTranscript = () => {
     if (!messages.length) return;
@@ -1206,66 +1214,134 @@ export function Chat({ onRequireLogin }: ChatProps) {
               </CardHeader>
 
               <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
-                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : "min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-8 lg:px-12"}>
-                  {messages.map((message, index) => (
-                    <div
-                      id={!isIosNativeApp ? `chat-message-${index}` : undefined}
-                      key={index}
-                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                    >
-                      <div className={`flex w-full max-w-6xl ${message.role === "user" ? "justify-end" : "justify-start"}`}>
-                        {message.role === "ai" ? (
-                          <div className="flex w-full max-w-[96%] gap-3 lg:max-w-[92%]">
+                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : isDesktopLandingState ? "flex flex-1 items-center justify-center px-6 py-10 sm:px-10 lg:px-16" : "min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-8 lg:px-12"}>
+                  {isDesktopLandingState ? (
+                    <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
+                      <h2 className="text-4xl font-medium tracking-tight text-[#0F172A] sm:text-5xl">
+                        Where should we begin?
+                      </h2>
+                      <form onSubmit={handleSubmit} className="mt-10 w-full">
+                        <div className="flex items-center gap-3 rounded-full border border-[#D9E2F0] bg-white px-5 py-3 shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+                          <button
+                            type="button"
+                            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-transparent text-[#0F172A] transition hover:bg-[#F2F7FF]"
+                            aria-label="Voice input"
+                            onClick={toggleVoiceInput}
+                            disabled={!speechSupported || starterLimitReached}
+                            title={speechSupported ? "Voice input" : "Voice input not supported in this browser"}
+                          >
+                            {isListening ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                          </button>
+                          <Textarea
+                            ref={questionInputRef}
+                            placeholder={starterLimitReached ? "Free plan limit reached. Upgrade to Professional." : "Ask anything"}
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            onKeyDown={handleQuestionKeyDown}
+                            className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-0 py-2 text-base shadow-none focus-visible:ring-0"
+                            rows={1}
+                            disabled={starterLimitReached}
+                          />
+                          {isTyping ? (
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="outline"
+                              className="h-11 w-11 flex-shrink-0 rounded-full border-[#D9E2F0] bg-white"
+                              onClick={handleStopResponse}
+                              title="Interrupt response"
+                            >
+                              <Square className="size-4 fill-current" />
+                            </Button>
+                          ) : (
+                            <Button
+                              type="submit"
+                              size="icon"
+                              className="h-11 w-11 flex-shrink-0 rounded-full bg-[#0F172A] text-white hover:bg-[#111c33]"
+                              disabled={starterLimitReached}
+                            >
+                              <Send className="size-5" />
+                            </Button>
+                          )}
+                        </div>
+                      </form>
+                      <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+                        {chatLandingPrompts.map((q) => (
+                          <Button
+                            key={q}
+                            type="button"
+                            variant="outline"
+                            className="rounded-full border-[#D9E2F0] bg-white px-5 py-3 text-sm font-medium text-[#0F172A] hover:bg-[#F2F7FF]"
+                            onClick={() => handleStarterQuestionSelect(q)}
+                          >
+                            {q}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      {messages.map((message, index) => (
+                        <div
+                          id={!isIosNativeApp ? `chat-message-${index}` : undefined}
+                          key={index}
+                          className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                        >
+                          <div className={`flex w-full max-w-6xl ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                            {message.role === "ai" ? (
+                              <div className="flex w-full max-w-[96%] gap-3 lg:max-w-[92%]">
+                                <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
+                                  <Bot className="size-5 text-[#0F172A]" />
+                                </div>
+                                <div className="w-full rounded-[1.6rem] border border-[#E2E8F0] bg-white px-5 py-4 text-[#0F172A] shadow-[0_14px_30px_rgba(15,23,42,0.05)]">
+                                  <div>
+                                    <ReactMarkdown
+                                      components={{
+                                        h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
+                                        h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
+                                        h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
+                                        h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
+                                        h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
+                                        h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
+                                        strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                        p: ({ children }) => <p className="mb-2">{children}</p>,
+                                        ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
+                                        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
+                                      }}
+                                    >
+                                      {ensureVisibleReply(message.content)}
+                                    </ReactMarkdown>
+                                    <TaxRuleTimeline timelines={message.taxRuleTimelines} compact />
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="max-w-[94%] rounded-[1.6rem] bg-[#2563eb] px-5 py-4 text-white shadow-[0_18px_34px_rgba(37,99,235,0.28)] sm:max-w-[88%] lg:max-w-[82%]">
+                                {message.content}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      
+                      {isTyping && (
+                        <div className="flex justify-start">
+                          <div className="flex max-w-[96%] gap-3 lg:max-w-[92%]">
                             <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
                               <Bot className="size-5 text-[#0F172A]" />
                             </div>
-                            <div className="w-full rounded-[1.6rem] border border-[#E2E8F0] bg-white px-5 py-4 text-[#0F172A] shadow-[0_14px_30px_rgba(15,23,42,0.05)]">
-                              <div>
-                                <ReactMarkdown
-                                  components={{
-                                    h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
-                                    h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
-                                    h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
-                                    h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
-                                    h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
-                                    h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
-                                    strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                                    p: ({ children }) => <p className="mb-2">{children}</p>,
-                                    ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
-                                    ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
-                                  }}
-                                >
-                                  {ensureVisibleReply(message.content)}
-                                </ReactMarkdown>
-                                <TaxRuleTimeline timelines={message.taxRuleTimelines} compact />
-                              </div>
+                            <div className="rounded-[1.6rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-5 py-4 text-sm font-black tracking-[0.18em] text-[#0F172A] shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
+                              <span className="blur-[0.2px]">Thinking.....</span>
                             </div>
                           </div>
-                        ) : (
-                          <div className="max-w-[94%] rounded-[1.6rem] bg-[#2563eb] px-5 py-4 text-white shadow-[0_18px_34px_rgba(37,99,235,0.28)] sm:max-w-[88%] lg:max-w-[82%]">
-                            {message.content}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                  
-                  {isTyping && (
-                    <div className="flex justify-start">
-                      <div className="flex max-w-[96%] gap-3 lg:max-w-[92%]">
-                        <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
-                          <Bot className="size-5 text-[#0F172A]" />
                         </div>
-                        <div className="rounded-[1.6rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-5 py-4 text-sm font-black tracking-[0.18em] text-[#0F172A] shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
-                          <span className="blur-[0.2px]">Thinking.....</span>
-                        </div>
-                      </div>
-                    </div>
+                      )}
+                    </>
                   )}
                 </CardContent>
               </div>
 
-              <CardFooter className={isIosNativeApp ? "flex-shrink-0 border-t border-[#E2E8F0] bg-white p-2" : "flex-shrink-0 border-t border-[#E2E8F0] bg-white/96 px-4 py-4 backdrop-blur sm:px-6 lg:px-10"}>
+              <CardFooter className={isIosNativeApp ? "flex-shrink-0 border-t border-[#E2E8F0] bg-white p-2" : isDesktopLandingState ? "hidden" : "flex-shrink-0 border-t border-[#E2E8F0] bg-white/96 px-4 py-4 backdrop-blur sm:px-6 lg:px-10"}>
                 <form onSubmit={handleSubmit} className={isIosNativeApp ? "grid w-full grid-cols-[1fr_auto_auto] items-end gap-2" : "w-full flex items-end gap-2"}>
                   <Textarea
                     ref={questionInputRef}
@@ -1311,24 +1387,15 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   )}
                 </form>
               </CardFooter>
-              {!isIosNativeApp ? (
-                <div className="border-t border-[#E2E8F0] bg-[#F8FBFF]/96 px-4 py-4 sm:px-6 lg:px-10">
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[#0F172A]">Starter Questions</p>
-                      <p className="text-xs text-slate-500">Use these to jump into common NRI tax conversations.</p>
-                    </div>
-                    <span className="rounded-full border border-[#D9E2F0] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      Quick Start
-                    </span>
-                  </div>
-                  <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                    {starterQuestions.map((q, i) => (
+              {!isIosNativeApp && !isDesktopLandingState ? (
+                <div className="border-t border-[#E2E8F0] bg-[#F8FBFF]/96 px-4 py-3 sm:px-6 lg:px-10">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {chatLandingPrompts.map((q) => (
                       <Button
-                        key={i}
+                        key={q}
                         type="button"
                         variant="outline"
-                        className="h-auto justify-start rounded-2xl border-[#D9E2F0] bg-white px-4 py-3 text-left text-sm font-medium leading-6 text-[#0F172A] hover:bg-[#F2F7FF]"
+                        className="rounded-full border-[#D9E2F0] bg-white px-4 py-2 text-sm font-medium text-[#0F172A] hover:bg-[#F2F7FF]"
                         onClick={() => handleStarterQuestionSelect(q)}
                       >
                         {q}
