@@ -309,10 +309,10 @@ export function Home({ onRequireLogin }: HomeProps) {
               variants={fadeUp}
               className="mb-4 text-center"
             >
-              <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">
+              <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                 Regulatory Intelligence
               </p>
-              <h3 className="mt-3 text-3xl font-bold tracking-tight text-gray-900 md:text-4xl">Tax Updates</h3>
+              <h3 className="mt-3 text-3xl font-bold tracking-tight text-slate-950 md:text-4xl">Tax Updates</h3>
             </motion.div>
             <motion.div
               initial="hidden"
@@ -331,31 +331,31 @@ export function Home({ onRequireLogin }: HomeProps) {
                     : { y: -5, boxShadow: "0 24px 42px rgba(15, 23, 42, 0.10)" }
                   }
                   transition={{ duration: 0.28, ease: PREMIUM_EASE }}
-                  className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,250,0.98))] p-5 text-left shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
+                  className="nri-tax-update-card rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,247,250,0.98))] p-5 text-left shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
                 >
                   <div className="mb-4 flex flex-wrap items-center gap-2">
-                    <span className="rounded-sm border border-slate-800 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
+                    <span className="nri-tax-update-card__label rounded-sm border border-slate-800 bg-slate-900 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
                       {item.label}
                     </span>
-                    <span className="rounded-sm bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                    <span className="nri-tax-update-card__country rounded-sm bg-slate-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-700">
                       {item.country}
                     </span>
-                    <span className="rounded-sm border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                    <span className="nri-tax-update-card__type rounded-sm border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
                       {item.type}
                     </span>
                   </div>
-                  <p className="text-lg font-semibold text-slate-900">
+                  <p className="nri-tax-update-card__title text-lg font-semibold text-slate-900">
                     {renderTextWithShortForms(item.title)}
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-                    <span className="inline-flex items-center gap-1 font-normal text-slate-500">
+                    <span className="nri-tax-update-card__date inline-flex items-center gap-1 font-medium text-slate-500">
                       <Globe className="size-3.5" />
                       {item.date}
                     </span>
-                    <span className="rounded-sm bg-slate-100 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-slate-700">
+                    <span className="nri-tax-update-card__source rounded-sm bg-slate-100 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-slate-700">
                       Source: {item.source}
                     </span>
-                    <span className="rounded-sm border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                    <span className="nri-tax-update-card__confidence rounded-sm border border-emerald-200 bg-emerald-50 px-2 py-1 font-semibold uppercase tracking-[0.12em] text-emerald-700">
                       {item.confidence}
                     </span>
                   </div>

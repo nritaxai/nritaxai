@@ -538,6 +538,84 @@ form :is(button, [data-slot="button"]):focus-visible {
   }
 }
 
+.nri-home-ticker__item {
+  color: #0f172a !important;
+}
+
+.nri-home-ticker__label {
+  color: #ffffff !important;
+  background-color: #0f172a !important;
+  border-color: #0f172a !important;
+}
+
+.nri-home-ticker__country {
+  color: #1e3a8a !important;
+}
+
+.nri-home-ticker__type {
+  color: #334155 !important;
+}
+
+.nri-home-ticker__title {
+  color: #0f172a !important;
+}
+
+.nri-home-ticker__date {
+  color: #475569 !important;
+}
+
+.nri-home-ticker__divider {
+  color: #cbd5e1 !important;
+}
+
+.nri-tax-update-card,
+.nri-tax-update-card * {
+  color: inherit;
+}
+
+.nri-tax-update-card__label {
+  color: #ffffff !important;
+}
+
+.nri-tax-update-card__country {
+  color: #1f2937 !important;
+}
+
+.nri-tax-update-card__type,
+.nri-tax-update-card__date,
+.nri-tax-update-card__source {
+  color: #475569 !important;
+}
+
+.nri-tax-update-card__title {
+  color: #020617 !important;
+}
+
+.nri-tax-update-card__confidence {
+  color: #047857 !important;
+}
+
+.nri-expert-card__specialization,
+.nri-expert-card__experience,
+.nri-expert-cta__copy {
+  color: #334155 !important;
+}
+
+.nri-expert-card__name,
+.nri-expert-cta h3,
+.nri-expert-council h2 {
+  color: #020617 !important;
+}
+
+.nri-expert-card__role,
+.nri-expert-card__connect {
+  color: #1d4ed8 !important;
+}
+
+.nri-expert-card__credential {
+  color: #1e3a8a !important;
+}
+
 @keyframes revealDrop {
   from {
     opacity: 0;

@@ -62,7 +62,7 @@ export function ExpertCouncil() {
   const shouldReduceMotion = useReducedMotion();
 
   return (
-    <section className="bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_22%,#ffffff_100%)] py-16 md:py-20">
+    <section className="nri-expert-council bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_22%,#ffffff_100%)] py-16 md:py-20">
       <div className="mx-auto max-w-6xl px-4 md:px-6">
         <motion.div
           initial="hidden"
@@ -93,21 +93,21 @@ export function ExpertCouncil() {
                   : { y: -5, boxShadow: "0 20px 36px rgba(15, 23, 42, 0.10)" }
               }
               transition={{ duration: 0.28, ease: PREMIUM_EASE }}
-              className="flex h-full flex-col rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(246,248,252,0.98))] p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
+              className="nri-expert-card flex h-full flex-col rounded-[1.6rem] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(246,248,252,0.98))] p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)]"
             >
               <img src={expert.imageUrl} alt={expert.name} className="mx-auto mb-4 h-24 w-24 rounded-full border-4 border-white object-cover shadow-[0_18px_30px_rgba(15,23,42,0.14)]" />
-              <h3 className="mb-1 text-lg font-semibold text-slate-900">{expert.name}</h3>
-              <p className="mb-2 text-sm font-medium text-blue-600">{expert.role}</p>
-              <p className="mb-3 text-sm font-normal leading-7 text-slate-600">{expert.specialization}</p>
+              <h3 className="nri-expert-card__name mb-1 text-lg font-semibold text-slate-900">{expert.name}</h3>
+              <p className="nri-expert-card__role mb-2 text-sm font-semibold text-blue-700">{expert.role}</p>
+              <p className="nri-expert-card__specialization mb-3 text-sm font-normal leading-7 text-slate-700">{expert.specialization}</p>
               <div className="mb-3 flex flex-wrap justify-center gap-1">
                 {expert.credentials.map((cred) => (
-                  <span key={cred} className="rounded-full bg-blue-100 px-2 py-1 text-xs font-medium text-blue-700">
+                  <span key={cred} className="nri-expert-card__credential rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
                     {cred}
                   </span>
                 ))}
               </div>
-              <p className="mb-4 mt-auto text-xs font-normal text-slate-500">{expert.experience} experience</p>
-              <a href={expert.linkedinUrl} className="inline-flex items-center justify-center gap-2 text-sm font-medium text-blue-600 transition-colors hover:text-blue-800">
+              <p className="nri-expert-card__experience mb-4 mt-auto text-xs font-medium text-slate-600">{expert.experience} experience</p>
+              <a href={expert.linkedinUrl} className="nri-expert-card__connect inline-flex items-center justify-center gap-2 text-sm font-semibold text-blue-700 transition-colors hover:text-blue-900">
                 <Linkedin className="size-4" />
                 Connect
               </a>
@@ -120,11 +120,11 @@ export function ExpertCouncil() {
           whileInView="visible"
           viewport={{ once: true, amount: 0.35 }}
           variants={fadeUp}
-          className="mt-10 rounded-[1.9rem] border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)] md:p-8"
+          className="nri-expert-cta mt-10 rounded-[1.9rem] border border-blue-100 bg-[linear-gradient(135deg,rgba(239,246,255,0.96),rgba(255,255,255,0.98))] p-6 text-center shadow-[0_18px_36px_rgba(15,23,42,0.08)] md:p-8"
         >
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-blue-700">Join Our Team</p>
           <h3 className="mt-3 text-3xl font-extrabold tracking-tight text-slate-950 md:text-4xl">Join the NRITAX expert network</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-base leading-7 text-slate-600">
+          <p className="nri-expert-cta__copy mx-auto mt-3 max-w-2xl text-base leading-7 text-slate-700">
             Are you a Chartered Accountant or cross-border tax specialist? Apply to support NRI users with tax,
             compliance, and advisory services.
           </p>
