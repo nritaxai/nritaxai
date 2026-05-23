@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { motion } from "motion/react";
@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Bot, Languages, Mic, MicOff, Send, Sparkles, Trash2, Download, Square, X } from "lucide-react";
+import { Bot, Download, Languages, Mic, MicOff, PanelLeft, Send, Sparkles, Square, Trash2, X } from "lucide-react";
 import { IOS_EXTERNAL_PURCHASES_DISABLED, IS_IOS_NATIVE_APP } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
@@ -144,6 +144,21 @@ const fallbackReplyByLanguage: Record<string, string> = {
     "### Answer\nLayanan AI langsung sedang tidak tersedia sementara.\n\n### Key Tax Points\n- Pertanyaan Anda sudah diterima.\n- Anda tetap bisa lanjut dengan langkah perencanaan pajak NRI umum.\n- Untuk kasus mendesak, konsultasikan ke CPA.\n\n### Next Steps\n- Coba kirim ulang pertanyaan dalam 1-2 menit.\n- Jika tetap terjadi, gunakan CPA Consultation.\n\n### Follow-up Questions\n- Topik pajak NRI mana yang ingin diprioritaskan?\n- Apakah Anda ingin checklist dokumen DTAA?",
 };
 
+const starterQuestions = [
+  "What is DTAA and how does it help NRIs?",
+  "Do I need to file ITR as an NRI?",
+  "How to claim India-USA DTAA benefits?",
+  "What's the difference between NRO and NRE accounts?",
+  "How is rental income taxed for NRIs?",
+  "What documents do I need for Tax Residency Certificate?",
+];
+
+const getMessagePreview = (content: string) =>
+  ensureVisibleReply(content)
+    .replace(/[#>*`_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
 type ChatMessage = {
   role: "user" | "ai";
   content: string;
@@ -209,6 +224,19 @@ export function Chat({ onRequireLogin }: ChatProps) {
   } | null>(null);
 
   const getWelcomeMessage = () => welcomeByLanguage[language] || welcomeByLanguage.english;
+  const conversationHistory = useMemo(
+    () =>
+      messages
+        .map((message, index) => ({ message, index }))
+        .filter(({ message }) => message.role === "user")
+        .map(({ message, index }, historyIndex) => ({
+          id: `chat-message-${index}`,
+          label: getMessagePreview(message.content).slice(0, 70) || `Question ${historyIndex + 1}`,
+          index,
+        }))
+        .reverse(),
+    [messages]
+  );
 
   const downloadChatTranscript = () => {
     if (!messages.length) return;
@@ -508,6 +536,11 @@ export function Chat({ onRequireLogin }: ChatProps) {
       questionInputRef.current?.focus();
     });
     void submitQuestion(selectedQuestion);
+  };
+
+  const handleScrollToMessage = (messageId: string) => {
+    const target = document.getElementById(messageId);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const handleOpenPopup = () => {
@@ -946,38 +979,120 @@ export function Chat({ onRequireLogin }: ChatProps) {
     >
       {!isIosNativeApp ? (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
+          className="rounded-[2rem] border border-[#D9E2F0] bg-[linear-gradient(180deg,#F8FBFF_0%,#F2F7FF_100%)] px-5 py-4 shadow-[0_18px_44px_rgba(15,23,42,0.08)]"
         >
-          <Card className="rounded-2xl border-[#E2E8F0] bg-white">
-            <CardHeader className="pb-3">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#CBD5E1] bg-[#E2E8F0] px-4 py-2 text-[#0F172A]">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#CBD5E1] bg-white px-4 py-2 text-[#0F172A] shadow-sm">
                 <Sparkles className="size-4" />
-                <span className="text-sm">AI Chat Assistant</span>
+                <span className="text-sm font-semibold">AI Chat Assistant</span>
               </div>
-              <h1 className="mb-2 text-3xl text-[#0F172A] sm:text-4xl">AI Tax Chat</h1>
-              <p className="max-w-2xl text-base text-[#0F172A]">
-                Get instant, intelligent answers to all your NRI tax questions
+              <h1 className="mt-3 text-3xl font-black tracking-tight text-[#0F172A] sm:text-4xl">AI Tax Chat</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
+                A wider workspace for NRI tax conversations with quick history access, starter prompts, and uninterrupted scrolling.
               </p>
-            </CardHeader>
-          </Card>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
+                <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
+                {isTyping ? "Generating" : "Ready"}
+              </Badge>
+              {subscription ? (
+                <>
+                  <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
+                    Current Plan: {subscription.currentPlan?.displayName || "Starter"}
+                  </Badge>
+                  <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
+                    {getRemainingChatLabel(subscription)}
+                  </Badge>
+                </>
+              ) : null}
+            </div>
+          </div>
         </motion.div>
       ) : null}
 
         <motion.div
           initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.2 }}
+          animate="visible"
           variants={{
             hidden: {},
             visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
           }}
-          className={isIosNativeApp ? "grid gap-3" : "grid gap-4 xl:grid-cols-3"}
+          className={isIosNativeApp ? "grid gap-3" : "grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]"}
         >
+          {!isIosNativeApp ? (
+            <motion.aside
+              variants={{
+                hidden: { opacity: 0, x: -20 },
+                visible: { opacity: 1, x: 0 },
+              }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="hidden xl:block"
+            >
+              <Card className="sticky top-24 flex h-[78dvh] min-h-[620px] flex-col overflow-hidden rounded-[1.75rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] shadow-[0_20px_48px_rgba(15,23,42,0.08)]">
+                <CardHeader className="border-b border-[#E2E8F0] pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-2xl border border-[#CBD5E1] bg-white p-2.5 shadow-sm">
+                      <PanelLeft className="size-5 text-[#0F172A]" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-[#0F172A]">History</CardTitle>
+                      <CardDescription className="text-slate-600">
+                        Browse recent prompts from this conversation
+                      </CardDescription>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    <Button type="button" className="justify-start rounded-2xl bg-[#0F172A] px-4 py-6 text-white hover:bg-[#111c33]" onClick={clearChat}>
+                      <Trash2 className="mr-2 size-4" />
+                      Start New Chat
+                    </Button>
+                    <Button type="button" variant="outline" className="justify-start rounded-2xl border-[#D9E2F0] bg-white px-4 py-6 text-[#0F172A]" onClick={downloadChatTranscript}>
+                      <Download className="mr-2 size-4" />
+                      Download Chat
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="min-h-0 flex-1 overflow-y-auto p-3">
+                  <div className="space-y-2">
+                    {conversationHistory.length ? (
+                      conversationHistory.map((item, itemIndex) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleScrollToMessage(item.id)}
+                          className="flex w-full flex-col rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-left transition hover:border-[#93C5FD] hover:bg-[#F8FBFF]"
+                        >
+                          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
+                            Question {conversationHistory.length - itemIndex}
+                          </span>
+                          <span className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-[#0F172A]">
+                            {item.label}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white/80 px-4 py-5 text-sm leading-6 text-slate-500">
+                        Your conversation history will appear here as soon as you send a question.
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+                <div className="border-t border-[#E2E8F0] p-4">
+                  <div className="rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 text-sm leading-6 text-slate-600">
+                    {userName ? `Hi ${userName}` : "Hi"} - ask anything about NRI tax, DTAA, filings, remittances, or compliance.
+                  </div>
+                </div>
+              </Card>
+            </motion.aside>
+          ) : null}
+
           <motion.div
-            className={isIosNativeApp ? "" : "xl:col-span-2"}
+            className={isIosNativeApp ? "" : "min-w-0"}
             variants={{
               hidden: { opacity: 0, y: 24, scale: 0.98 },
               visible: { opacity: 1, y: 0, scale: 1 },
@@ -985,37 +1100,31 @@ export function Chat({ onRequireLogin }: ChatProps) {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <Card
-              className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[78dvh] min-h-[460px] max-h-[820px] flex-col rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/82"}
+              className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[82dvh] min-h-[700px] max-h-[920px] flex-col overflow-hidden rounded-[1.9rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_24px_56px_rgba(15,23,42,0.08)]"}
             >
               <CardHeader
-                className={isIosNativeApp ? "flex-shrink-0 cursor-pointer bg-white p-3" : "flex-shrink-0 cursor-pointer"}
-                onClick={handleOpenPopup}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    handleOpenPopup();
-                  }
-                }}
+                className={isIosNativeApp ? "flex-shrink-0 cursor-pointer bg-white p-3" : "flex-shrink-0 border-b border-[#E2E8F0] bg-white/85 px-6 py-5 backdrop-blur-md"}
               >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg border border-[#CBD5E1] bg-[#E2E8F0] p-2">
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <div className="rounded-2xl border border-[#CBD5E1] bg-[#F2F7FF] p-3 shadow-sm">
                       <Bot className="size-6 text-[#0F172A]" />
                     </div>
-                    <div>
-                      <CardTitle className="text-[#0F172A]">AI Chat Assistant</CardTitle>
-                      <CardDescription className="text-[#0F172A]">
-                        {userName ? `Hi ${userName}` : "Hi"} - Ask anything about NRI taxes and DTAA
+                    <div className="min-w-0">
+                      <CardTitle className="text-xl text-[#0F172A]">AI Chat Assistant</CardTitle>
+                      <CardDescription className="mt-1 text-sm leading-6 text-slate-600">
+                        {userName ? `Hi ${userName}` : "Hi"} - ask anything about NRI taxes, DTAA, filing, remittances, and compliance.
                       </CardDescription>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className="border border-[#CBD5E1] bg-[#E2E8F0] text-[#0F172A]">
+                  <div className="flex flex-wrap items-center gap-2 xl:justify-end">
+                    <Badge className="border border-[#CBD5E1] bg-[#F8FBFF] text-[#0F172A]">
                       <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
                       {isTyping ? "Generating" : "Ready"}
                     </Badge>
+                    <Button type="button" variant="outline" size="sm" className="border-[#D9E2F0] bg-white text-[#0F172A]" onClick={handleOpenPopup}>
+                      Open Popup
+                    </Button>
                   </div>
                 </div>
                 {providerWarning ? (
@@ -1039,85 +1148,151 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </p>
                 ) : null}
                 
-                <div className={isIosNativeApp ? "mt-3 flex flex-col gap-2" : "mt-4 flex flex-col gap-2 sm:flex-row sm:items-center"}>
-                  <Languages className="size-4 text-[#0F172A]" />
-                  <Select value={language} onValueChange={setLanguage}>
-                    <SelectTrigger className={isIosNativeApp ? "h-10 w-full border-[#E2E8F0] bg-[#F7FAFC]/85" : "w-full border-[#E2E8F0] bg-[#F7FAFC]/85 sm:w-44"}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="english">English</SelectItem>
-                      <SelectItem value="hindi">Hindi</SelectItem>
-                      <SelectItem value="tamil">Tamil</SelectItem>
-                      <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className={isIosNativeApp ? "hidden" : "w-full border-[#E2E8F0] text-[#0F172A] sm:ml-auto sm:w-auto"}
-                    onClick={downloadChatTranscript}
-                  >
-                    <Download className="size-4 mr-2" />
-                    Download Chat
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" className={isIosNativeApp ? "h-10 w-full border-[#E2E8F0] px-3 text-[#0F172A]" : "w-full border-[#E2E8F0] text-[#0F172A] sm:w-auto"} onClick={clearChat}>
-                    <Trash2 className="size-4 mr-2" />
-                    Clear Chat
-                  </Button>
+                <div className={isIosNativeApp ? "mt-3 flex flex-col gap-2" : "mt-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <Languages className="size-4 text-[#0F172A]" />
+                    <Select value={language} onValueChange={setLanguage}>
+                      <SelectTrigger className={isIosNativeApp ? "h-10 w-full border-[#E2E8F0] bg-[#F7FAFC]/85" : "h-11 w-full rounded-2xl border-[#D9E2F0] bg-[#F8FBFF] sm:w-52"}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="english">English</SelectItem>
+                        <SelectItem value="hindi">Hindi</SelectItem>
+                        <SelectItem value="tamil">Tamil</SelectItem>
+                        <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {!isIosNativeApp ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-2xl border-[#D9E2F0] bg-white text-[#0F172A]"
+                        onClick={downloadChatTranscript}
+                      >
+                        <Download className="mr-2 size-4" />
+                        Download Chat
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="rounded-2xl border-[#D9E2F0] bg-white text-[#0F172A]"
+                        onClick={clearChat}
+                      >
+                        <Trash2 className="mr-2 size-4" />
+                        Clear Chat
+                      </Button>
+                    </div>
+                  ) : null}
+                  {isIosNativeApp ? (
+                    <div className="flex flex-col gap-2">
+                      <Select value={language} onValueChange={setLanguage}>
+                        <SelectTrigger className="h-10 w-full border-[#E2E8F0] bg-[#F7FAFC]/85">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="english">English</SelectItem>
+                          <SelectItem value="hindi">Hindi</SelectItem>
+                          <SelectItem value="tamil">Tamil</SelectItem>
+                          <SelectItem value="indonesian">Bahasa Indonesia</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
                 </div>
               </CardHeader>
 
-              <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : "flex-1 space-y-4 overflow-y-auto px-3 sm:px-6"}>
-                {messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-                  >
+              <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
+                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : "min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6 lg:px-10"}>
+                  {messages.map((message, index) => (
                     <div
-                      className={`max-w-[92%] break-words rounded-2xl px-4 py-3 sm:max-w-[80%] ${
-                        message.role === "user"
-                          ? "bg-[#2563eb] text-[#0F172A]"
-                          : "border border-[#E2E8F0] bg-[#F7FAFC]/90 text-[#0F172A]"
-                      }`}
+                      id={!isIosNativeApp ? `chat-message-${index}` : undefined}
+                      key={index}
+                      className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
                     >
-                      {message.role === "ai" ? (
-                        <div>
-                          <ReactMarkdown
-                            components={{
-                              h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
-                              h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
-                              h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
-                              h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
-                              h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
-                              h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
-                              strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                              p: ({ children }) => <p className="mb-2">{children}</p>,
-                              ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
-                              ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
-                            }}
-                          >
-                            {ensureVisibleReply(message.content)}
-                          </ReactMarkdown>
-                          <TaxRuleTimeline timelines={message.taxRuleTimelines} compact />
+                      <div className={`flex w-full max-w-5xl ${message.role === "user" ? "justify-end" : "justify-start"}`}>
+                        {message.role === "ai" ? (
+                          <div className="flex w-full max-w-[92%] gap-3 lg:max-w-[88%]">
+                            <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
+                              <Bot className="size-5 text-[#0F172A]" />
+                            </div>
+                            <div className="w-full rounded-[1.6rem] border border-[#E2E8F0] bg-white px-5 py-4 text-[#0F172A] shadow-[0_14px_30px_rgba(15,23,42,0.05)]">
+                              <div>
+                                <ReactMarkdown
+                                  components={{
+                                    h1: ({ children }) => <h1 className="font-bold text-base">{children}</h1>,
+                                    h2: ({ children }) => <h2 className="font-bold text-[15px]">{children}</h2>,
+                                    h3: ({ children }) => <h3 className="font-bold text-sm">{children}</h3>,
+                                    h4: ({ children }) => <h4 className="font-bold text-sm">{children}</h4>,
+                                    h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
+                                    h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
+                                    strong: ({ children }) => <strong className="font-bold">{children}</strong>,
+                                    p: ({ children }) => <p className="mb-2">{children}</p>,
+                                    ul: ({ children }) => <ul className="mb-2 list-disc pl-5">{children}</ul>,
+                                    ol: ({ children }) => <ol className="mb-2 list-decimal pl-5">{children}</ol>,
+                                  }}
+                                >
+                                  {ensureVisibleReply(message.content)}
+                                </ReactMarkdown>
+                                <TaxRuleTimeline timelines={message.taxRuleTimelines} compact />
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="max-w-[92%] rounded-[1.6rem] bg-[#2563eb] px-5 py-4 text-white shadow-[0_18px_34px_rgba(37,99,235,0.28)] sm:max-w-[84%] lg:max-w-[78%]">
+                            {message.content}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {isTyping && (
+                    <div className="flex justify-start">
+                      <div className="flex max-w-[92%] gap-3 lg:max-w-[88%]">
+                        <div className="mt-1 hidden h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-[#D9E2F0] bg-white shadow-sm sm:flex">
+                          <Bot className="size-5 text-[#0F172A]" />
                         </div>
-                      ) : message.content}
+                        <div className="rounded-[1.6rem] border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-5 py-4 text-sm font-black tracking-[0.18em] text-[#0F172A] shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
+                          <span className="blur-[0.2px]">Thinking.....</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+
+                {!isIosNativeApp ? (
+                  <div className="border-t border-[#E2E8F0] bg-[#F8FBFF]/92 px-4 py-4 sm:px-6 lg:px-10">
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[#0F172A]">Starter Questions</p>
+                        <p className="text-xs text-slate-500">Use these to jump into common NRI tax conversations.</p>
+                      </div>
+                      <span className="rounded-full border border-[#D9E2F0] bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                        Quick Start
+                      </span>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                      {starterQuestions.map((q, i) => (
+                        <Button
+                          key={i}
+                          type="button"
+                          variant="outline"
+                          className="h-auto justify-start rounded-2xl border-[#D9E2F0] bg-white px-4 py-3 text-left text-sm font-medium leading-6 text-[#0F172A] hover:bg-[#F2F7FF]"
+                          onClick={() => handleStarterQuestionSelect(q)}
+                        >
+                          {q}
+                        </Button>
+                      ))}
                     </div>
                   </div>
-                ))}
-                
-                {isTyping && (
-                  <div className="flex justify-start">
-                    <div className="rounded-2xl border border-white/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(226,232,240,0.92))] px-4 py-3 text-sm font-black tracking-[0.18em] text-[#0F172A] shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.95),inset_0_-6px_14px_rgba(148,163,184,0.18)] backdrop-blur-md [text-shadow:0_1px_0_rgba(255,255,255,0.9),0_10px_20px_rgba(148,163,184,0.45)]">
-                      <span className="blur-[0.2px]">Thinking.....</span>
-                    </div>
-                  </div>
-                )}
+                ) : null}
+              </div>
 
-              </CardContent>
-
-              <CardFooter className={isIosNativeApp ? "flex-shrink-0 border-t border-[#E2E8F0] bg-white p-2" : "sticky bottom-0 flex-shrink-0 border-t border-[#E2E8F0] bg-white backdrop-blur"}>
+              <CardFooter className={isIosNativeApp ? "flex-shrink-0 border-t border-[#E2E8F0] bg-white p-2" : "flex-shrink-0 border-t border-[#E2E8F0] bg-white/96 px-4 py-4 backdrop-blur sm:px-6 lg:px-10"}>
                 <form onSubmit={handleSubmit} className={isIosNativeApp ? "grid w-full grid-cols-[1fr_auto_auto] items-end gap-2" : "w-full flex items-end gap-2"}>
                   <Textarea
                     ref={questionInputRef}
@@ -1125,7 +1300,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     value={question}
                     onChange={(e) => setQuestion(e.target.value)}
                     onKeyDown={handleQuestionKeyDown}
-                    className={isIosNativeApp ? "block min-h-[44px] max-h-24 w-full resize-none border-[#E2E8F0] bg-white text-base opacity-100" : "min-h-[44px] max-h-32 resize-none border-[#E2E8F0] bg-[#F7FAFC]/90"}
+                    className={isIosNativeApp ? "block min-h-[44px] max-h-24 w-full resize-none border-[#E2E8F0] bg-white text-base opacity-100" : "min-h-[56px] max-h-36 resize-none rounded-[1.6rem] border-[#D9E2F0] bg-[#F8FBFF] px-5 py-4 text-base shadow-inner"}
                     rows={1}
                     disabled={starterLimitReached}
                   />
@@ -1133,7 +1308,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     type="button"
                     size="icon"
                     variant={isListening ? "destructive" : "outline"}
-                    className="h-10 w-10 flex-shrink-0 border-[#E2E8F0]"
+                    className={isIosNativeApp ? "h-10 w-10 flex-shrink-0 border-[#E2E8F0]" : "h-12 w-12 flex-shrink-0 rounded-2xl border-[#D9E2F0] bg-white"}
                     onClick={toggleVoiceInput}
                     disabled={!speechSupported || starterLimitReached}
                     title={speechSupported ? "Voice input" : "Voice input not supported in this browser"}
@@ -1145,7 +1320,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                       type="button"
                       size="icon"
                       variant="outline"
-                      className="h-10 w-10 flex-shrink-0 border-[#E2E8F0] bg-[#F7FAFC]/90"
+                      className={isIosNativeApp ? "h-10 w-10 flex-shrink-0 border-[#E2E8F0] bg-[#F7FAFC]/90" : "h-12 w-12 flex-shrink-0 rounded-2xl border-[#D9E2F0] bg-white"}
                       onClick={handleStopResponse}
                       title="Interrupt response"
                     >
@@ -1155,7 +1330,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                     <Button
                       type="submit"
                       size="icon"
-                      className="h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95"
+                      className={isIosNativeApp ? "h-10 w-10 flex-shrink-0 bg-[#2563eb] text-[#0F172A] hover:opacity-95" : "h-12 w-12 flex-shrink-0 rounded-2xl bg-[#2563eb] text-white shadow-[0_16px_28px_rgba(37,99,235,0.28)] hover:opacity-95"}
                       disabled={starterLimitReached}
                     >
                       <Send className="size-5" />
@@ -1179,72 +1354,40 @@ export function Chat({ onRequireLogin }: ChatProps) {
             </Card>
           </motion.div>
 
-          <motion.div
-            className={isIosNativeApp ? "space-y-4" : "space-y-4"}
-            variants={{
-              hidden: { opacity: 0, y: 24, scale: 0.98 },
-              visible: { opacity: 1, y: 0, scale: 1 },
-            }}
-            transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-          >
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Starter Questions</CardTitle>
-                <CardDescription>Click to ask the AI Chat Assistant</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {[
-                  "What is DTAA and how does it help NRIs?",
-                  "Do I need to file ITR as an NRI?",
-                  "How to claim India-USA DTAA benefits?",
-                  "What's the difference between NRO and NRE accounts?",
-                  "How is rental income taxed for NRIs?",
-                  "What documents do I need for Tax Residency Certificate?"
-                ].map((q, i) => (
-                  <Button
-                    key={i}
-                    variant="outline"
-                    className="w-full text-left justify-start h-auto py-2 px-3"
-                    onClick={() => handleStarterQuestionSelect(q)}
-                  >
-                    <span className="text-sm">{q}</span>
-                  </Button>
-                ))}
-              </CardContent>
-            </Card>
-            {!hasActivePaidSubscription && (
-              <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/80">
-                <CardHeader>
-                  <CardTitle className="text-lg text-[#0F172A]">Need expert-level support?</CardTitle>
-                  <CardDescription className="text-[#0F172A]">
-                    {IOS_EXTERNAL_PURCHASES_DISABLED
-                      ? "Review available plan access and restore any existing paid subscription."
-                      : "Upgrade for deeper guidance and uninterrupted chat access."}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    type="button"
-                    className="w-full bg-[#2563eb] text-[#0F172A] hover:opacity-95"
-                    onClick={() => navigate("/pricing")}
-                  >
-                    {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Access Options" : "View Plans"}
-                  </Button>
-                </CardContent>
-              </Card>
-            )}
-          </motion.div>
         </motion.div>
 
-        <div className="rounded-2xl border border-[#E2E8F0] bg-[#F7FAFC]/80 p-4 text-sm leading-6 text-[#0F172A]">
-          <p>
-            <strong>Disclaimer:</strong> This chatbot values your privacy and is designed to protect your personal
-            information. Any data shared during interactions is used solely to provide accurate and relevant
-            responses. The chatbot does not store, share, or sell personal data to third parties. Conversations may
-            be monitored anonymously to improve performance and user experience. Do not share sensitive information
-            such as passwords, financial details, or identification numbers. By continuing to use this chatbot, you
-            acknowledge and accept this notice.
-          </p>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="rounded-2xl border border-[#E2E8F0] bg-[#F7FAFC]/80 p-4 text-sm leading-6 text-[#0F172A]">
+            <p>
+              <strong>Disclaimer:</strong> This chatbot values your privacy and is designed to protect your personal
+              information. Any data shared during interactions is used solely to provide accurate and relevant
+              responses. The chatbot does not store, share, or sell personal data to third parties. Conversations may
+              be monitored anonymously to improve performance and user experience. Do not share sensitive information
+              such as passwords, financial details, or identification numbers. By continuing to use this chatbot, you
+              acknowledge and accept this notice.
+            </p>
+          </div>
+          {!hasActivePaidSubscription ? (
+            <Card className="rounded-2xl border-[#E2E8F0] bg-[#F7FAFC]/80">
+              <CardHeader>
+                <CardTitle className="text-lg text-[#0F172A]">Need expert-level support?</CardTitle>
+                <CardDescription className="text-[#0F172A]">
+                  {IOS_EXTERNAL_PURCHASES_DISABLED
+                    ? "Review available plan access and restore any existing paid subscription."
+                    : "Upgrade for deeper guidance and uninterrupted chat access."}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  type="button"
+                  className="w-full bg-[#2563eb] text-white hover:opacity-95"
+                  onClick={() => navigate("/pricing")}
+                >
+                  {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Access Options" : "View Plans"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : null}
         </div>
 
         <Dialog open={isPopupOpen} onOpenChange={setIsPopupOpen}>
