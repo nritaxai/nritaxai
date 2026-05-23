@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from "../components/ui/dialog";
 import { Textarea } from "../components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Badge } from "../components/ui/badge";
-import { Bot, Download, Languages, Mic, MicOff, PanelLeft, Send, Sparkles, Square, Trash2, X } from "lucide-react";
+import { Bot, Download, Languages, Mic, MicOff, PanelLeft, Send, Square, Trash2, X } from "lucide-react";
 import { IOS_EXTERNAL_PURCHASES_DISABLED, IS_IOS_NATIVE_APP } from "../../config/appConfig";
 import { buildApiUrl, clearStoredAuth, getMySubscription, getStoredAuthToken } from "../../utils/api";
 import { PLAN_KEYS, getRemainingChatLabel, type SubscriptionMe } from "../../utils/subscription";
@@ -153,11 +153,7 @@ const starterQuestions = [
   "What documents do I need for Tax Residency Certificate?",
 ];
 
-const chatLandingPrompts = [
-  "What is DTAA and how does it help NRIs?",
-  "Do I need to file ITR as an NRI?",
-  "How to claim India-USA DTAA benefits?",
-];
+const chatLandingPrompts = starterQuestions.slice(0, 3);
 
 const getMessagePreview = (content: string) =>
   ensureVisibleReply(content)
@@ -179,6 +175,13 @@ type ConversationSummary = {
   updatedAt?: string | null;
   messageCount?: number;
 };
+
+const buildDraftConversation = (conversationId: string): ConversationSummary => ({
+  conversationId,
+  title: "New Chat",
+  updatedAt: null,
+  messageCount: 0,
+});
 
 const normalizeMessage = (message: unknown): ChatMessage | null => {
   if (!message || typeof message !== "object") return null;
@@ -270,13 +273,14 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
     setConversationList(normalizedConversations);
 
-    if (normalizedConversations.length) {
-      const preferredId = preferredConversationId || pendingConversationIdRef.current;
-      if (preferredId && normalizedConversations.some((item: ConversationSummary) => item.conversationId === preferredId)) {
+    const preferredId = preferredConversationId || pendingConversationIdRef.current;
+
+    if (preferredId) {
+      if (normalizedConversations.some((item: ConversationSummary) => item.conversationId === preferredId)) {
         setCurrentConversationId(preferredId);
-      } else if (!pendingConversationIdRef.current && !normalizedConversations.some((item: ConversationSummary) => item.conversationId === currentConversationId)) {
-        setCurrentConversationId(normalizedConversations[0].conversationId);
       }
+    } else if (normalizedConversations.length && !normalizedConversations.some((item: ConversationSummary) => item.conversationId === currentConversationId)) {
+      setCurrentConversationId(normalizedConversations[0].conversationId);
     }
 
     pendingConversationIdRef.current = null;
@@ -344,9 +348,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
     activeRequestIdRef.current += 1;
     setIsTyping(false);
     setProviderWarning("");
+    setSessionMessage("");
     setQuestion("");
-    pendingConversationIdRef.current = null;
-    setCurrentConversationId(createConversationId());
+    const nextConversationId = createConversationId();
+    pendingConversationIdRef.current = nextConversationId;
+    setCurrentConversationId(nextConversationId);
+    setConversationList((prev) => [buildDraftConversation(nextConversationId), ...prev.filter((item) => item.conversationId !== nextConversationId)]);
     setMessages([{ role: "ai", content: getWelcomeMessage() }]);
   };
 
@@ -642,7 +649,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
     activeRequestIdRef.current += 1;
     setIsTyping(false);
     setProviderWarning("");
+    setSessionMessage("");
     setQuestion("");
+    pendingConversationIdRef.current = null;
     setCurrentConversationId(conversationId);
   };
 
@@ -1082,44 +1091,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
         WebkitOverflowScrolling: "touch",
       } : undefined}
     >
-      {!isIosNativeApp ? (
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.42, ease: [0.22, 1, 0.36, 1] }}
-          className="rounded-[2rem] border border-[#D9E2F0] bg-[linear-gradient(180deg,#F8FBFF_0%,#F2F7FF_100%)] px-5 py-4 shadow-[0_18px_44px_rgba(15,23,42,0.08)]"
-        >
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0">
-              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[#CBD5E1] bg-white px-4 py-2 text-[#0F172A] shadow-sm">
-                <Sparkles className="size-4" />
-                <span className="text-sm font-semibold">AI Chat Assistant</span>
-              </div>
-              <h1 className="mt-3 text-3xl font-black tracking-tight text-[#0F172A] sm:text-4xl">AI Tax Chat</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-                A wider workspace for NRI tax conversations with quick history access, starter prompts, and uninterrupted scrolling.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
-                <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
-                {isTyping ? "Generating" : "Ready"}
-              </Badge>
-              {subscription ? (
-                <>
-                  <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
-                    Current Plan: {subscription.currentPlan?.displayName || "Starter"}
-                  </Badge>
-                  <Badge className="border border-[#CBD5E1] bg-white text-[#0F172A]">
-                    {getRemainingChatLabel(subscription)}
-                  </Badge>
-                </>
-              ) : null}
-            </div>
-          </div>
-        </motion.div>
-      ) : null}
-
         <motion.div
           initial="hidden"
           animate="visible"
@@ -1212,22 +1183,22 @@ export function Chat({ onRequireLogin }: ChatProps) {
               className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[86dvh] min-h-[760px] max-h-[980px] flex-col overflow-hidden rounded-[1.9rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_24px_56px_rgba(15,23,42,0.08)]"}
             >
               <CardHeader
-                className={isIosNativeApp ? "flex-shrink-0 cursor-pointer bg-white p-3" : "flex-shrink-0 border-b border-[#E2E8F0] bg-white/85 px-6 py-5 backdrop-blur-md"}
+                className={isIosNativeApp ? "flex-shrink-0 cursor-pointer bg-white p-3" : "flex-shrink-0 border-b border-[#E2E8F0] bg-white/85 px-5 py-4 backdrop-blur-md"}
               >
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="rounded-2xl border border-[#CBD5E1] bg-[#F2F7FF] p-3 shadow-sm">
-                      <Bot className="size-6 text-[#0F172A]" />
+                    <div className="rounded-xl border border-[#CBD5E1] bg-[#F2F7FF] p-2.5 shadow-sm">
+                      <Bot className="size-5 text-[#0F172A]" />
                     </div>
                     <div className="min-w-0">
-                      <CardTitle className="text-xl text-[#0F172A]">AI Chat Assistant</CardTitle>
-                      <CardDescription className="mt-1 text-sm leading-6 text-slate-600">
-                        {userName ? `Hi ${userName}` : "Hi"} - ask anything about NRI taxes, DTAA, filing, remittances, and compliance.
+                      <CardTitle className="text-lg font-semibold text-[#0F172A]">AI Tax Chat</CardTitle>
+                      <CardDescription className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm">
+                        {userName ? `Hi ${userName}` : "Hi"} - ask anything about NRI tax, DTAA, filing, remittances, and compliance.
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 xl:justify-end">
-                    <Badge className="border border-[#CBD5E1] bg-[#F8FBFF] text-[#0F172A]">
+                    <Badge className="border border-[#CBD5E1] bg-[#F8FBFF] px-2.5 py-1 text-[#0F172A]">
                       <span className={`mr-2 size-2 rounded-full ${isTyping ? "animate-pulse bg-amber-500" : "animate-pulse bg-green-600"}`}></span>
                       {isTyping ? "Generating" : "Ready"}
                     </Badge>
