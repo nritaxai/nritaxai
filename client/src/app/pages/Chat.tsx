@@ -243,8 +243,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
         .reverse(),
     [messages]
   );
-  const hasUserMessages = conversationHistory.length > 0;
-  const isDesktopLandingState = !isIosNativeApp && !hasUserMessages && !isTyping;
 
   const downloadChatTranscript = () => {
     if (!messages.length) return;
@@ -744,6 +742,8 @@ export function Chat({ onRequireLogin }: ChatProps) {
   }
 
   const isIosNativeApp = IS_IOS_NATIVE_APP;
+  const hasUserMessages = conversationHistory.length > 0;
+  const isDesktopLandingState = !isIosNativeApp && !hasUserMessages && !isTyping;
 
   if (isIosNativeApp) {
     return (
