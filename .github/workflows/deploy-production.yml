@@ -128,8 +128,10 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Optional incident alert webhook
-        if: ${{ failure() && secrets.ALERT_WEBHOOK_URL != '' }}
+        if: ${{ failure() && env.ALERT_WEBHOOK_URL != '' }}
+        env:
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
         run: |
           curl -X POST -H "Content-Type: application/json" \
             -d "{\"service\":\"nritax-api\",\"environment\":\"production\",\"status\":\"failed\",\"image_tag\":\"${{ inputs.image_tag }}\",\"workflow\":\"${{ github.workflow }}\",\"run_url\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\"}" \
-            "${{ secrets.ALERT_WEBHOOK_URL }}"
+            "$ALERT_WEBHOOK_URL"
