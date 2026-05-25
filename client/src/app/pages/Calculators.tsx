@@ -235,7 +235,7 @@ function ResidencyCalculator() {
             max="365"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">Financial Year: April 1 - March 31</p>
+          <p className="mt-1 text-xs text-slate-600">Financial Year: April 1 - March 31</p>
         </div>
 
         <div>
@@ -251,7 +251,7 @@ function ResidencyCalculator() {
             max="365"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">Calendar Year: January 1 - December 31</p>
+          <p className="mt-1 text-xs text-slate-600">Calendar Year: January 1 - December 31</p>
         </div>
 
         <div>
@@ -442,7 +442,7 @@ function IncomeTaxCalculator() {
             placeholder={currentCountryData.currency === 'INR' ? '10,00,000' : '1,000,000'}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">Tax Year: {currentCountryData.taxYear}</p>
+          <p className="mt-1 text-xs text-slate-600">Tax Year: {currentCountryData.taxYear}</p>
         </div>
 
         <div>
@@ -459,7 +459,7 @@ function IncomeTaxCalculator() {
             <option value="Rental">Rental</option>
             <option value="Capital Gains">Capital Gains</option>
           </select>
-          <p className="text-xs text-gray-500 mt-1">This calculator uses standard {incomeType.toLowerCase()} income tax rates</p>
+          <p className="mt-1 text-xs text-slate-600">This calculator uses standard {incomeType.toLowerCase()} income tax rates</p>
         </div>
 
         <div className="flex gap-3">
@@ -630,7 +630,7 @@ function DTAACalculator() {
             placeholder="1,00,000"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-xs text-gray-500 mt-1">Total income tax paid or deducted in India</p>
+          <p className="mt-1 text-xs text-slate-600">Total income tax paid or deducted in India</p>
         </div>
 
         <div>
@@ -648,7 +648,7 @@ function DTAACalculator() {
               </option>
             ))}
           </select>
-          <p className="text-xs text-gray-500 mt-1">The country where you are a tax resident</p>
+          <p className="mt-1 text-xs text-slate-600">The country where you are a tax resident</p>
         </div>
 
         <div>

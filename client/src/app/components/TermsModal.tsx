@@ -140,14 +140,14 @@ export function TermsModal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close modal"
-                className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:text-slate-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2563eb]/15"
+                className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:text-slate-900 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#2563eb]/15"
               >
                 <X className="size-5" />
               </button>
             </div>
 
             <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                 <span>Reading progress</span>
                 <span>{Math.round(hasScrolled ? 100 : scrollProgress)}%</span>
               </div>
@@ -169,7 +169,7 @@ export function TermsModal({
           <div className="border-t border-slate-200 bg-white px-5 py-4 sm:px-6">
             <div className="flex flex-col gap-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                   {hasScrolled ? "Acknowledgment unlocked" : "Scroll near the end to continue"}
                 </p>
                 <a
@@ -191,7 +191,7 @@ export function TermsModal({
                   onChange={(event) => setChecked(event.target.checked)}
                   className="mt-1 h-4 w-4 accent-[#1d4ed8] disabled:opacity-40"
                 />
-                <span className={`text-sm leading-6 ${hasScrolled ? "text-slate-700" : "text-slate-400"}`}>
+                <span className={`text-sm leading-6 ${hasScrolled ? "text-slate-700" : "text-slate-500"}`}>
                   I have read and agree to the {title}
                 </span>
               </label>

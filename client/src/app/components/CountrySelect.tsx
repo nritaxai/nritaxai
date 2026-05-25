@@ -29,8 +29,8 @@ export function CountrySelect({
 
   return (
     <div className="space-y-2.5">
-      <label className="text-sm font-medium text-white">
-        Country of Residence <span className="text-[#f5ede4]">*</span>
+      <label className="text-sm font-semibold text-white">
+        Country of Residence <span className="text-white">*</span>
       </label>
 
       <Popover open={open} onOpenChange={setOpen}>
@@ -41,14 +41,14 @@ export function CountrySelect({
             className={cn(
               "flex h-14 w-full items-center justify-between rounded-[22px] border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] px-4 text-left shadow-none transition-all",
               "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/10",
-              disabled ? "cursor-not-allowed opacity-60" : "hover:border-white/22",
+              disabled ? "cursor-not-allowed opacity-70" : "hover:border-white/24",
             )}
             aria-expanded={open}
             aria-label="Select your country of residence"
           >
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-xl">
-                {selected ? countryToFlag(selected.code) : <Search className="size-4 text-slate-400" />}
+                {selected ? countryToFlag(selected.code) : <Search className="size-4 text-slate-500" />}
               </div>
               <div className="min-w-0">
                 <p className={cn("truncate text-sm font-medium", selected ? "text-[#172033]" : "text-[#94a3b8]")}>
@@ -76,7 +76,7 @@ export function CountrySelect({
               />
             </div>
             <CommandList className="max-h-[320px] p-2">
-              <CommandEmpty className="py-8 text-slate-500">
+              <CommandEmpty className="py-8 text-slate-600">
                 No country found.
               </CommandEmpty>
               <CommandGroup>
@@ -106,7 +106,7 @@ export function CountrySelect({
         </PopoverContent>
       </Popover>
 
-      <p className="text-xs leading-5 text-[rgba(230,236,244,0.70)]">
+      <p className="text-xs leading-5 text-slate-200">
         Country determines applicable tax guidance and subscription availability.
       </p>
     </div>

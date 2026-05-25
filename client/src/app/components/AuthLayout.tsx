@@ -18,13 +18,13 @@ export function AuthLayout({ children, showIntro = true }: AuthLayoutProps) {
       {showIntro ? (
         <div className="mb-6 w-full text-center sm:mb-8">
           <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-white shadow-sm backdrop-blur-xl">
-          <ShieldCheck className="size-4 text-[#f5efe6]" />
+          <ShieldCheck className="size-4 text-white" />
           NRITAX.AI
           </div>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-[2rem]">
+          <h1 className="mt-4 text-3xl font-bold tracking-tight text-white sm:text-[2rem]">
             Global tax intelligence platform for NRIs.
           </h1>
-          <p className="mt-2 text-sm leading-6 text-white/70 sm:text-[15px]">
+          <p className="mt-2 text-sm leading-7 text-slate-200 sm:text-[15px]">
             Secure sign in and compliant account setup for global tax guidance, subscriptions, and expert workflows.
           </p>
         </div>

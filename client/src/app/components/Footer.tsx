@@ -78,7 +78,7 @@ const socialLinks = [
 ] as const;
 
 const footerLinkClass =
-  "text-sm leading-6 text-slate-500 transition-colors duration-200 hover:text-slate-900";
+  "text-sm leading-6 text-slate-600 transition-colors duration-200 hover:text-slate-900";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -97,7 +97,7 @@ export function Footer() {
             <Link to="/home" className="inline-flex items-center" aria-label={`${COMPANY_LEGAL_NAME} home`}>
               <img src="/logo-transparent.png" alt={`${COMPANY_LEGAL_NAME} logo`} className="h-14 w-auto object-contain" />
             </Link>
-            <p className="mt-4 text-base leading-7 text-slate-600">
+              <p className="mt-4 text-base leading-8 text-slate-700">
               {renderTextWithShortForms(PLATFORM_TAGLINE)} Built for global NRIs navigating tax, treaty, remittance, and compliance questions with more clarity.
             </p>
           </div>
@@ -105,15 +105,15 @@ export function Footer() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2563EB]">Secure</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Privacy-first product design and structured account workflows.</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">Privacy-first product design and structured account workflows.</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2563EB]">Global</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Built for cross-border tax scenarios and country-aware guidance.</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">Built for cross-border tax scenarios and country-aware guidance.</p>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#2563EB]">Expert-backed</p>
-              <p className="mt-2 text-sm leading-6 text-slate-600">AI guidance paired with premium consultation and onboarding support.</p>
+              <p className="mt-2 text-sm leading-7 text-slate-700">AI guidance paired with premium consultation and onboarding support.</p>
             </div>
           </div>
         </div>
@@ -162,7 +162,7 @@ export function Footer() {
         </div>
 
         <div className="flex flex-col gap-6 pt-8 md:flex-row md:items-center md:justify-between">
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-slate-600">
             © {currentYear} {COMPANY_COPYRIGHT_NAME}. {renderTextWithShortForms(PLATFORM_TAGLINE)}
           </p>
 
@@ -176,7 +176,7 @@ export function Footer() {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={item.label}
-                  className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition-colors hover:text-slate-900"
+                  className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:text-slate-900"
                 >
                   <Icon className="size-4" />
                 </a>

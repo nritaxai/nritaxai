@@ -164,7 +164,7 @@ export function Header({ onLogin }: HeaderProps) {
           onError={() => setAvatarFailed(true)}
         />
       ) : (
-        <UserIcon className={`${iconSizeClass} text-slate-500`} />
+        <UserIcon className={`${iconSizeClass} text-slate-600`} />
       )}
     </span>
   );

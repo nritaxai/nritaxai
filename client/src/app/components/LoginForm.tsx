@@ -34,11 +34,11 @@ type FieldProps = {
 function Field({ label, icon: Icon, endAdornment, className, ...props }: FieldProps) {
   return (
     <div className="space-y-2.5">
-      <Label className="text-sm font-medium text-white">{label}</Label>
+      <Label className="text-sm font-semibold text-white">{label}</Label>
       <div className="relative">
-        <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[rgba(230,236,244,0.72)]" />
+        <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
         <Input
-          className={`h-14 rounded-[22px] border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] pl-11 pr-12 text-[#172033] placeholder:text-[#94a3b8] shadow-none focus-visible:border-[rgba(255,255,255,0.4)] focus-visible:ring-white/10 ${className || ""}`}
+          className={`h-14 rounded-[22px] border border-slate-300 bg-white pl-11 pr-12 text-slate-900 placeholder:text-slate-500 shadow-none focus-visible:border-[#2563EB] focus-visible:ring-[#2563EB]/15 ${className || ""}`}
           {...props}
         />
         {endAdornment ? (
@@ -104,12 +104,12 @@ export function LoginForm({
       />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs leading-5 text-[rgba(230,236,244,0.70)]">
+        <p className="text-xs leading-5 text-slate-200">
           Secure sign in to access chats, subscriptions, and tax tools.
         </p>
         <button
           type="button"
-          className="text-sm font-medium text-[#f5ede4] transition-colors hover:text-white"
+          className="text-sm font-semibold text-white transition-colors hover:text-slate-200"
           onClick={onToggleForgotPassword}
         >
           Forgot password?
@@ -124,7 +124,7 @@ export function LoginForm({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="rounded-[22px] border border-white/14 bg-white/10 p-4">
+            <div className="rounded-[22px] border border-white/16 bg-white/10 p-4">
               <div className="space-y-2">
                 <Label htmlFor="forgot-password-email" className="text-sm font-medium text-white">
                   Reset Email
@@ -135,13 +135,13 @@ export function LoginForm({
                   value={forgotPasswordEmail}
                   onChange={(event) => onForgotPasswordEmailChange(event.target.value)}
                   placeholder="your.email@example.com"
-                  className="h-12 rounded-[20px] border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] text-[#172033] placeholder:text-[#94a3b8] focus-visible:border-[rgba(255,255,255,0.4)] focus-visible:ring-white/10"
+                  className="h-12 rounded-[20px] border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 focus-visible:border-[#2563EB] focus-visible:ring-[#2563EB]/15"
                 />
               </div>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-4 h-11 w-full rounded-full border-white/18 bg-white/12 text-white hover:bg-white/18"
+                className="mt-4 h-11 w-full rounded-full border-white/20 bg-white/14 text-white hover:bg-white/20"
                 disabled={loading}
                 onClick={onForgotPassword}
               >
@@ -158,7 +158,7 @@ export function LoginForm({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="flex items-start gap-3 rounded-[22px] border border-[#f5d7a6]/40 bg-[#f6deb7]/14 px-4 py-3 text-sm text-[#fff0d7]"
+            className="flex items-start gap-3 rounded-[22px] border border-[#f5d7a6]/55 bg-[#f6deb7]/18 px-4 py-3 text-sm text-[#fff7e7]"
           >
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <p className="leading-6">{error}</p>
@@ -179,7 +179,7 @@ export function LoginForm({
           <span className="w-full border-t border-white/12" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-transparent px-3 text-xs font-medium uppercase tracking-[0.16em] text-[rgba(230,236,244,0.52)]">
+          <span className="bg-transparent px-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-300">
             Or continue with
           </span>
         </div>

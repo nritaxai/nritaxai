@@ -56,11 +56,11 @@ const getPasswordStrength = (password: string) => {
 function Field({ label, icon: Icon, endAdornment, className, ...props }: FieldProps) {
   return (
     <div className="space-y-2.5">
-      <Label className="text-sm font-medium text-white">{label}</Label>
+      <Label className="text-sm font-semibold text-white">{label}</Label>
       <div className="relative">
-        <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[rgba(230,236,244,0.72)]" />
+        <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
         <Input
-          className={`h-14 rounded-[22px] border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] pl-11 pr-12 text-[#172033] placeholder:text-[#94a3b8] shadow-none focus-visible:border-[rgba(255,255,255,0.4)] focus-visible:ring-white/10 ${className || ""}`}
+          className={`h-14 rounded-[22px] border border-slate-300 bg-white pl-11 pr-12 text-slate-900 placeholder:text-slate-500 shadow-none focus-visible:border-[#2563EB] focus-visible:ring-[#2563EB]/15 ${className || ""}`}
           {...props}
         />
         {endAdornment ? (
@@ -144,7 +144,7 @@ export function SignupForm({
               <button
                 type="button"
                 onClick={onTogglePassword}
-                className="inline-flex size-9 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+                className="inline-flex size-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -152,10 +152,10 @@ export function SignupForm({
             }
           />
           <div className="space-y-2 pt-2">
-            <Progress value={passwordStrength.value} className="h-1.5 bg-white/10" />
+            <Progress value={passwordStrength.value} className="h-1.5 bg-white/20" />
             <div className="flex items-center justify-between text-xs">
-              <span className="text-white/55">Use at least 6 characters for a secure password.</span>
-              <span className="font-medium text-white/80">{passwordStrength.label}</span>
+              <span className="text-slate-200">Use at least 6 characters for a secure password.</span>
+              <span className="font-semibold text-white">{passwordStrength.label}</span>
             </div>
           </div>
         </div>
@@ -173,7 +173,7 @@ export function SignupForm({
             <button
               type="button"
               onClick={onToggleConfirmPassword}
-              className="inline-flex size-9 items-center justify-center rounded-full text-white/60 transition-colors hover:bg-white/10 hover:text-white"
+              className="inline-flex size-9 items-center justify-center rounded-full text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
               aria-label={showConfirmPassword ? "Hide password" : "Show password"}
             >
               {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -188,7 +188,7 @@ export function SignupForm({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="flex items-start gap-3 rounded-[22px] border border-[#f5d7a6]/40 bg-[#f6deb7]/14 px-4 py-3 text-sm text-[#fff0d7]"
+            className="flex items-start gap-3 rounded-[22px] border border-[#f5d7a6]/55 bg-[#f6deb7]/18 px-4 py-3 text-sm text-[#fff7e7]"
           >
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <p className="leading-6">{error}</p>
@@ -204,12 +204,12 @@ export function SignupForm({
             onChange={(event) => onTermsChange(event.target.checked)}
             className="mt-1 h-4 w-4 rounded border-white/30 text-[#f5ede4] focus:ring-[#f5ede4]"
           />
-          <span className="text-sm leading-6 text-[rgba(233,239,247,0.84)]">
+          <span className="text-sm leading-6 text-slate-200">
             I agree to the{" "}
             <button
               type="button"
               onClick={() => onOpenTerms("terms")}
-              className="font-medium text-[#f5ede4] underline underline-offset-4"
+              className="font-semibold text-white underline underline-offset-4"
             >
               Terms & Conditions
             </button>{" "}
@@ -217,15 +217,15 @@ export function SignupForm({
             <button
               type="button"
               onClick={() => onOpenTerms("privacy")}
-              className="font-medium text-[#f5ede4] underline underline-offset-4"
+              className="font-semibold text-white underline underline-offset-4"
             >
               Privacy Policy
             </button>
           </span>
         </label>
 
-        <div className="mt-3 flex items-start gap-2 rounded-[18px] bg-white/10 px-3 py-2 text-xs leading-5 text-white/58">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-[#f5ede4]" />
+        <div className="mt-3 flex items-start gap-2 rounded-[18px] bg-white/12 px-3 py-2 text-xs leading-5 text-slate-200">
+          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-white" />
           We use this acknowledgment for new account creation only. Existing sign-in behavior remains unchanged.
         </div>
       </div>
@@ -243,7 +243,7 @@ export function SignupForm({
           <span className="w-full border-t border-white/12" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-transparent px-3 text-xs font-medium uppercase tracking-[0.16em] text-[rgba(230,236,244,0.52)]">
+          <span className="bg-transparent px-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-300">
             Or continue with
           </span>
         </div>
