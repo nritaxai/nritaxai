@@ -90,13 +90,13 @@ const clamp = (value: number, min: number, max: number) => Math.min(Math.max(val
 
 const getDefaultPopupBounds = (): PopupBounds => {
   if (typeof window === "undefined") {
-    return { width: 920, height: 680, x: 24, y: 24 };
+    return { width: 1040, height: 760, x: 24, y: 24 };
   }
 
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
-  const width = clamp(Math.min(960, viewportWidth - 40), 420, Math.max(420, viewportWidth - 24));
-  const height = clamp(Math.min(720, viewportHeight - 40), 360, Math.max(360, viewportHeight - 24));
+  const width = clamp(Math.min(1080, viewportWidth - 32), 520, Math.max(520, viewportWidth - 24));
+  const height = clamp(Math.min(800, viewportHeight - 32), 420, Math.max(420, viewportHeight - 24));
 
   return {
     width,
@@ -109,8 +109,8 @@ const getDefaultPopupBounds = (): PopupBounds => {
 const getClampedPopupBounds = (bounds: PopupBounds): PopupBounds => {
   if (typeof window === "undefined") return bounds;
 
-  const width = clamp(bounds.width, 420, Math.max(420, window.innerWidth - 16));
-  const height = clamp(bounds.height, 360, Math.max(360, window.innerHeight - 16));
+  const width = clamp(bounds.width, 520, Math.max(520, window.innerWidth - 16));
+  const height = clamp(bounds.height, 420, Math.max(420, window.innerHeight - 16));
 
   return {
     width,
@@ -122,7 +122,7 @@ const getClampedPopupBounds = (bounds: PopupBounds): PopupBounds => {
 
 const getViewportPopupBounds = (): PopupBounds => {
   if (typeof window === "undefined") {
-    return { width: 920, height: 680, x: 24, y: 24 };
+    return { width: 1040, height: 760, x: 24, y: 24 };
   }
 
   return {
@@ -176,13 +176,6 @@ type ConversationSummary = {
   messageCount?: number;
 };
 
-const buildDraftConversation = (conversationId: string): ConversationSummary => ({
-  conversationId,
-  title: "New Chat",
-  updatedAt: null,
-  messageCount: 0,
-});
-
 const normalizeMessage = (message: unknown): ChatMessage | null => {
   if (!message || typeof message !== "object") return null;
   const role = (message as { role?: string }).role === "user" ? "user" : "ai";
@@ -203,6 +196,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
   const [currentConversationId, setCurrentConversationId] = useState(() => createConversationId());
   const [conversationList, setConversationList] = useState<ConversationSummary[]>([]);
   const [subscription, setSubscription] = useState<SubscriptionMe | null>(null);
+  const [isDraftConversation, setIsDraftConversation] = useState(false);
   const welcomeByLanguage: Record<string, string> = {
     english: `Hi${userName ? ` ${userName}` : ""}! I am your AI chat assistant. I can help you with DTAA regulations, NRI tax queries, and tax planning. How can I assist you today?`,
     tamil: `Vanakkam${userName ? ` ${userName}` : ""}! Naan ungal AI chat assistant. DTAA vidhigal, NRI vari kelvigal, matrum vari thittamidhalil naan uthava tayaaraga irukkiren. Indru naan ungalukku eppadi uthavalam?`,
@@ -246,6 +240,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
   const getWelcomeMessage = () => welcomeByLanguage[language] || welcomeByLanguage.english;
   const hasCurrentConversationMessages = messages.some((message) => message.role === "user");
+  const isCurrentConversationSaved = conversationList.some((item) => item.conversationId === currentConversationId);
 
   const loadConversations = async (preferredConversationId?: string | null) => {
     if (!isAuthenticated) {
@@ -278,9 +273,15 @@ export function Chat({ onRequireLogin }: ChatProps) {
     if (preferredId) {
       if (normalizedConversations.some((item: ConversationSummary) => item.conversationId === preferredId)) {
         setCurrentConversationId(preferredId);
+        setIsDraftConversation(false);
       }
-    } else if (normalizedConversations.length && !normalizedConversations.some((item: ConversationSummary) => item.conversationId === currentConversationId)) {
+    } else if (
+      normalizedConversations.length &&
+      !isDraftConversation &&
+      !normalizedConversations.some((item: ConversationSummary) => item.conversationId === currentConversationId)
+    ) {
       setCurrentConversationId(normalizedConversations[0].conversationId);
+      setIsDraftConversation(false);
     }
 
     pendingConversationIdRef.current = null;
@@ -351,9 +352,9 @@ export function Chat({ onRequireLogin }: ChatProps) {
     setSessionMessage("");
     setQuestion("");
     const nextConversationId = createConversationId();
-    pendingConversationIdRef.current = nextConversationId;
+    pendingConversationIdRef.current = null;
     setCurrentConversationId(nextConversationId);
-    setConversationList((prev) => [buildDraftConversation(nextConversationId), ...prev.filter((item) => item.conversationId !== nextConversationId)]);
+    setIsDraftConversation(true);
     setMessages([{ role: "ai", content: getWelcomeMessage() }]);
   };
 
@@ -472,6 +473,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
       setConversationList([]);
       pendingConversationIdRef.current = null;
       setCurrentConversationId(createConversationId());
+      setIsDraftConversation(true);
       setMessages([{ role: "ai", content: getWelcomeMessage() }]);
       return;
     }
@@ -486,7 +488,10 @@ export function Chat({ onRequireLogin }: ChatProps) {
         if (!conversations.length) {
           pendingConversationIdRef.current = null;
           setCurrentConversationId(createConversationId());
+          setIsDraftConversation(true);
           setMessages([{ role: "ai", content: getWelcomeMessage() }]);
+        } else {
+          setIsDraftConversation(false);
         }
       } catch {
         if (!isCancelled) {
@@ -581,6 +586,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
           taxRuleTimelines: Array.isArray(response.data?.taxRuleTimelines) ? response.data.taxRuleTimelines : [],
         },
       ]);
+      setIsDraftConversation(false);
       pendingConversationIdRef.current = currentConversationId;
       void loadConversations(currentConversationId);
     } catch (error: any) {
@@ -652,6 +658,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
     setSessionMessage("");
     setQuestion("");
     pendingConversationIdRef.current = null;
+    setIsDraftConversation(false);
     setCurrentConversationId(conversationId);
   };
 
@@ -1083,7 +1090,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
 
   return (
     <div
-      className={isIosNativeApp ? "mx-auto flex w-full max-w-[1320px] flex-col bg-white" : "mx-auto w-full max-w-[1320px] space-y-5"}
+      className={isIosNativeApp ? "mx-auto flex w-full max-w-[1320px] flex-col bg-white" : "mx-auto w-full max-w-[1480px] space-y-5"}
       style={isIosNativeApp ? {
         minHeight: "100dvh",
         padding: "calc(56px + env(safe-area-inset-top)) 10px calc(68px + env(safe-area-inset-bottom))",
@@ -1098,7 +1105,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             hidden: {},
             visible: { transition: { staggerChildren: 0.08, delayChildren: 0.08 } },
           }}
-          className={isIosNativeApp ? "grid gap-3" : "grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]"}
+          className={isIosNativeApp ? "grid gap-3" : "grid gap-5 xl:grid-cols-[320px_minmax(0,1fr)]"}
         >
           {!isIosNativeApp ? (
             <motion.aside
@@ -1109,7 +1116,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
               className="hidden xl:block"
             >
-              <Card className="sticky top-24 flex h-[78dvh] min-h-[620px] flex-col overflow-hidden rounded-[1.75rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] shadow-[0_20px_48px_rgba(15,23,42,0.08)]">
+              <Card className="sticky top-24 flex h-[84dvh] min-h-[720px] flex-col overflow-hidden rounded-[1.75rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#F8FBFF_0%,#FFFFFF_100%)] shadow-[0_20px_48px_rgba(15,23,42,0.08)]">
                 <CardHeader className="border-b border-[#E2E8F0] pb-4">
                   <div className="flex items-center gap-3">
                     <div className="rounded-2xl border border-[#CBD5E1] bg-white p-2.5 shadow-sm">
@@ -1134,7 +1141,12 @@ export function Chat({ onRequireLogin }: ChatProps) {
                   </div>
                 </CardHeader>
                 <CardContent className="min-h-0 flex-1 overflow-y-auto p-3">
-                  <div className="space-y-2">
+                  <div className="space-y-2.5">
+                    {isDraftConversation && !isCurrentConversationSaved ? (
+                      <div className="rounded-2xl border border-dashed border-[#93C5FD] bg-[#F8FBFF] px-4 py-4 text-sm leading-6 text-slate-600">
+                        You are in a new chat. This full thread will appear here after you send the first question.
+                      </div>
+                    ) : null}
                     {conversationList.length ? (
                       conversationList.map((item) => (
                         <button
@@ -1180,7 +1192,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
           >
             <Card
-              className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[86dvh] min-h-[760px] max-h-[980px] flex-col overflow-hidden rounded-[1.9rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_24px_56px_rgba(15,23,42,0.08)]"}
+              className={isIosNativeApp ? "flex min-h-[620px] flex-col overflow-hidden rounded-2xl border-[#E2E8F0] bg-white" : "flex h-[88dvh] min-h-[820px] max-h-[1120px] flex-col overflow-hidden rounded-[1.9rem] border-[#D9E2F0] bg-[linear-gradient(180deg,#FFFFFF_0%,#F8FBFF_100%)] shadow-[0_24px_56px_rgba(15,23,42,0.08)]"}
             >
               <CardHeader
                 className={isIosNativeApp ? "flex-shrink-0 cursor-pointer bg-white p-3" : "flex-shrink-0 border-b border-[#E2E8F0] bg-white/85 px-5 py-4 backdrop-blur-md"}
@@ -1286,14 +1298,14 @@ export function Chat({ onRequireLogin }: ChatProps) {
               </CardHeader>
 
               <div className="min-h-0 flex flex-1 flex-col overflow-hidden">
-                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : isDesktopLandingState ? "flex flex-1 items-center justify-center px-6 py-10 sm:px-10 lg:px-16" : "min-h-0 flex-1 space-y-6 overflow-y-auto px-4 py-6 sm:px-8 lg:px-12"}>
+                <CardContent ref={chatContentRef} className={isIosNativeApp ? "min-h-[260px] flex-1 space-y-4 overflow-y-auto bg-white px-3 pb-3 sm:px-6" : isDesktopLandingState ? "flex flex-1 items-center justify-center px-8 py-12 sm:px-12 lg:px-20" : "min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-7 sm:px-10 lg:px-16"}>
                   {isDesktopLandingState ? (
-                    <div className="mx-auto flex w-full max-w-4xl flex-col items-center text-center">
+                    <div className="mx-auto flex w-full max-w-5xl flex-col items-center text-center">
                       <h2 className="text-4xl font-medium tracking-tight text-[#0F172A] sm:text-5xl">
                         Where should we begin?
                       </h2>
                       <form onSubmit={handleSubmit} className="mt-10 w-full">
-                        <div className="flex items-center gap-3 rounded-full border border-[#D9E2F0] bg-white px-5 py-3 shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
+                        <div className="flex items-center gap-3 rounded-full border border-[#D9E2F0] bg-white px-6 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.08)]">
                           <button
                             type="button"
                             className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-transparent text-[#0F172A] transition hover:bg-[#F2F7FF]"
