@@ -177,7 +177,7 @@ export function Header({ onLogin }: HeaderProps) {
   return (
     <header className="relative z-50">
       <div className="border-b border-white/60 bg-white/70 backdrop-blur-xl md:hidden">
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between px-4">
+        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-3 px-4">
           <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
             <img
               src="/logo-transparent.png"
@@ -217,7 +217,7 @@ export function Header({ onLogin }: HeaderProps) {
       >
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between gap-6">
-            <div className="flex items-center gap-4 lg:gap-6">
+            <div className="flex items-center gap-3 lg:gap-5">
               <button
                 type="button"
                 onClick={handleGoBack}
@@ -235,7 +235,7 @@ export function Header({ onLogin }: HeaderProps) {
               </Link>
             </div>
 
-            <nav className="hidden items-center gap-5 lg:gap-7 md:flex">
+            <nav className="hidden items-center gap-4 md:flex lg:gap-6">
               {navItems.map((item) => {
                 const isActive = isNavItemActive(item.to);
                 return (
@@ -246,7 +246,7 @@ export function Header({ onLogin }: HeaderProps) {
                   >
                     <Link
                       to={item.to}
-                      className={`relative rounded-full px-1 py-2 text-sm font-medium transition-colors ${
+                      className={`relative rounded-full px-1 py-2 text-sm font-medium leading-5 transition-colors ${
                         isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
                       }`}
                     >
@@ -275,7 +275,7 @@ export function Header({ onLogin }: HeaderProps) {
                     title="Open profile"
                   >
                     {renderUserAvatar("h-11 w-11", "size-5")}
-                    <span>WELCOME! {user.name}</span>
+                    <span className="leading-5">WELCOME! {user.name}</span>
                   </Link>
                   <Button
                     variant="outline"
@@ -319,14 +319,14 @@ export function Header({ onLogin }: HeaderProps) {
             className="border-b border-white/70 bg-white/92 py-4 backdrop-blur-xl md:hidden"
           >
             <div className="mx-auto max-w-6xl px-4">
-              <nav className="space-y-1.5">
+              <nav className="space-y-2">
                 {navItems.map((item) => {
                   const isActive = isNavItemActive(item.to);
                   return (
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`block rounded-2xl px-4 py-3 text-sm font-medium transition-colors ${
+                      className={`block rounded-2xl px-4 py-3 text-sm font-medium leading-5 transition-colors ${
                         isActive ? "bg-blue-50 text-blue-700" : "text-slate-800 hover:bg-slate-100 hover:text-blue-700"
                       }`}
                       onClick={() => setMobileMenuOpen(false)}

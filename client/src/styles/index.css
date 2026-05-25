@@ -47,6 +47,10 @@ body {
   background-color: #ffffff;
   background: var(--ambient-bg);
   background-size: 220% 220%;
+  line-height: 1.5;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   animation: premiumGradientShift 18s ease-in-out infinite;
 }
 
@@ -408,6 +412,23 @@ input,
 select,
 textarea {
   font-size: 16px;
+}
+
+p {
+  line-height: 1.65;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  line-height: 1.2;
+}
+
+label {
+  letter-spacing: 0;
 }
 
 form > :nth-child(1) { --entry-stagger: 0; }

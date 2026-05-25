@@ -208,7 +208,7 @@ export function Home({ onRequireLogin }: HomeProps) {
             initial="hidden"
             animate="visible"
             variants={heroVariants}
-            className="mb-12 text-center"
+            className="mb-12 text-center md:mb-14"
           >
             {userName ? (
               <motion.p variants={fadeUp} className="mb-4 text-xs font-semibold uppercase tracking-wide text-blue-600">
@@ -217,25 +217,25 @@ export function Home({ onRequireLogin }: HomeProps) {
             ) : null}
             <motion.span
               variants={fadeUp}
-              className="inline-flex rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-blue-600 [word-spacing:0.2rem]"
+              className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600"
             >
               {renderTextWithShortForms(heroContent.badge)}
             </motion.span>
-            <motion.h1 variants={fadeUp} className="mb-4 mt-6 text-5xl font-bold tracking-tight text-gray-900 md:text-6xl">
+            <motion.h1 variants={fadeUp} className="mt-6 text-5xl font-bold tracking-tight text-gray-900 md:text-6xl">
               {heroContent.headline}
             </motion.h1>
-            <motion.p variants={fadeUp} className="mb-4 text-lg font-normal text-slate-600">
+            <motion.p variants={fadeUp} className="mt-4 text-lg font-normal leading-8 text-slate-600">
               {renderTextWithShortForms(heroContent.subheadline)}
             </motion.p>
-            <motion.p variants={fadeUp} className="mx-auto mb-8 max-w-2xl text-lg font-normal text-slate-600">
+            <motion.p variants={fadeUp} className="mx-auto mt-4 max-w-2xl text-lg font-normal leading-8 text-slate-600">
               {renderTextWithShortForms(heroContent.description)}
             </motion.p>
-            <motion.div variants={fadeUp} className="flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <motion.div variants={fadeUp} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row sm:flex-wrap">
               <motion.button
                 type="button"
                 aria-label="Ask AI instantly"
                 onClick={() => requireAuthFor("/chat")}
-                className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-base font-semibold text-white shadow-lg transition-all hover:bg-blue-700"
+                className="inline-flex min-w-[12rem] items-center justify-center rounded-lg bg-blue-600 px-8 py-4 text-base font-semibold leading-6 text-white shadow-lg transition-all hover:bg-blue-700"
                 whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 18px 36px rgba(37, 99, 235, 0.24)" }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
                 transition={{ duration: 0.25, ease: PREMIUM_EASE }}
@@ -247,7 +247,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 type="button"
                 aria-label="Consult a CPA"
                 onClick={() => requireAuthFor("/consult")}
-                className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-8 py-4 text-base font-semibold text-blue-700 shadow-sm transition-all hover:bg-blue-50"
+                className="inline-flex min-w-[12rem] items-center justify-center rounded-lg border border-blue-200 bg-white px-8 py-4 text-base font-semibold leading-6 text-blue-700 shadow-sm transition-all hover:bg-blue-50"
                 whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 16px 32px rgba(15, 23, 42, 0.08)" }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
                 transition={{ duration: 0.25, ease: PREMIUM_EASE }}
@@ -258,7 +258,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 type="button"
                 aria-label="View pricing"
                 onClick={() => navigate("/pricing")}
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold text-slate-700 shadow-sm transition-all hover:bg-slate-100"
+                className="inline-flex min-w-[12rem] items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-8 py-4 text-base font-semibold leading-6 text-slate-700 shadow-sm transition-all hover:bg-slate-100"
                 whileHover={shouldReduceMotion ? undefined : { y: -2, boxShadow: "0 16px 32px rgba(15, 23, 42, 0.08)" }}
                 whileTap={shouldReduceMotion ? undefined : { scale: 0.985 }}
                 transition={{ duration: 0.25, ease: PREMIUM_EASE }}
@@ -288,7 +288,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 className="rounded-xl border bg-white p-6 text-center shadow-sm"
               >
                 <AnimatedStatValue label={stat.label} fallback={stat.value} />
-                <div className="text-sm font-normal text-slate-600">{stat.label}</div>
+                <div className="text-sm font-normal leading-6 text-slate-600">{stat.label}</div>
               </motion.div>
             ))}
           </motion.div>
@@ -299,7 +299,7 @@ export function Home({ onRequireLogin }: HomeProps) {
         <Features />
       </section>
 
-      <section className="bg-gradient-to-b from-gray-50 to-white pt-10 pb-5 md:pt-14 md:pb-8">
+      <section className="bg-gradient-to-b from-gray-50 to-white pt-10 pb-8 md:pt-14 md:pb-10">
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <section id="tax-updates">
             <motion.div
@@ -307,7 +307,7 @@ export function Home({ onRequireLogin }: HomeProps) {
               whileInView="visible"
               viewport={{ once: true, amount: 0.35 }}
               variants={fadeUp}
-              className="mb-4 text-center"
+              className="mb-6 text-center"
             >
               <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">
                 Regulatory Intelligence
@@ -344,7 +344,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                       {item.type}
                     </span>
                   </div>
-                  <p className="nri-tax-update-card__title text-lg font-semibold text-slate-900">
+                  <p className="nri-tax-update-card__title text-lg font-semibold leading-7 text-slate-900">
                     {renderTextWithShortForms(item.title)}
                   </p>
                   <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
@@ -364,7 +364,7 @@ export function Home({ onRequireLogin }: HomeProps) {
             </motion.div>
           </section>
 
-          <div className="mt-10">
+          <div className="mt-12">
             <motion.p
               initial="hidden"
               whileInView="visible"
@@ -388,7 +388,7 @@ export function Home({ onRequireLogin }: HomeProps) {
               whileInView="visible"
               viewport={{ once: true, amount: 0.2 }}
               variants={staggerContainer(0.08, 0.08)}
-              className="grid grid-cols-2 gap-4 lg:grid-cols-4"
+              className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
             >
               {scenarioCards.map((scenario) => {
                 const Icon = scenario.icon;
@@ -405,14 +405,14 @@ export function Home({ onRequireLogin }: HomeProps) {
                     }
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.99 }}
                     transition={{ duration: 0.25, ease: PREMIUM_EASE }}
-                    className={`${scenario.color} rounded-xl p-6 transition-all hover:-translate-y-1 hover:shadow-lg`}
+                    className={`${scenario.color} flex h-full flex-col items-start rounded-xl p-6 text-left transition-all hover:-translate-y-1 hover:shadow-lg`}
                     aria-label={scenario.title}
                   >
                     <motion.div whileHover={shouldReduceMotion ? undefined : { scale: 1.06 }} transition={{ duration: 0.2 }}>
                       <Icon className="mb-3 size-8" />
                     </motion.div>
-                    <h4 className="mb-1 text-lg font-semibold">{scenario.title}</h4>
-                    <p className="text-sm font-normal leading-7 opacity-80">{renderTextWithShortForms(scenario.subtitle)}</p>
+                    <h4 className="mb-2 text-lg font-semibold leading-6">{scenario.title}</h4>
+                    <p className="text-sm font-normal leading-6 opacity-80">{renderTextWithShortForms(scenario.subtitle)}</p>
                   </motion.button>
                 );
               })}

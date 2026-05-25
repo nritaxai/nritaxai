@@ -70,8 +70,8 @@ export function ClarificationPanel({
       onSubmit={handleSubmit}
       className="mt-4 rounded-2xl border border-[#BFDBFE] bg-[#EFF6FF] p-4 text-[#0F172A] shadow-sm"
     >
-      <p className="text-sm font-semibold">Required tax context</p>
-      <p className="mt-1 text-xs text-[#475569]">
+      <p className="text-sm font-semibold leading-6">Required tax context</p>
+      <p className="mt-1 text-xs leading-5 text-[#475569]">
         Yukti will continue once these details are filled.
       </p>
 
@@ -80,7 +80,7 @@ export function ClarificationPanel({
           {Object.entries(clarification.context).map(([field, value]) => (
             <span
               key={field}
-              className="rounded-full border border-[#BFDBFE] bg-white px-3 py-1 text-[11px] font-medium"
+              className="rounded-full border border-[#BFDBFE] bg-white px-3 py-1 text-[11px] font-medium leading-5"
             >
               {formatFieldLabel(field)}: {value}
             </span>
@@ -90,8 +90,8 @@ export function ClarificationPanel({
 
       <div className="mt-4 grid gap-4">
         {clarification.questions.map((question) => (
-          <label key={question.field} className="block">
-            <span className="mb-2 block text-sm font-medium">{question.question}</span>
+          <label key={question.field} className="block space-y-2">
+            <span className="block text-sm font-medium leading-6">{question.question}</span>
             {question.inputType === "select" ? (
               <Select
                 value={values[question.field] || ""}

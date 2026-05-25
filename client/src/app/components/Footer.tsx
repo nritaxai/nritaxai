@@ -78,7 +78,7 @@ const socialLinks = [
 ] as const;
 
 const footerLinkClass =
-  "text-sm font-normal text-slate-400 transition-colors duration-200 hover:text-white hover:underline";
+  "text-sm font-normal leading-6 text-slate-400 transition-colors duration-200 hover:text-white hover:underline";
 
 export function Footer() {
   const currentYear = new Date().getFullYear();
@@ -91,14 +91,14 @@ export function Footer() {
       variants={fadeUp}
       className="mt-auto border-t border-slate-800 bg-black"
     >
-      <div className="mx-auto max-w-7xl px-6 py-12">
+      <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
         <motion.div
           variants={staggerContainer(0.06, 0.06)}
-          className="hidden gap-10 border-b border-slate-800 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5"
+          className="hidden gap-8 border-b border-slate-800 pb-10 md:grid md:grid-cols-3 lg:grid-cols-5"
         >
           {footerColumns.map((column) => (
             <motion.div key={column.heading} variants={fadeUp}>
-              <h2 className="mb-4 text-sm font-medium text-white">{column.heading}</h2>
+              <h2 className="mb-4 text-sm font-medium leading-5 text-white">{column.heading}</h2>
               <ul className="space-y-3">
                 {column.links.map((link) => (
                   <li key={link.label}>

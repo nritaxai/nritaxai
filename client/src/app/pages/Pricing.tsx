@@ -178,15 +178,15 @@ export function Pricing({ onRequireLogin }: PricingProps) {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, amount: 0.3 }}
         transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-        className="mb-12 pt-8 text-center"
+        className="mb-12 pt-4 text-center md:pt-6"
       >
         <h1 className="mb-4 text-4xl font-bold text-[#0F172A] md:text-5xl">Simple, Transparent Pricing</h1>
-        <p className="mb-8 text-lg text-[#475569] md:text-xl">Choose the plan that fits your needs</p>
+        <p className="mb-8 text-lg leading-8 text-[#475569] md:text-xl">Choose the plan that fits your needs</p>
 
         <div className="inline-flex items-center rounded-lg border border-gray-300 bg-white p-1 shadow-sm">
           <button
             onClick={() => setBillingCycle("monthly")}
-            className={`rounded-md px-6 py-2 font-medium transition-all ${
+            className={`rounded-md px-5 py-2.5 text-sm font-medium leading-5 transition-all sm:px-6 ${
               billingCycle === "monthly" ? "bg-blue-600 text-white shadow-sm" : "text-[#475569] hover:text-[#0F172A]"
             }`}
           >
@@ -194,7 +194,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
           </button>
           <button
             onClick={() => setBillingCycle("yearly")}
-            className={`relative rounded-md px-6 py-2 font-medium transition-all ${
+            className={`relative rounded-md px-5 py-2.5 text-sm font-medium leading-5 transition-all sm:px-6 ${
               billingCycle === "yearly" ? "bg-blue-600 text-white shadow-sm" : "text-[#475569] hover:text-[#0F172A]"
             }`}
           >
@@ -204,8 +204,8 @@ export function Pricing({ onRequireLogin }: PricingProps) {
             </span>
           </button>
         </div>
-        <div className="mx-auto mt-4 max-w-xs text-left">
-          <p className="mb-2 text-sm text-[#0F172A]">Display Currency</p>
+        <div className="mx-auto mt-6 max-w-xs text-left">
+          <p className="mb-2 text-sm font-medium text-[#0F172A]">Display Currency</p>
           <Select value={currencyOverride} onValueChange={handleCurrencyOverrideChange}>
             <SelectTrigger className="border-gray-300 bg-white text-[#0F172A] data-[placeholder]:text-[#64748B] [&_svg]:text-[#64748B]">
               <SelectValue />
@@ -219,12 +219,12 @@ export function Pricing({ onRequireLogin }: PricingProps) {
             </SelectContent>
           </Select>
         </div>
-        <p className="mt-4 text-sm text-[#64748B]">{pricingCurrencyNote}</p>
+        <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-[#64748B]">{pricingCurrencyNote}</p>
       </motion.div>
 
       {isIosNativeApp && (
-        <div className="mx-auto mb-8 max-w-4xl rounded-lg border border-blue-200 bg-blue-50 p-4">
-          <p className="text-sm text-blue-900">
+        <div className="mx-auto mb-8 max-w-4xl rounded-lg border border-blue-200 bg-blue-50 p-4 md:p-5">
+          <p className="text-sm leading-6 text-blue-900">
             Purchases are not offered inside the iOS app in this build. If your account already has paid access, use
             sync below.
           </p>
@@ -262,7 +262,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 visible: { opacity: 1, y: 0, scale: 1 },
               }}
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className={`relative rounded-lg border p-8 transition-all ${
+              className={`relative rounded-lg border p-6 transition-all md:p-8 ${
                 isPopular
                   ? "scale-100 border-blue-600 bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-xl md:scale-105"
                   : plan.name === "enterprise"
@@ -290,22 +290,22 @@ export function Pricing({ onRequireLogin }: PricingProps) {
               )}
 
               <div className={isPopular ? "mb-6 mt-4" : "mb-6"}>
-                <h3 className={`mb-2 text-2xl font-bold ${isPopular ? "text-white" : "text-[#0F172A]"}`}>{plan.label}</h3>
-                <p className={`mb-3 text-sm ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>{renderTextWithShortForms(plan.description)}</p>
+                <h3 className={`mb-2 text-2xl font-bold leading-tight ${isPopular ? "text-white" : "text-[#0F172A]"}`}>{plan.label}</h3>
+                <p className={`mb-4 text-sm leading-6 ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>{renderTextWithShortForms(plan.description)}</p>
                 {monthlyDisplay !== null ? (
                   <>
-                    <div className="mb-2 flex items-baseline">
+                    <div className="mb-2 flex flex-wrap items-end gap-x-2 gap-y-1">
                       <span className={`text-5xl font-bold ${isPopular ? "text-white" : "text-[#0F172A]"}`}>
                         {getDisplayPriceLine(monthlyDisplay)}
                       </span>
-                      <span className={`ml-2 ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>/ month</span>
+                      <span className={`text-sm leading-6 ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>/ month</span>
                     </div>
                     {typeof plan.yearlyInr === "number" && (
-                      <p className={`text-sm ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>
+                      <p className={`text-sm leading-6 ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>
                         or {getDisplayPriceLine(plan.yearlyInr)} / year {yearlySavings > 0 ? `(save ${yearlySavings}%)` : ""}
                       </p>
                     )}
-                    <p className={`mt-2 text-xs ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>All prices are exclusive of GST.</p>
+                    <p className={`mt-2 text-xs leading-5 ${isPopular ? "text-blue-100" : "text-[#64748B]"}`}>All prices are exclusive of GST.</p>
                   </>
                 ) : (
                   <div className="mb-2 text-4xl font-bold text-[#0F172A]">Custom</div>
@@ -340,7 +340,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
               <button
                 onClick={() => handleSelect(plan.name)}
                 disabled={isButtonDisabled || (isIosNativeApp && plan.name !== "starter")}
-                className={`block w-full rounded-md py-3 text-center font-semibold transition-all ${
+                className={`block w-full rounded-md px-4 py-3 text-center text-sm font-semibold leading-6 transition-all ${
                   isPopular
                     ? "bg-white text-blue-700 hover:bg-gray-50"
                     : plan.name === "enterprise"
@@ -366,15 +366,15 @@ export function Pricing({ onRequireLogin }: PricingProps) {
       </motion.div>
 
       <div className="mx-auto mb-16 max-w-5xl px-4 md:px-6">
-        <div className="rounded-lg border border-gray-200 bg-white p-8 md:p-12">
-          <h2 className="mb-12 text-center text-2xl font-bold text-[#0F172A] md:text-3xl">Frequently Asked Questions</h2>
+        <div className="rounded-lg border border-gray-200 bg-white p-6 md:p-10">
+          <h2 className="mb-10 text-center text-2xl font-bold text-[#0F172A] md:text-3xl">Frequently Asked Questions</h2>
           <div className="grid gap-8 md:grid-cols-2">
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-semibold text-[#0F172A]">
                 <Zap className="h-5 w-5 text-blue-600" />
                 What happens after free messages are used?
               </h3>
-              <p className="text-[#64748B]">
+              <p className="leading-6 text-[#64748B]">
                 {isIosNativeApp
                   ? "Paid plan purchases are not available in this iOS build yet. Existing paid access can still be restored."
                   : "Upgrade to Professional for unlimited chat or wait for monthly reset."}
@@ -385,14 +385,14 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 <Shield className="h-5 w-5 text-blue-600" />
                 Can I cancel anytime?
               </h3>
-              <p className="text-[#64748B]">Yes, you can manage plan changes anytime from your account.</p>
+              <p className="leading-6 text-[#64748B]">Yes, you can manage plan changes anytime from your account.</p>
             </div>
             <div>
               <h3 className="mb-2 flex items-center gap-2 text-lg font-semibold text-[#0F172A]">
                 <Award className="h-5 w-5 text-blue-600" />
                 {renderTextWithShortForms("Are these prices in INR?")}
               </h3>
-              <p className="text-[#64748B]">
+              <p className="leading-6 text-[#64748B]">
                 {renderTextWithShortForms("Yes, plans are billed in INR. Payment providers may apply currency conversion for international cards.")}
               </p>
             </div>
@@ -401,16 +401,16 @@ export function Pricing({ onRequireLogin }: PricingProps) {
                 <Lock className="h-5 w-5 text-blue-600" />
                 Is payment secure?
               </h3>
-              <p className="text-[#64748B]">Yes, payments are processed via secure encrypted checkout.</p>
+              <p className="leading-6 text-[#64748B]">Yes, payments are processed via secure encrypted checkout.</p>
             </div>
           </div>
         </div>
       </div>
 
       <div className="mx-auto mb-16 max-w-4xl px-4 md:px-6">
-        <div className="rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-center text-white shadow-xl">
+        <div className="rounded-lg bg-gradient-to-br from-blue-600 to-blue-800 p-8 text-center text-white shadow-xl md:p-12">
           <h2 className="mb-4 text-2xl font-bold md:text-3xl">Need help choosing a plan?</h2>
-          <p className="mb-8 text-lg text-blue-100 md:text-xl">Our team can help you select the right option.</p>
+          <p className="mb-8 text-lg leading-8 text-blue-100 md:text-xl">Our team can help you select the right option.</p>
           <a
             href={buildSupportMailto("Pricing Inquiry")}
             className="inline-block rounded-md bg-white px-8 py-4 text-lg font-semibold text-blue-700 transition-all hover:bg-gray-50"
@@ -422,7 +422,7 @@ export function Pricing({ onRequireLogin }: PricingProps) {
 
       <div className="border-t border-gray-200 bg-white py-8">
         <div className="mx-auto max-w-4xl px-4 md:px-6">
-          <div className="mb-6 flex flex-wrap items-center justify-center gap-8">
+          <div className="mb-6 flex flex-wrap items-center justify-center gap-6">
             <div className="flex items-center gap-2 text-[#64748B]">
               <Shield className="h-5 w-5 text-blue-600" />
               <span className="font-medium">Secure Payment</span>

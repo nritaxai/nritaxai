@@ -344,7 +344,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-6 sm:items-center">
       <Card className="max-h-[92dvh] w-full max-w-lg overflow-y-auto border-slate-200 bg-white text-slate-900">
-        <CardHeader>
+        <CardHeader className="pb-4">
           <div className="flex items-center justify-between gap-3">
             <div>
               <CardTitle className="text-slate-900">Welcome to {COMPANY_LEGAL_NAME}</CardTitle>
@@ -358,7 +358,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
           </div>
         </CardHeader>
 
-        <CardContent>
+        <CardContent className="pb-6">
           <Tabs
             defaultValue={initialMode}
             value={activeTab}
@@ -379,8 +379,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="login">
-              <form onSubmit={handleLogin} className="space-y-4">
+            <TabsContent value="login" className="space-y-0">
+              <form onSubmit={handleLogin} className="space-y-5">
                 <div className="space-y-2">
                   <Label className="text-slate-800">Email</Label>
                   <Input
@@ -408,7 +408,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   <button
                     type="button"
                     onClick={() => setShowLoginPassword((prev) => !prev)}
-                    className="absolute right-3 top-9 text-slate-500"
+                    className="absolute right-3 top-[2.55rem] text-slate-500"
                     aria-label={showLoginPassword ? "Hide password" : "Show password"}
                   >
                     {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -455,7 +455,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                 ) : null}
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <label className="flex items-start gap-3 text-sm text-slate-700">
+                  <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
                     <input
                       type="checkbox"
                       checked={loginTermsAccepted}
@@ -562,8 +562,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
               </form>
             </TabsContent>
 
-            <TabsContent value="signup">
-              <form onSubmit={handleSignup} className="space-y-4">
+            <TabsContent value="signup" className="space-y-0">
+              <form onSubmit={handleSignup} className="space-y-5">
                 <div className="space-y-2">
                   <Label className="text-slate-800">Full Name</Label>
                   <Input
@@ -615,7 +615,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs text-[#475569]">
+                  <p className="text-xs leading-5 text-[#475569]">
                     This country is locked at signup for pricing, tax workflow, and compliance.
                   </p>
                 </div>
@@ -633,7 +633,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   <button
                     type="button"
                     onClick={() => setShowSignupPassword((prev) => !prev)}
-                    className="absolute right-3 top-9 text-slate-500"
+                    className="absolute right-3 top-[2.55rem] text-slate-500"
                     aria-label={showSignupPassword ? "Hide password" : "Show password"}
                   >
                     {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -653,7 +653,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((prev) => !prev)}
-                    className="absolute right-3 top-9 text-slate-500"
+                    className="absolute right-3 top-[2.55rem] text-slate-500"
                     aria-label={showConfirmPassword ? "Hide password" : "Show password"}
                   >
                     {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
@@ -662,10 +662,10 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
                 {signupError ? <p className="text-sm text-red-600">{signupError}</p> : null}
 
-                <p className="text-xs text-[#0F172A]">Use at least 6 characters for a secure password.</p>
+                <p className="text-xs leading-5 text-[#0F172A]">Use at least 6 characters for a secure password.</p>
 
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <label className="flex items-start gap-3 text-sm text-slate-700">
+                  <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
                     <input
                       type="checkbox"
                       checked={signupData.termsAccepted}
@@ -776,7 +776,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   ) : null}
                 </div>
 
-                <p className="text-center text-xs text-slate-600">
+                <p className="text-center text-xs leading-5 text-slate-600">
                   By signing up, you agree to our Terms of Service and Privacy Policy.
                 </p>
               </form>

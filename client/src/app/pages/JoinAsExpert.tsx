@@ -439,7 +439,7 @@ export function JoinAsExpertPage() {
           Back
         </button>
 
-        <div className={IS_IOS_NATIVE_APP ? "mb-5 w-full max-w-full" : "mb-8 max-w-3xl"}>
+        <div className={IS_IOS_NATIVE_APP ? "mb-5 w-full max-w-full" : "mb-10 max-w-3xl"}>
           <p className={IS_IOS_NATIVE_APP ? "text-xs font-semibold uppercase tracking-[0.14em] text-[#2563eb]" : "text-sm font-semibold uppercase tracking-[0.18em] text-[#2563eb]"}>Expert Onboarding</p>
           <h1 className={IS_IOS_NATIVE_APP ? "mt-2 text-2xl text-[#0F172A]" : "mt-2 text-3xl text-[#0F172A] sm:text-4xl"}>Join Our Expert Team</h1>
           <p className={IS_IOS_NATIVE_APP ? "mt-2 text-sm leading-6 text-[#0F172A]" : "mt-3 text-base leading-7 text-[#0F172A]"}>
@@ -670,7 +670,7 @@ export function JoinAsExpertPage() {
                     ref={setFieldRef("profile") as never}
                     className={`rounded-xl border border-dashed bg-white/70 p-4 transition hover:bg-[#F9FAFB] ${errors.profile ? "border-[#DC2626]" : "border-[#CBD5E1]"}`}
                   >
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                       <div>
                         <p className="text-sm font-medium text-[#0F172A]">Upload profile from desktop</p>
                         <p className="text-xs text-[#0F172A]/70">Accepted formats: PDF, DOC, DOCX up to 10 MB</p>
@@ -759,11 +759,11 @@ export function JoinAsExpertPage() {
                   <Button type="submit" className="h-11 px-6" disabled={loading}>
                     {loading ? "Submitting..." : "Submit Application"}
                   </Button>
-                  <p className="text-sm text-[#0F172A]">
+                  <p className="text-sm leading-6 text-[#0F172A]">
                     Your details will be reviewed by our team before onboarding.
                   </p>
                 </div>
-                <p className="mt-3 text-sm text-[#0F172A]/80">
+                <p className="mt-3 text-sm leading-6 text-[#0F172A]/80">
                   Your information is secure and used only for onboarding purposes.
                 </p>
                 </div>

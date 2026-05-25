@@ -612,10 +612,10 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         }`}
       >
         {!minimal ? (
-        <CardHeader className="flex-shrink-0 border-b border-[#E2E8F0]/80 bg-[linear-gradient(135deg,rgba(255,245,252,0.88),rgba(236,246,255,0.86))] backdrop-blur-md p-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <CardHeader className="flex-shrink-0 border-b border-[#E2E8F0]/80 bg-[linear-gradient(135deg,rgba(255,245,252,0.88),rgba(236,246,255,0.86))] p-4 backdrop-blur-md sm:p-5">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#2563eb]/12 rounded-lg border border-[#2563eb]/40 shadow-sm">
+              <div className="rounded-lg border border-[#2563eb]/40 bg-[#2563eb]/12 p-2 shadow-sm">
                 <Bot className="size-6 text-[#2563eb]" />
               </div>
               <div>
@@ -666,7 +666,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
             )}
           </div>
           {sessionMessage ? (
-            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm leading-6 text-red-700">
               {sessionMessage}
             </p>
           ) : null}
@@ -678,9 +678,9 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
           ) : null}
 
           {isAuthenticated && (
-          <div className="flex flex-col md:flex-row md:items-center gap-2 mt-4">
+          <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
             <Languages className="size-4 text-[#0F172A]" />
-            <span className="text-sm text-[#0F172A]">Language</span>
+            <span className="text-sm font-medium leading-5 text-[#0F172A]">Language</span>
             <Select value={language} onValueChange={setLanguage}>
               <SelectTrigger className="w-full md:w-44 bg-[#F7FAFC]/90 border-[#E2E8F0]">
                 <SelectValue />
@@ -697,7 +697,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
 
           {isAuthenticated && (
           <div className="mt-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-[#0F172A] mb-2">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[#0F172A]">
               Starter Questions
             </p>
             <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
@@ -707,7 +707,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-auto py-1.5 px-2.5 text-xs text-left whitespace-nowrap shrink-0"
+                  className="h-auto shrink-0 whitespace-nowrap px-3 py-2 text-left text-xs leading-5"
                   onClick={() => handleStarterQuestionSelect(item)}
                   disabled={starterLimitReached}
                 >
@@ -721,12 +721,12 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         ) : null}
 
         {!isAuthenticated ? (
-          <CardContent className="flex-1 py-10 px-6 text-center bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)]">
+          <CardContent className="flex-1 bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)] px-6 py-10 text-center">
             <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-[#2563eb]/12">
               <Bot className="size-7 text-[#2563eb]" />
             </div>
-            <h3 className="text-xl text-[#0F172A] mb-2">Login to continue chat</h3>
-            <p className="text-[#0F172A] mb-6">
+            <h3 className="mb-2 text-xl text-[#0F172A]">Login to continue chat</h3>
+            <p className="mb-6 leading-6 text-[#0F172A]">
               Sign in to use AI assistant and get personalized responses.
             </p>
             <Button onClick={onRequireLogin}>Login / Sign Up</Button>
@@ -735,7 +735,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         <>
         <CardContent
           ref={chatContentRef}
-          className={`flex-1 overflow-y-auto space-y-4 p-4 ${
+          className={`flex-1 space-y-4 overflow-y-auto p-4 sm:p-5 ${
             minimal
               ? "bg-white"
               : "bg-[linear-gradient(180deg,rgba(25,17,39,0.72)_0%,rgba(20,14,34,0.65)_48%,rgba(16,11,27,0.76)_100%)]"
@@ -752,10 +752,10 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                 </div>
               )}
               <div
-                className={`max-w-[94%] sm:max-w-[82%] break-words rounded-2xl px-4 py-3 text-sm leading-relaxed shadow-md transition-all duration-200 ${
+              className={`max-w-[94%] break-words rounded-2xl px-4 py-3 text-sm leading-6 shadow-md transition-all duration-200 sm:max-w-[82%] ${
                   message.role === "user"
-                    ? "bg-[#2563eb] text-[#0F172A] border border-[#2563eb]/40"
-                    : "bg-[#F7FAFC]/95 text-[#0F172A] border border-[#E2E8F0]/80 prose prose-sm max-w-none"
+                    ? "border border-[#2563eb]/40 bg-[#2563eb] text-white"
+                    : "border border-[#E2E8F0]/80 bg-[#F7FAFC]/95 text-[#0F172A] prose prose-sm"
                 }`}
               >
                 {message.role === "ai" ? (
@@ -769,9 +769,9 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
                         h5: ({ children }) => <h5 className="font-bold text-sm">{children}</h5>,
                         h6: ({ children }) => <h6 className="font-bold text-sm">{children}</h6>,
                         strong: ({ children }) => <strong className="font-bold">{children}</strong>,
-                        p: ({ children }) => <p className="mb-2">{children}</p>,
-                        ul: ({ children }) => <ul className="list-disc pl-5 mb-2">{children}</ul>,
-                        ol: ({ children }) => <ol className="list-decimal pl-5 mb-2">{children}</ol>,
+                        p: ({ children }) => <p className="mb-2 leading-6 last:mb-0">{children}</p>,
+                        ul: ({ children }) => <ul className="mb-2 list-disc pl-5 leading-6">{children}</ul>,
+                        ol: ({ children }) => <ol className="mb-2 list-decimal pl-5 leading-6">{children}</ol>,
                       }}
                     >
                       {ensureVisibleReply(message.content)}
@@ -791,7 +791,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
           ))}
 
           {isTyping && (
-            <div className="flex justify-start items-end gap-2">
+            <div className="flex items-end justify-start gap-2">
               <div className="size-8 shrink-0 rounded-full border border-[#2563eb]/40 bg-[#F7FAFC]/90 text-[#2563eb] flex items-center justify-center text-[10px] font-semibold">
                 AI
               </div>
@@ -816,14 +816,14 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         <CardFooter className="flex-shrink-0 border-t border-[#E2E8F0]/80 bg-[rgba(255,255,255,0.9)] p-3 sm:p-4">
           <form
             onSubmit={handleSubmit}
-            className="w-full flex items-end gap-2 sm:gap-3 rounded-xl border border-[#E2E8F0] bg-[#F7FAFC]/80 p-2.5 sm:p-3"
+            className="flex w-full items-end gap-2 rounded-xl border border-[#E2E8F0] bg-[#F7FAFC]/80 p-2.5 sm:gap-3 sm:p-3"
           >
             <Textarea
               placeholder="Ask about DTAA, NRI taxes, tax planning..."
               value={question}
               onChange={(e) => setQuestion(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="resize-none min-h-[52px] max-h-40 border-0 bg-transparent focus-visible:ring-0 text-[#0F172A] placeholder:text-[#0F172A]"
+              className="min-h-[52px] max-h-40 resize-none border-0 bg-transparent text-[#0F172A] placeholder:text-[#64748B] focus-visible:ring-0"
               rows={1}
               disabled={starterLimitReached}
             />
@@ -856,7 +856,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
             )}
           </form>
           {starterLimitReached ? (
-            <p className="mt-2 text-sm text-amber-900">
+            <p className="mt-2 text-sm leading-6 text-amber-900">
               {IOS_EXTERNAL_PURCHASES_DISABLED
                 ? "Free plan limit reached. Paid upgrades are not available inside this iOS build yet."
                 : "Free plan limit reached. Upgrade to Professional."}
@@ -870,7 +870,7 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         )}
       </Card>
       {!minimal && isAuthenticated && !hasActivePaidSubscription && (
-        <div className="mt-2 w-full rounded-lg border border-[#2563eb]/40 bg-[#2563eb]/12 p-3 text-xs text-[#0F172A]">
+        <div className="mt-2 w-full rounded-lg border border-[#2563eb]/40 bg-[#2563eb]/12 p-3 text-xs leading-5 text-[#0F172A]">
           {IOS_EXTERNAL_PURCHASES_DISABLED ? "Need expert support?" : "Need expert support?"}{" "}
           <button type="button" onClick={() => navigate("/pricing")} className="font-semibold underline underline-offset-2">
             {IOS_EXTERNAL_PURCHASES_DISABLED ? "View access options" : "View plans"}
@@ -878,10 +878,10 @@ export function AIChat({ onRequireLogin, minimal = false }: AIChatProps) {
         </div>
       )}
       {!minimal ? (
-      <div className="mt-2 w-full bg-[#F7FAFC] border border-[#E2E8F0] rounded-lg p-3 text-xs text-[#0F172A] leading-relaxed">
-          <div className="flex items-center gap-2 mb-3">
+      <div className="mt-2 w-full rounded-lg border border-[#E2E8F0] bg-[#F7FAFC] p-3 text-xs leading-6 text-[#0F172A]">
+          <div className="mb-3 flex items-center gap-2">
             <Shield className="size-4 text-[#0F172A]" />
-            <p className="font-semibold text-[#E2E8F0]">Privacy and Data Protection Notice</p>
+            <p className="font-semibold text-[#0F172A]">Privacy and Data Protection Notice</p>
           </div>
           <p>
             This chatbot values your privacy and is designed to protect your personal information.
