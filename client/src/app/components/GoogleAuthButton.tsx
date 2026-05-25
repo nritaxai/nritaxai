@@ -20,13 +20,13 @@ export function GoogleAuthButton({
       {disabled ? (
         <button
           type="button"
-          className="absolute inset-0 z-10 cursor-pointer rounded-2xl"
+          className="absolute inset-0 z-10 cursor-pointer rounded-xl"
           aria-label="Complete required fields before Google authentication"
           onClick={onBlockedClick}
         />
       ) : null}
 
-      <div className="w-full max-w-[380px] overflow-hidden rounded-2xl border border-slate-200 bg-white p-1 shadow-[0_10px_28px_rgba(148,163,184,0.14)] [&>div]:!w-full [&>div>div]:!w-full">
+      <div className="w-full overflow-hidden rounded-xl border border-slate-300 bg-white p-1 shadow-none [&>div]:!w-full [&>div>div]:!w-full">
         <GoogleLogin
           text={text}
           theme="outline"

@@ -405,7 +405,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       <Button
         type="button"
         variant="outline"
-        className="h-13 w-full rounded-2xl border-slate-200 bg-white text-slate-900 shadow-[0_10px_28px_rgba(148,163,184,0.14)] hover:bg-slate-50"
+        className="h-11 w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-none hover:bg-slate-50"
         disabled={loading}
         onClick={() => void handleAppleLogin("login")}
       >
@@ -415,7 +415,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         <Button
           type="button"
           variant="outline"
-          className="h-13 w-full rounded-2xl border-[#bfd7f4] bg-white text-[#0A66C2] shadow-[0_10px_28px_rgba(10,102,194,0.08)] hover:bg-[#f3f8fe]"
+          className="h-11 w-full rounded-xl border-slate-300 bg-white text-[#0A66C2] shadow-none hover:bg-slate-50"
           disabled={loading}
           onClick={() => handleLinkedInAuth("login")}
         >
@@ -441,7 +441,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       <Button
         type="button"
         variant="outline"
-        className="h-13 w-full rounded-2xl border-slate-200 bg-white text-slate-900 shadow-[0_10px_28px_rgba(148,163,184,0.14)] hover:bg-slate-50"
+        className="h-11 w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-none hover:bg-slate-50"
         disabled={!signupCanContinue}
         onClick={() => void handleAppleLogin("signup")}
       >
@@ -451,7 +451,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         <Button
           type="button"
           variant="outline"
-          className="h-13 w-full rounded-2xl border-[#bfd7f4] bg-white text-[#0A66C2] shadow-[0_10px_28px_rgba(10,102,194,0.08)] hover:bg-[#f3f8fe]"
+          className="h-11 w-full rounded-xl border-slate-300 bg-white text-[#0A66C2] shadow-none hover:bg-slate-50"
           onClick={() => handleLinkedInAuth("signup")}
           disabled={!signupCanContinue}
         >
@@ -492,7 +492,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_28%),linear-gradient(180deg,rgba(15,23,42,0.50),rgba(15,23,42,0.72))] p-3 backdrop-blur-sm sm:p-4 sm:py-6">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] p-3 sm:p-4 sm:py-8">
       <TermsModal
         isOpen={signupTermsModalOpen}
         type={signupTermsModalType}
@@ -503,7 +503,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         <AuthLayout>
           <AuthCard
             title={`Welcome to ${COMPANY_LEGAL_NAME}`}
-            description="Sign in to continue where you left off, or create a new account with the same secure NRITAX.AI workflow."
+            description="Sign in to continue, or create an account to access country-aware tax guidance and subscription tools."
             onClose={onClose}
             disableClose={disableClose}
           >

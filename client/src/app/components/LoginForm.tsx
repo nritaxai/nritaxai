@@ -38,7 +38,7 @@ function Field({ label, icon: Icon, endAdornment, className, ...props }: FieldPr
       <div className="relative">
         <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
         <Input
-          className={`h-14 rounded-2xl border-slate-200 bg-white pl-11 pr-12 text-slate-900 placeholder:text-slate-400 shadow-[0_8px_25px_rgba(148,163,184,0.10)] focus-visible:border-[#2563eb] focus-visible:ring-[#2563eb]/15 ${className || ""}`}
+          className={`h-13 rounded-xl border-slate-300 bg-white pl-11 pr-12 text-slate-900 placeholder:text-slate-400 shadow-none focus-visible:border-[#1d4ed8] focus-visible:ring-[#1d4ed8]/10 ${className || ""}`}
           {...props}
         />
         {endAdornment ? (
@@ -70,7 +70,7 @@ export function LoginForm({
   return (
     <form onSubmit={onSubmit} className="space-y-5">
       <Field
-        label="Email"
+        label="Email Address"
         icon={Mail}
         type="email"
         required
@@ -109,7 +109,7 @@ export function LoginForm({
         </p>
         <button
           type="button"
-          className="text-sm font-medium text-[#2563eb] transition-colors hover:text-[#1d4ed8]"
+          className="text-sm font-medium text-[#1d4ed8] transition-colors hover:text-[#1e40af]"
           onClick={onToggleForgotPassword}
         >
           Forgot password?
@@ -124,7 +124,7 @@ export function LoginForm({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="rounded-[24px] border border-sky-100 bg-sky-50/70 p-4">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="space-y-2">
                 <Label htmlFor="forgot-password-email" className="text-sm font-medium text-slate-800">
                   Reset Email
@@ -135,13 +135,13 @@ export function LoginForm({
                   value={forgotPasswordEmail}
                   onChange={(event) => onForgotPasswordEmailChange(event.target.value)}
                   placeholder="your.email@example.com"
-                  className="h-13 rounded-2xl border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2563eb] focus-visible:ring-[#2563eb]/15"
+                  className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#1d4ed8] focus-visible:ring-[#1d4ed8]/10"
                 />
               </div>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-4 h-12 w-full rounded-2xl border-slate-200 bg-white text-slate-900 hover:bg-slate-50"
+                className="mt-4 h-11 w-full rounded-xl border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                 disabled={loading}
                 onClick={onForgotPassword}
               >
@@ -158,7 +158,7 @@ export function LoginForm({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="flex items-start gap-3 rounded-2xl border border-red-100 bg-red-50/80 px-4 py-3 text-sm text-red-700"
+            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
           >
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <p className="leading-6">{error}</p>
@@ -168,7 +168,7 @@ export function LoginForm({
 
       <Button
         type="submit"
-        className="h-14 w-full rounded-2xl bg-[linear-gradient(135deg,#2563eb,#1d4ed8)] text-base font-semibold text-white shadow-[0_18px_40px_rgba(37,99,235,0.28)] hover:opacity-95"
+        className="h-12 w-full rounded-xl bg-[#0f172a] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)] hover:bg-[#111827]"
         disabled={loading}
       >
         {loading ? "Processing..." : "Sign In"}
@@ -179,7 +179,7 @@ export function LoginForm({
           <span className="w-full border-t border-slate-200" />
         </div>
         <div className="relative flex justify-center">
-          <span className="rounded-full bg-white px-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+          <span className="bg-white px-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
             Or continue with
           </span>
         </div>
