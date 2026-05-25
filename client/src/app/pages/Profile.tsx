@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { User, Mail, Image as ImageIcon, Save, Pencil, Crown, CalendarDays, Sparkles, LockKeyhole, LogOut, Trash2, Eye, EyeOff } from "lucide-react";
+import { User, Mail, Image as ImageIcon, Save, Pencil, Crown, CalendarDays, Sparkles, LogOut, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
@@ -20,16 +20,7 @@ import {
   AlertDialogTrigger,
 } from "../components/ui/alert-dialog";
 import { IOS_EXTERNAL_PURCHASES_DISABLED } from "../../config/appConfig";
-import {
-  changePassword,
-  acceptTerms,
-  clearStoredAuth,
-  deleteAccount,
-  getMySubscription,
-  getUserProfile,
-  requestCountryChange,
-  updateUserProfile,
-} from "../../utils/api";
+import { acceptTerms, clearStoredAuth, deleteAccount, getMySubscription, getUserProfile, requestCountryChange, updateUserProfile } from "../../utils/api";
 import { CURRENT_POLICY_VERSION } from "../../config/legal";
 import { COUNTRY_OPTIONS, detectUserCountry } from "../utils/countries";
 import { getPlanLabel, type SubscriptionMe } from "../../utils/subscription";
@@ -188,29 +179,17 @@ export function Profile() {
   const [requestingCountryChange, setRequestingCountryChange] = useState(false);
   const [acceptingLegal, setAcceptingLegal] = useState(false);
   const [retryingProfile, setRetryingProfile] = useState(false);
-  const [changingPassword, setChangingPassword] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
-  const [passwordError, setPasswordError] = useState("");
-  const [passwordSuccess, setPasswordSuccess] = useState("");
   const [profileLoadFailed, setProfileLoadFailed] = useState(false);
   const [isProfileImagePreviewOpen, setIsProfileImagePreviewOpen] = useState(false);
-  const [passwordForm, setPasswordForm] = useState({
-    oldPassword: "",
-    newPassword: "",
-    confirmNewPassword: "",
-  });
-  const [showOldPassword, setShowOldPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
   const [requestedCountryCode, setRequestedCountryCode] = useState("");
   const [countryChangeReason, setCountryChangeReason] = useState("");
   const [isDeleteAccountDialogOpen, setIsDeleteAccountDialogOpen] = useState(false);
   const [deleteAccountStep, setDeleteAccountStep] = useState<"phrase" | "confirm">("phrase");
   const [deleteAccountConfirmationInput, setDeleteAccountConfirmationInput] = useState("");
   const [deleteAccountDialogError, setDeleteAccountDialogError] = useState("");
-  const requiresCurrentPassword = profile?.provider !== "google";
 
   const isDirty = useMemo(() => {
     if (!profile) return false;
@@ -516,57 +495,6 @@ export function Profile() {
     setIsEditingProfile(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
-    }
-  };
-
-  const handleChangePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setSuccessMessage("");
-    setPasswordError("");
-    setPasswordSuccess("");
-
-    if (!passwordForm.newPassword || !passwordForm.confirmNewPassword || (requiresCurrentPassword && !passwordForm.oldPassword)) {
-      setPasswordError(
-        requiresCurrentPassword
-          ? "Please fill current, new, and confirm password fields."
-          : "Please fill new and confirm password fields."
-      );
-      return;
-    }
-
-    if (passwordForm.newPassword.length < 6) {
-      setPasswordError("New password must be at least 6 characters.");
-      return;
-    }
-
-    if (requiresCurrentPassword && passwordForm.oldPassword === passwordForm.newPassword) {
-      setPasswordError("Current password and new password cannot be the same.");
-      return;
-    }
-
-    if (passwordForm.newPassword !== passwordForm.confirmNewPassword) {
-      setPasswordError("New password and confirm new password do not match.");
-      return;
-    }
-
-    setChangingPassword(true);
-    try {
-      await changePassword({
-        oldPassword: passwordForm.oldPassword || undefined,
-        newPassword: passwordForm.newPassword,
-        confirmNewPassword: passwordForm.confirmNewPassword,
-      });
-      setPasswordSuccess("Password updated successfully.");
-      setPasswordForm({
-        oldPassword: "",
-        newPassword: "",
-        confirmNewPassword: "",
-      });
-    } catch (err: any) {
-      setPasswordError(err?.response?.data?.message || "Failed to change password.");
-    } finally {
-      setChangingPassword(false);
     }
   };
 
@@ -1097,123 +1025,8 @@ export function Profile() {
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 rounded-2xl border border-[#E2E8F0] shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-[#0F172A]">Change Password</CardTitle>
-              <CardDescription>Update your account password securely</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleChangePassword} className="space-y-4">
-                {requiresCurrentPassword && (
-                  <div className="space-y-2">
-                    <Label htmlFor="oldPassword">Current Password</Label>
-                    <div className="relative">
-                      <LockKeyhole className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
-                    <Input
-                      id="oldPassword"
-                      type={showOldPassword ? "text" : "password"}
-                      value={passwordForm.oldPassword}
-                      onChange={(e) => {
-                        setPasswordError("");
-                        setPasswordSuccess("");
-                        setPasswordForm((prev) => ({ ...prev, oldPassword: e.target.value }));
-                      }}
-                      className="pl-9 pr-10"
-                      autoComplete="current-password"
-                    />
-                      <button
-                        type="button"
-                        onClick={() => setShowOldPassword((prev) => !prev)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0F172A]"
-                        aria-label={showOldPassword ? "Hide current password" : "Show current password"}
-                      >
-                        {showOldPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
-                    </div>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <div className="relative">
-                    <LockKeyhole className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
-                    <Input
-                      id="newPassword"
-                      type={showNewPassword ? "text" : "password"}
-                      value={passwordForm.newPassword}
-                      onChange={(e) => {
-                        setPasswordError("");
-                        setPasswordSuccess("");
-                        setPasswordForm((prev) => ({ ...prev, newPassword: e.target.value }));
-                      }}
-                      className="pl-9 pr-10"
-                      minLength={6}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowNewPassword((prev) => !prev)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0F172A]"
-                      aria-label={showNewPassword ? "Hide new password" : "Show new password"}
-                    >
-                      {showNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
-                  <div className="relative">
-                    <LockKeyhole className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-[#0F172A]" />
-                    <Input
-                      id="confirmNewPassword"
-                      type={showConfirmNewPassword ? "text" : "password"}
-                      value={passwordForm.confirmNewPassword}
-                      onChange={(e) => {
-                        setPasswordError("");
-                        setPasswordSuccess("");
-                        setPasswordForm((prev) => ({ ...prev, confirmNewPassword: e.target.value }));
-                      }}
-                      className="pl-9 pr-10"
-                      minLength={6}
-                      autoComplete="new-password"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowConfirmNewPassword((prev) => !prev)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#0F172A]"
-                      aria-label={showConfirmNewPassword ? "Hide confirm password" : "Show confirm password"}
-                    >
-                      {showConfirmNewPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </div>
-                {passwordError && (
-                  <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{passwordError}</p>
-                )}
-                {passwordSuccess && (
-                  <p className="rounded-md border border-[#2563eb]/40 bg-[#2563eb]/12 px-3 py-2 text-sm text-[#2563eb]">{passwordSuccess}</p>
-                )}
-                <p className="text-xs text-[#0F172A]">
-                  Use at least 6 characters. Confirm password must match exactly.
-                </p>
-                <div className="flex justify-end">
-                  <Button
-                    type="submit"
-                    disabled={
-                      changingPassword ||
-                      !passwordForm.newPassword ||
-                      !passwordForm.confirmNewPassword ||
-                      (requiresCurrentPassword && !passwordForm.oldPassword)
-                    }
-                  >
-                    {changingPassword ? "Updating..." : "Update Password"}
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-2xl border border-red-200 shadow-sm">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="rounded-2xl border border-red-200 shadow-sm lg:col-start-3">
             <CardHeader>
               <CardTitle className="text-[#0F172A]">Account Actions</CardTitle>
               <CardDescription>Session and account-level controls</CardDescription>
