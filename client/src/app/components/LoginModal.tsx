@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import {
   Card,
@@ -76,6 +76,13 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const termsErrorMessage = "You must agree to the Terms & Conditions to continue.";
   const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
   const loginCanContinue = loginTermsAccepted;
+  const loginTermsAcceptedRef = useRef(loginTermsAccepted);
+  const signupDataRef = useRef(signupData);
+  const selectedSignupCountryRef = useRef(selectedSignupCountry);
+
+  loginTermsAcceptedRef.current = loginTermsAccepted;
+  signupDataRef.current = signupData;
+  selectedSignupCountryRef.current = selectedSignupCountry;
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
@@ -347,19 +354,23 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         throw new Error("Missing Google credential.");
       }
 
+      const latestLoginTermsAccepted = loginTermsAcceptedRef.current;
+      const latestSignupData = signupDataRef.current;
+      const latestSelectedSignupCountry = selectedSignupCountryRef.current;
+
       const payload =
         mode === "signup"
           ? {
               credential: credentialResponse.credential,
               termsAccepted: true,
               policyVersion: CURRENT_POLICY_VERSION,
-              country: selectedSignupCountry?.name,
-              countryCode: signupData.countryCode,
+              country: latestSelectedSignupCountry?.name,
+              countryCode: latestSignupData.countryCode,
             }
           : {
               credential: credentialResponse.credential,
-              termsAccepted: loginTermsAccepted,
-              policyVersion: loginTermsAccepted ? CURRENT_POLICY_VERSION : undefined,
+              termsAccepted: latestLoginTermsAccepted,
+              policyVersion: latestLoginTermsAccepted ? CURRENT_POLICY_VERSION : undefined,
             };
 
       const response = await googleLoginUser(payload);
