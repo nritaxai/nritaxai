@@ -1,31 +1,36 @@
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
-import { Capacitor } from "@capacitor/core";
-import { Button } from "./ui/button";
-import { Tabs, TabsContent } from "./ui/tabs";
+import { GoogleLogin } from "@react-oauth/google";
 import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "./ui/card";
+import { Button } from "./ui/button";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
+import { X, Eye, EyeOff, Loader2 } from "lucide-react";
+import {
+  appleLoginUser,
   forgotPassword,
   googleLoginUser,
   loginUser,
   signupUser,
 } from "../../utils/api";
 import {
+  APPLE_AUTH_CONFIG,
   GOOGLE_AUTH_CONFIG,
   IS_IOS_NATIVE_APP,
   LINKEDIN_AUTH_CONFIG,
 } from "../../config/appConfig";
+import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
 import { TermsModal } from "./TermsModal";
 import { CURRENT_POLICY_VERSION } from "../../config/legal";
 import { COMPANY_LEGAL_NAME } from "../../config/branding";
 import { COUNTRY_OPTIONS } from "../utils/countries";
-import { AuthLayout } from "./AuthLayout";
-import { AuthCard } from "./AuthCard";
-import { AuthToggle } from "./AuthToggle";
-import { CountrySelect } from "./CountrySelect";
-import { GoogleAuthButton } from "./GoogleAuthButton";
-import { LoginForm } from "./LoginForm";
-import { SignupForm } from "./SignupForm";
 
 interface LoginModalProps {
   onClose: () => void;
@@ -40,7 +45,6 @@ const getApiErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.message || fallback;
 
 export function LoginModal({ onClose, disableClose = false, initialMode = "login" }: LoginModalProps) {
-  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
     name: "",
@@ -299,6 +303,64 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     }
   };
 
+  const handleAppleLogin = async (mode: "login" | "signup") => {
+    if (mode === "signup" && !signupCanContinue) {
+      setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
+      return;
+    }
+    setLoginError(null);
+    setSignupError(null);
+    setLoading(true);
+
+    try {
+      const appleResponse = await startAppleAuth();
+      const response = await appleLoginUser({
+        authorizationCode: appleResponse?.authorization?.code,
+        identityToken: appleResponse?.authorization?.id_token,
+        user: appleResponse?.user,
+        fullName: appleResponse?.user?.name,
+        termsAccepted: mode === "signup" ? true : undefined,
+        policyVersion: mode === "signup" ? CURRENT_POLICY_VERSION : undefined,
+        country: mode === "signup" ? selectedSignupCountry?.name : undefined,
+        countryCode: mode === "signup" ? signupData.countryCode : undefined,
+      });
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(
+        response,
+        mode === "signup"
+          ? `Account created successfully! WELCOME ${user?.name || "User"}`
+          : `WELCOME ${user?.name || "User"}!`
+      );
+    } catch (error: any) {
+      const message = getApiErrorMessage(
+        error,
+        "Apple Sign in could not be completed. Please try again."
+      );
+      console.error("[auth] apple sign-in failed", {
+        mode,
+        platform: IS_IOS_NATIVE_APP ? "ios-native" : "web",
+        configured: APPLE_AUTH_CONFIG.isConfigured,
+        message,
+      });
+      if (mode === "signup") {
+        setSignupError(message);
+      } else {
+        setLoginError(message);
+      }
+      showPopup(message, "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const googleButtonProps = {
+    theme: "outline" as const,
+    shape: "rectangular" as const,
+    size: "large" as const,
+    width: "380",
+    logo_alignment: "left" as const,
+  };
+
   const handleGoogleAuthSuccess = async (
     mode: "login" | "signup",
     credentialResponse: { credential?: string }
@@ -349,195 +411,419 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     }
   };
 
-  const loginSocialButtons = (
-    <>
-      {canUseLinkedInAuth ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 w-full rounded-full border-white/16 bg-white/10 text-white shadow-none hover:bg-white/14"
-          disabled={loading}
-          onClick={() => handleLinkedInAuth("login")}
-        >
-          Sign in with LinkedIn
-        </Button>
-      ) : null}
-      {canUseGoogleAuth ? (
-        <GoogleAuthButton
-          text="signin_with"
-          onSuccess={(credentialResponse) => void handleGoogleAuthSuccess("login", credentialResponse)}
-          onError={() => {
-            const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
-            setLoginError(message);
-            showPopup(message, "error", 4000);
-          }}
-        />
-      ) : null}
-    </>
-  );
-
-  const signupSocialButtons = (
-    <>
-      {canUseLinkedInAuth ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="h-12 w-full rounded-full border-white/16 bg-white/10 text-white shadow-none hover:bg-white/14"
-          onClick={() => handleLinkedInAuth("signup")}
-          disabled={!signupCanContinue}
-        >
-          Sign up with LinkedIn
-        </Button>
-      ) : null}
-      {canUseGoogleAuth ? (
-        <GoogleAuthButton
-          text="signup_with"
-          disabled={!signupCanContinue}
-          onBlockedClick={() => {
-            if (!signupData.countryCode) {
-              setSignupError("Country is required");
-              return;
-            }
-            openSignupTermsModal("terms");
-          }}
-          onSuccess={(credentialResponse) => {
-            if (!signupData.countryCode) {
-              setSignupError("Country is required");
-              return;
-            }
-            if (!signupTermsAcceptedRef.current) {
-              setSignupError(termsErrorMessage);
-              openSignupTermsModal("terms");
-              return;
-            }
-            void handleGoogleAuthSuccess("signup", credentialResponse);
-          }}
-          onError={() => {
-            const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
-            setSignupError(message);
-            showPopup(message, "error", 4000);
-          }}
-        />
-      ) : null}
-    </>
-  );
+  const fieldClassName =
+    "border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#2563eb] focus-visible:ring-[#2563eb]/20";
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(49,86,245,0.20),transparent_22%),radial-gradient(circle_at_80%_18%,rgba(255,255,255,0.10),transparent_16%),linear-gradient(180deg,#081a33_0%,#0b2d58_56%,#0a1f3d_100%)] p-3 sm:p-4 sm:py-8">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-6 sm:items-center">
       <TermsModal
         isOpen={signupTermsModalOpen}
         type={signupTermsModalType}
         onAccept={handleSignupTermsAccepted}
         onClose={() => setSignupTermsModalOpen(false)}
       />
-      <div className={`flex min-h-[100dvh] justify-center ${isAndroidNative ? "items-start pt-16" : "items-center"}`}>
-        <AuthLayout showIntro={!isAndroidNative}>
-          <AuthCard
-            title={activeTab === "login" ? "Welcome back" : `Join ${COMPANY_LEGAL_NAME}`}
-            description={
-              activeTab === "login"
-                ? "Log in with your email and password to continue."
-                : "Create your account to access country-aware tax guidance and subscription tools."
-            }
-            onClose={onClose}
-            disableClose={disableClose}
-          >
-            <Tabs
-              defaultValue={initialMode}
-              value={activeTab}
-              onValueChange={(value) => {
-                setActiveTab(value as "login" | "signup");
-                setForgotPasswordMode(false);
-                setLoginError(null);
-                setSignupError(null);
-              }}
-              className="w-full"
-            >
-              <AuthToggle />
+      <Card className="max-h-[92dvh] w-full max-w-lg overflow-y-auto border-slate-200 bg-white text-slate-900">
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-slate-900">Welcome to {COMPANY_LEGAL_NAME}</CardTitle>
+              <CardDescription className="text-slate-600">Login or create an account to continue</CardDescription>
+            </div>
+            {!disableClose ? (
+              <Button variant="ghost" size="icon" onClick={onClose} className="text-slate-700 hover:bg-slate-100 hover:text-slate-900">
+                <X className="size-5" />
+              </Button>
+            ) : null}
+          </div>
+        </CardHeader>
 
-              <AnimatePresence mode="wait" initial={false}>
-                {activeTab === "login" ? (
-                  <TabsContent key="login" value="login" forceMount className="mt-6 space-y-0 data-[state=inactive]:hidden">
-                    <motion.div
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 12 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
-                    >
-                      <LoginForm
-                        loginData={loginData}
-                        showPassword={showLoginPassword}
-                        loading={loading}
-                        error={loginError}
-                        forgotPasswordMode={forgotPasswordMode}
-                        forgotPasswordEmail={forgotPasswordEmail}
-                        onSubmit={handleLogin}
-                        onEmailChange={(value) => setLoginData({ ...loginData, email: value })}
-                        onPasswordChange={(value) => setLoginData({ ...loginData, password: value })}
-                        onTogglePassword={() => setShowLoginPassword((prev) => !prev)}
-                        onToggleForgotPassword={() => {
-                          setForgotPasswordMode((prev) => !prev);
-                          setLoginError(null);
-                          setForgotPasswordEmail(loginData.email);
-                        }}
-                        onForgotPasswordEmailChange={setForgotPasswordEmail}
-                        onForgotPassword={() => void handleForgotPassword()}
-                        socialButtons={loginSocialButtons}
+        <CardContent className="pb-6">
+          <Tabs
+            defaultValue={initialMode}
+            value={activeTab}
+            onValueChange={(value) => {
+              setActiveTab(value as "login" | "signup");
+              setForgotPasswordMode(false);
+              setLoginError(null);
+              setSignupError(null);
+            }}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 bg-slate-100 text-slate-600">
+              <TabsTrigger value="login" className="data-[state=active]:bg-[#1d2b53] data-[state=active]:text-white text-slate-700">
+                Login
+              </TabsTrigger>
+              <TabsTrigger value="signup" className="data-[state=active]:bg-[#1d2b53] data-[state=active]:text-white text-slate-700">
+                Sign Up
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="login" className="space-y-0">
+              <form onSubmit={handleLogin} className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-slate-800">Email</Label>
+                  <Input
+                    className={fieldClassName}
+                    type="email"
+                    required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    placeholder="your.email@example.com"
+                    value={loginData.email}
+                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="relative space-y-2">
+                  <Label className="text-slate-800">Password</Label>
+                  <Input
+                    className={fieldClassName}
+                    type={showLoginPassword ? "text" : "password"}
+                    required
+                    placeholder="........"
+                    value={loginData.password}
+                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword((prev) => !prev)}
+                    className="absolute right-3 top-[2.55rem] text-slate-500"
+                    aria-label={showLoginPassword ? "Hide password" : "Show password"}
+                  >
+                    {showLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    className="text-sm text-[#2563eb] hover:underline"
+                    onClick={() => {
+                      setForgotPasswordMode((prev) => !prev);
+                      setLoginError(null);
+                      setForgotPasswordEmail(loginData.email);
+                    }}
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                {forgotPasswordMode ? (
+                  <div className="space-y-3 rounded-lg border border-[#E2E8F0] bg-[#F7FAFC] p-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="forgot-password-email" className="text-slate-800">Reset Email</Label>
+                      <Input
+                        className={fieldClassName}
+                        id="forgot-password-email"
+                        type="email"
+                        placeholder="your.email@example.com"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
                       />
-                    </motion.div>
-                  </TabsContent>
-                ) : (
-                  <TabsContent key="signup" value="signup" forceMount className="mt-6 space-y-0 data-[state=inactive]:hidden">
-                    <motion.div
-                      initial={{ opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -12 }}
-                      transition={{ duration: 0.2, ease: "easeOut" }}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      disabled={loading}
+                      onClick={() => void handleForgotPassword()}
                     >
-                      <SignupForm
-                        signupData={{
-                          name: signupData.name,
-                          email: signupData.email,
-                          linkedinProfile: signupData.linkedinProfile,
-                          password: signupData.password,
-                          confirmPassword: signupData.confirmPassword,
-                          termsAccepted: signupData.termsAccepted,
-                        }}
-                        loading={loading}
-                        error={signupError}
-                        canContinue={signupCanContinue}
-                        showPassword={showSignupPassword}
-                        showConfirmPassword={showConfirmPassword}
-                        onSubmit={handleSignup}
-                        onFieldChange={(field, value) => setSignupData({ ...signupData, [field]: value })}
-                        onTogglePassword={() => setShowSignupPassword((prev) => !prev)}
-                        onToggleConfirmPassword={() => setShowConfirmPassword((prev) => !prev)}
-                        onTermsChange={(checked) => {
-                          if (checked && !signupData.termsAccepted) {
-                            openSignupTermsModal("terms");
-                            return;
-                          }
-                          signupTermsAcceptedRef.current = false;
-                          clearSignupTermsSession();
-                          setSignupData({ ...signupData, termsAccepted: false });
-                        }}
-                        onOpenTerms={openSignupTermsModal}
-                        countryField={
-                          <CountrySelect
-                            value={signupData.countryCode}
-                            onChange={(value) => setSignupData({ ...signupData, countryCode: value })}
-                          />
+                      {loading ? "Sending reset link..." : "Send Reset Link"}
+                    </Button>
+                  </div>
+                ) : null}
+
+                {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
+
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    "Login"
+                  )}
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-slate-500">Or continue with</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
+                    disabled={loading}
+                    onClick={() => void handleAppleLogin("login")}
+                  >
+                    Sign in with Apple
+                  </Button>
+                  {canUseLinkedInAuth ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
+                      disabled={loading}
+                      onClick={() => handleLinkedInAuth("login")}
+                    >
+                      Sign in with LinkedIn
+                    </Button>
+                  ) : null}
+                  {canUseGoogleAuth ? (
+                    <div className="flex w-full justify-center overflow-hidden rounded-md">
+                      <div className="w-full max-w-[380px] overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
+                        <GoogleLogin
+                          text="signin_with"
+                          {...googleButtonProps}
+                          onSuccess={(credentialResponse) => void handleGoogleAuthSuccess("login", credentialResponse)}
+                          onError={() => {
+                            const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
+                            setLoginError(message);
+                            showPopup(message, "error", 4000);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+              </form>
+            </TabsContent>
+
+            <TabsContent value="signup" className="space-y-0">
+              <form onSubmit={handleSignup} className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-slate-800">Full Name</Label>
+                  <Input
+                    className={fieldClassName}
+                    required
+                    value={signupData.name}
+                    placeholder="Your full name"
+                    onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-800">Email</Label>
+                  <Input
+                    className={fieldClassName}
+                    type="email"
+                    required
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    placeholder="your.email@example.com"
+                    value={signupData.email}
+                    onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-800">LinkedIn Profile (optional)</Label>
+                  <Input
+                    className={fieldClassName}
+                    type="url"
+                    placeholder="https://www.linkedin.com/in/your-profile"
+                    value={signupData.linkedinProfile}
+                    onChange={(e) => setSignupData({ ...signupData, linkedinProfile: e.target.value })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-slate-800">Country of Residence *</Label>
+                  <select
+                    required
+                    value={signupData.countryCode}
+                    onChange={(e) => setSignupData({ ...signupData, countryCode: e.target.value })}
+                    className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 ring-offset-background"
+                  >
+                    <option value="">Select your country</option>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="relative space-y-2">
+                  <Label className="text-slate-800">Password</Label>
+                  <Input
+                    className={fieldClassName}
+                    type={showSignupPassword ? "text" : "password"}
+                    required
+                    placeholder="........"
+                    value={signupData.password}
+                    onChange={(e) => setSignupData({ ...signupData, password: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSignupPassword((prev) => !prev)}
+                    className="absolute right-3 top-[2.55rem] text-slate-500"
+                    aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                  >
+                    {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                <div className="relative space-y-2">
+                  <Label className="text-slate-800">Confirm Password</Label>
+                  <Input
+                    className={fieldClassName}
+                    type={showConfirmPassword ? "text" : "password"}
+                    required
+                    placeholder="........"
+                    value={signupData.confirmPassword}
+                    onChange={(e) => setSignupData({ ...signupData, confirmPassword: e.target.value })}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword((prev) => !prev)}
+                    className="absolute right-3 top-[2.55rem] text-slate-500"
+                    aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                  >
+                    {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+
+                {signupError ? <p className="text-sm text-red-600">{signupError}</p> : null}
+
+                <p className="text-xs leading-5 text-[#0F172A]">Use at least 6 characters for a secure password.</p>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                    <input
+                      type="checkbox"
+                      checked={signupData.termsAccepted}
+                      onChange={(e) => {
+                        if (e.target.checked && !signupData.termsAccepted) {
+                          openSignupTermsModal("terms");
+                          return;
                         }
-                        socialButtons={signupSocialButtons}
-                      />
-                    </motion.div>
-                  </TabsContent>
-                )}
-              </AnimatePresence>
-            </Tabs>
-          </AuthCard>
-        </AuthLayout>
-      </div>
+                        signupTermsAcceptedRef.current = false;
+                        clearSignupTermsSession();
+                        setSignupData({ ...signupData, termsAccepted: false });
+                      }}
+                      className="mt-1"
+                    />
+                    <span>
+                      I agree to the{" "}
+                      <button
+                        type="button"
+                        onClick={() => openSignupTermsModal("terms")}
+                        className="text-[#2563eb] underline"
+                      >
+                        Terms & Conditions
+                      </button>{" "}
+                      and{" "}
+                      <button
+                        type="button"
+                        onClick={() => openSignupTermsModal("privacy")}
+                        className="text-[#2563eb] underline"
+                      >
+                        Privacy Policy
+                      </button>
+                    </span>
+                  </label>
+                </div>
+
+                <Button type="submit" className="w-full" disabled={loading || !signupCanContinue}>
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Processing...
+                    </span>
+                  ) : (
+                    "Create Account"
+                  )}
+                </Button>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-slate-200" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white px-2 text-slate-500">Or continue with</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
+                    disabled={!signupCanContinue}
+                    onClick={() => void handleAppleLogin("signup")}
+                  >
+                    Sign up with Apple
+                  </Button>
+                  {canUseLinkedInAuth ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
+                      onClick={() => handleLinkedInAuth("signup")}
+                      disabled={!signupCanContinue}
+                    >
+                      Sign up with LinkedIn
+                    </Button>
+                  ) : null}
+                  {canUseGoogleAuth ? (
+                    <div className="relative flex w-full justify-center overflow-hidden rounded-md">
+                      {!signupCanContinue ? (
+                        <div
+                          className="absolute inset-0 z-10 cursor-pointer"
+                          onClick={() => {
+                            if (!signupData.countryCode) {
+                              setSignupError("Country is required");
+                              return;
+                            }
+                            openSignupTermsModal("terms");
+                          }}
+                          title={!signupData.countryCode ? "Please select your country first" : "Please accept Terms & Conditions first"}
+                        />
+                      ) : null}
+                      <div className="w-full max-w-[380px] overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
+                        <GoogleLogin
+                          text="signup_with"
+                          {...googleButtonProps}
+                          onSuccess={(credentialResponse) => {
+                            if (!signupData.countryCode) {
+                              setSignupError("Country is required");
+                              return;
+                            }
+                            if (!signupTermsAcceptedRef.current) {
+                              setSignupError(termsErrorMessage);
+                              openSignupTermsModal("terms");
+                              return;
+                            }
+                            void handleGoogleAuthSuccess("signup", credentialResponse);
+                          }}
+                          onError={() => {
+                            const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
+                            setSignupError(message);
+                            showPopup(message, "error", 4000);
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <p className="text-center text-xs leading-5 text-slate-600">
+                  By signing up, you agree to our Terms of Service and Privacy Policy.
+                </p>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {popup ? <AuthPopup message={popup.message} type={popup.type} /> : null}
     </div>

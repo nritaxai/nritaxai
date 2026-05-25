@@ -1161,7 +1161,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                         </button>
                       ))
                     ) : (
-                      <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white/90 px-4 py-5 text-sm leading-7 text-slate-700">
+                      <div className="rounded-2xl border border-dashed border-[#CBD5E1] bg-white/80 px-4 py-5 text-sm leading-6 text-slate-500">
                         Your saved chats will appear here after you send the first question in each new thread.
                       </div>
                     )}

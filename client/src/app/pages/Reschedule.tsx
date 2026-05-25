@@ -166,7 +166,7 @@ export function Reschedule() {
                     />
                     {fieldErrors.date ? <p className="text-sm text-red-600">{fieldErrors.date}</p> : null}
                     {!fieldErrors.date ? (
-                      <p className="text-sm text-slate-700">Choose today or a future date. Sunday bookings are unavailable.</p>
+                      <p className="text-sm text-slate-500">Choose today or a future date. Sunday bookings are unavailable.</p>
                     ) : null}
                   </div>
 
@@ -194,10 +194,10 @@ export function Reschedule() {
                     </Select>
                     {fieldErrors.time ? <p className="text-sm text-red-600">{fieldErrors.time}</p> : null}
                     {!fieldErrors.time && availableTimeSlots.length === 0 && date ? (
-                      <p className="text-sm text-slate-700">No time slots are left for today. Please choose another date.</p>
+                      <p className="text-sm text-slate-500">No time slots are left for today. Please choose another date.</p>
                     ) : null}
                     {!fieldErrors.time ? (
-                      <p className="text-sm text-slate-700">
+                      <p className="text-sm text-slate-500">
                         {browserTimeZone
                           ? `Times shown in your timezone (${browserTimeZone}).`
                           : "Times shown in your local timezone."}
