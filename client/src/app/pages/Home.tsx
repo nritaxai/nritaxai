@@ -313,7 +313,7 @@ export function Home({ onRequireLogin }: HomeProps) {
                 variants={fadeUp}
                 className="inline-flex items-center justify-center whitespace-nowrap rounded-full border border-blue-100 bg-white/90 px-8 py-3 text-[13px] font-semibold tracking-[0.28em] text-slate-800 shadow-sm backdrop-blur-sm md:text-sm"
               >
-                {renderTextWithShortForms(heroContent.badge).toUpperCase()}
+                {heroContent.badge.toUpperCase()}
               </motion.span>
 
               <motion.h1
