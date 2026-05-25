@@ -1,0 +1,164 @@
+import { useEffect, useRef, useState } from "react";
+
+type TermsModalProps = {
+  isOpen: boolean;
+  onAccept: () => void;
+  onClose: () => void;
+  type?: "terms" | "privacy";
+};
+
+export function TermsModal({
+  isOpen,
+  onAccept,
+  onClose,
+  type = "terms",
+}: TermsModalProps) {
+  const [checked, setChecked] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  const contentRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setChecked(false);
+      setHasScrolled(false);
+      document.body.style.overflow = "hidden";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    if (isOpen) {
+      window.addEventListener("keydown", handleKeyDown);
+    }
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
+  const handleScroll = () => {
+    const element = contentRef.current;
+    if (!element) return;
+
+    const nearBottom = element.scrollTop + element.clientHeight >= element.scrollHeight - 50;
+    if (nearBottom) {
+      setHasScrolled(true);
+    }
+  };
+
+  const handleContinue = () => {
+    if (!checked) return;
+
+    sessionStorage.setItem("signupTermsAccepted", "true");
+    sessionStorage.setItem("signupTermsAcceptedAt", new Date().toISOString());
+    onAccept();
+  };
+
+  if (!isOpen) return null;
+
+  const title = type === "terms" ? "Terms & Conditions" : "Privacy Policy";
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="terms-modal-title"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="animate-fadeIn flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+          <h2 id="terms-modal-title" className="text-lg font-semibold text-slate-900">
+            {title}
+          </h2>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close modal"
+            className="text-2xl leading-none text-slate-500 transition-colors hover:text-slate-700"
+          >
+            x
+          </button>
+        </div>
+
+        <div
+          ref={contentRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-6 py-5 text-sm leading-relaxed text-slate-700"
+          tabIndex={0}
+        >
+          {type === "terms" ? <TermsContent /> : <PrivacyContent />}
+        </div>
+
+        <div className="space-y-4 border-t border-slate-200 px-6 py-4">
+          {!hasScrolled ? <p className="text-center text-xs text-slate-400">Please scroll and read before accepting</p> : null}
+
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={checked}
+              disabled={!hasScrolled}
+              onChange={(event) => setChecked(event.target.checked)}
+              className="mt-1 h-4 w-4 accent-[#2563eb] disabled:opacity-40"
+            />
+
+            <span className={`text-sm ${hasScrolled ? "text-slate-700" : "text-slate-400"}`}>
+              I have read and agree to the {title}
+            </span>
+          </label>
+
+          <button
+            type="button"
+            onClick={handleContinue}
+            disabled={!checked}
+            className="w-full rounded-xl bg-[#2563eb] py-3 font-semibold text-white transition-all hover:bg-[#1d4ed8] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Continue
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TermsContent() {
+  return (
+    <div className="space-y-4">
+      <p className="font-medium">Last Updated: May 2026</p>
+      <p>By using NRITAX.AI, you agree to comply with all applicable tax, legal, and platform usage requirements.</p>
+      <p>NRITAX.AI provides AI-assisted guidance and does not replace professional legal or tax advice.</p>
+      <p>Users are responsible for providing accurate information during onboarding and subscription processes.</p>
+      <p>The platform may use country-specific tax rules and DTAA logic depending on the country selected during signup.</p>
+      <p>Subscription plans, pricing, and compliance workflows may vary based on country.</p>
+      <p>Continued usage of the platform constitutes acceptance of all applicable policies.</p>
+    </div>
+  );
+}
+
+function PrivacyContent() {
+  return (
+    <div className="space-y-4">
+      <p className="font-medium">Last Updated: May 2026</p>
+      <p>NRITAX.AI respects your privacy and securely handles your account and tax-related information.</p>
+      <p>Information collected may include identity details, tax-related metadata, and onboarding information.</p>
+      <p>Data may be processed to improve tax guidance, AI responses, onboarding experience, and subscription handling.</p>
+      <p>Your information is protected using secure authentication and encrypted infrastructure.</p>
+      <p>We do not sell sensitive user data to advertisers.</p>
+      <p>By using NRITAX.AI, you consent to the platform privacy practices described in this policy.</p>
+    </div>
+  );
+}

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import {
   Card,
@@ -27,6 +27,7 @@ import {
 } from "../../config/appConfig";
 import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
+import { TermsModal } from "./TermsModal";
 import { CURRENT_POLICY_VERSION } from "../../config/legal";
 import { COMPANY_LEGAL_NAME } from "../../config/branding";
 import { COUNTRY_OPTIONS } from "../utils/countries";
@@ -64,6 +65,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const [activeTab, setActiveTab] = useState<"login" | "signup">(initialMode);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
+  const [signupTermsModalOpen, setSignupTermsModalOpen] = useState(false);
+  const [signupTermsModalType, setSignupTermsModalType] = useState<"terms" | "privacy">("terms");
   const [popup, setPopup] = useState<{
     message: string;
     type: "success" | "error";
@@ -76,13 +79,41 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const termsErrorMessage = "You must agree to the Terms & Conditions to continue.";
   const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
   const loginCanContinue = loginTermsAccepted;
+  const signupTermsAcceptedRef = useRef(false);
 
   const resolveAuthUser = (response: any) =>
     response?.user || response?.data?.user || response?.data || null;
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sessionAccepted = sessionStorage.getItem("signupTermsAccepted") === "true";
+    signupTermsAcceptedRef.current = sessionAccepted;
+    if (sessionAccepted) {
+      setSignupData((prev) => ({ ...prev, termsAccepted: true }));
+    }
+  }, []);
+
   const showPopup = (message: string, type: "success" | "error", duration = 2500) => {
     setPopup({ message, type });
     window.setTimeout(() => setPopup(null), duration);
+  };
+
+  const clearSignupTermsSession = () => {
+    if (typeof window === "undefined") return;
+    sessionStorage.removeItem("signupTermsAccepted");
+    sessionStorage.removeItem("signupTermsAcceptedAt");
+  };
+
+  const openSignupTermsModal = (type: "terms" | "privacy") => {
+    setSignupTermsModalType(type);
+    setSignupTermsModalOpen(true);
+  };
+
+  const handleSignupTermsAccepted = () => {
+    signupTermsAcceptedRef.current = true;
+    setSignupData((prev) => ({ ...prev, termsAccepted: true }));
+    setSignupTermsModalOpen(false);
+    setSignupError((prev) => (prev === termsErrorMessage ? null : prev));
   };
 
   const handleLinkedInAuth = (mode: "login" | "signup") => {
@@ -237,8 +268,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
       return;
     }
 
-    if (!signupData.termsAccepted) {
+    if (!signupTermsAcceptedRef.current) {
       setSignupError(termsErrorMessage);
+      openSignupTermsModal("terms");
       return;
     }
 
@@ -257,10 +289,16 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         countryCode: signupData.countryCode,
         password: signupData.password,
         confirmPassword: signupData.confirmPassword,
-        termsAccepted: signupData.termsAccepted,
+        termsAccepted: true,
+        acceptedTerms: true,
+        termsAcceptedAt:
+          typeof window !== "undefined"
+            ? sessionStorage.getItem("signupTermsAcceptedAt") || new Date().toISOString()
+            : new Date().toISOString(),
         policyVersion: CURRENT_POLICY_VERSION,
       });
       const user = resolveAuthUser(response);
+      clearSignupTermsSession();
       handleAuthSuccess(response, `Account created successfully! WELCOME ${user?.name || "User"}`);
     } catch (error: any) {
       const message = getApiErrorMessage(error, "Signup failed.");
@@ -352,6 +390,11 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
           ? {
               credential: credentialResponse.credential,
               termsAccepted: true,
+              acceptedTerms: true,
+              termsAcceptedAt:
+                typeof window !== "undefined"
+                  ? sessionStorage.getItem("signupTermsAcceptedAt") || new Date().toISOString()
+                  : new Date().toISOString(),
               policyVersion: CURRENT_POLICY_VERSION,
               country: selectedSignupCountry?.name,
               countryCode: signupData.countryCode,
@@ -364,6 +407,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
       const response = await googleLoginUser(payload);
       const user = resolveAuthUser(response);
+      if (mode === "signup") {
+        clearSignupTermsSession();
+      }
       handleAuthSuccess(
         response,
         mode === "signup"
@@ -387,6 +433,12 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-6 sm:items-center">
+      <TermsModal
+        isOpen={signupTermsModalOpen}
+        type={signupTermsModalType}
+        onAccept={handleSignupTermsAccepted}
+        onClose={() => setSignupTermsModalOpen(false)}
+      />
       <Card className="max-h-[92dvh] w-full max-w-lg overflow-y-auto border-slate-200 bg-white text-slate-900">
         <CardHeader className="pb-4">
           <div className="flex items-center justify-between gap-3">
@@ -693,22 +745,33 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                       type="checkbox"
                       checked={signupData.termsAccepted}
                       onChange={(e) => {
-                        setSignupData({ ...signupData, termsAccepted: e.target.checked });
-                        if (e.target.checked && signupError === termsErrorMessage) {
-                          setSignupError(null);
+                        if (e.target.checked && !signupData.termsAccepted) {
+                          openSignupTermsModal("terms");
+                          return;
                         }
+                        signupTermsAcceptedRef.current = false;
+                        clearSignupTermsSession();
+                        setSignupData({ ...signupData, termsAccepted: false });
                       }}
                       className="mt-1"
                     />
                     <span>
                       I agree to the{" "}
-                      <a href="/terms-and-conditions" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
+                      <button
+                        type="button"
+                        onClick={() => openSignupTermsModal("terms")}
+                        className="text-[#2563eb] underline"
+                      >
                         Terms & Conditions
-                      </a>{" "}
+                      </button>{" "}
                       and{" "}
-                      <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
+                      <button
+                        type="button"
+                        onClick={() => openSignupTermsModal("privacy")}
+                        className="text-[#2563eb] underline"
+                      >
                         Privacy Policy
-                      </a>
+                      </button>
                     </span>
                   </label>
                 </div>
@@ -755,24 +818,42 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     </Button>
                   ) : null}
                   {canUseGoogleAuth ? (
-                    <div className="flex w-full justify-center overflow-hidden rounded-md">
+                    <div className="relative flex w-full justify-center overflow-hidden rounded-md">
+                      {!signupCanContinue ? (
+                        <div
+                          className="absolute inset-0 z-10 cursor-pointer"
+                          onClick={() => {
+                            if (!signupData.countryCode) {
+                              setSignupError("Country is required");
+                              return;
+                            }
+                            openSignupTermsModal("terms");
+                          }}
+                          title={!signupData.countryCode ? "Please select your country first" : "Please accept Terms & Conditions first"}
+                        />
+                      ) : null}
                       <div className="w-full max-w-[380px] overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
-                      {signupCanContinue ? (
                         <GoogleLogin
                           text="signup_with"
                           {...googleButtonProps}
-                          onSuccess={(credentialResponse) => void handleGoogleAuthSuccess("signup", credentialResponse)}
+                          onSuccess={(credentialResponse) => {
+                            if (!signupData.countryCode) {
+                              setSignupError("Country is required");
+                              return;
+                            }
+                            if (!signupTermsAcceptedRef.current) {
+                              setSignupError(termsErrorMessage);
+                              openSignupTermsModal("terms");
+                              return;
+                            }
+                            void handleGoogleAuthSuccess("signup", credentialResponse);
+                          }}
                           onError={() => {
                             const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setSignupError(message);
                             showPopup(message, "error", 4000);
                           }}
                         />
-                      ) : (
-                        <Button type="button" variant="outline" className="w-full" disabled>
-                          Sign up with Google
-                        </Button>
-                      )}
                       </div>
                     </div>
                   ) : null}
