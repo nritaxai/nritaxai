@@ -1,21 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { Capacitor } from "@capacitor/core";
 import { Button } from "./ui/button";
 import { Tabs, TabsContent } from "./ui/tabs";
 import {
-  appleLoginUser,
   forgotPassword,
   googleLoginUser,
   loginUser,
   signupUser,
 } from "../../utils/api";
 import {
-  APPLE_AUTH_CONFIG,
   GOOGLE_AUTH_CONFIG,
   IS_IOS_NATIVE_APP,
   LINKEDIN_AUTH_CONFIG,
 } from "../../config/appConfig";
-import { startAppleAuth } from "../../utils/appleAuth";
 import { AuthPopup } from "./AuthPopup";
 import { TermsModal } from "./TermsModal";
 import { CURRENT_POLICY_VERSION } from "../../config/legal";
@@ -42,6 +40,7 @@ const getApiErrorMessage = (error: any, fallback: string) =>
   error?.response?.data?.message || error?.message || fallback;
 
 export function LoginModal({ onClose, disableClose = false, initialMode = "login" }: LoginModalProps) {
+  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
     name: "",
@@ -300,56 +299,6 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     }
   };
 
-  const handleAppleLogin = async (mode: "login" | "signup") => {
-    if (mode === "signup" && !signupCanContinue) {
-      setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
-      return;
-    }
-    setLoginError(null);
-    setSignupError(null);
-    setLoading(true);
-
-    try {
-      const appleResponse = await startAppleAuth();
-      const response = await appleLoginUser({
-        authorizationCode: appleResponse?.authorization?.code,
-        identityToken: appleResponse?.authorization?.id_token,
-        user: appleResponse?.user,
-        fullName: appleResponse?.user?.name,
-        termsAccepted: mode === "signup" ? true : undefined,
-        policyVersion: mode === "signup" ? CURRENT_POLICY_VERSION : undefined,
-        country: mode === "signup" ? selectedSignupCountry?.name : undefined,
-        countryCode: mode === "signup" ? signupData.countryCode : undefined,
-      });
-      const user = resolveAuthUser(response);
-      handleAuthSuccess(
-        response,
-        mode === "signup"
-          ? `Account created successfully! WELCOME ${user?.name || "User"}`
-          : `WELCOME ${user?.name || "User"}!`
-      );
-    } catch (error: any) {
-      const message = getApiErrorMessage(
-        error,
-        "Apple Sign in could not be completed. Please try again."
-      );
-      console.error("[auth] apple sign-in failed", {
-        mode,
-        platform: IS_IOS_NATIVE_APP ? "ios-native" : "web",
-        configured: APPLE_AUTH_CONFIG.isConfigured,
-        message,
-      });
-      if (mode === "signup") {
-        setSignupError(message);
-      } else {
-        setLoginError(message);
-      }
-      showPopup(message, "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleGoogleAuthSuccess = async (
     mode: "login" | "signup",
     credentialResponse: { credential?: string }
@@ -402,20 +351,11 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const loginSocialButtons = (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-none hover:bg-slate-50"
-        disabled={loading}
-        onClick={() => void handleAppleLogin("login")}
-      >
-        Sign in with Apple
-      </Button>
       {canUseLinkedInAuth ? (
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full rounded-xl border-slate-300 bg-white text-[#0A66C2] shadow-none hover:bg-slate-50"
+          className="h-12 w-full rounded-full border-white/16 bg-white/10 text-white shadow-none hover:bg-white/14"
           disabled={loading}
           onClick={() => handleLinkedInAuth("login")}
         >
@@ -438,20 +378,11 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const signupSocialButtons = (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 w-full rounded-xl border-slate-300 bg-white text-slate-900 shadow-none hover:bg-slate-50"
-        disabled={!signupCanContinue}
-        onClick={() => void handleAppleLogin("signup")}
-      >
-        Sign up with Apple
-      </Button>
       {canUseLinkedInAuth ? (
         <Button
           type="button"
           variant="outline"
-          className="h-11 w-full rounded-xl border-slate-300 bg-white text-[#0A66C2] shadow-none hover:bg-slate-50"
+          className="h-12 w-full rounded-full border-white/16 bg-white/10 text-white shadow-none hover:bg-white/14"
           onClick={() => handleLinkedInAuth("signup")}
           disabled={!signupCanContinue}
         >
@@ -492,18 +423,22 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[linear-gradient(180deg,#f8fafc_0%,#eef2f7_100%)] p-3 sm:p-4 sm:py-8">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(49,86,245,0.20),transparent_22%),radial-gradient(circle_at_80%_18%,rgba(255,255,255,0.10),transparent_16%),linear-gradient(180deg,#081a33_0%,#0b2d58_56%,#0a1f3d_100%)] p-3 sm:p-4 sm:py-8">
       <TermsModal
         isOpen={signupTermsModalOpen}
         type={signupTermsModalType}
         onAccept={handleSignupTermsAccepted}
         onClose={() => setSignupTermsModalOpen(false)}
       />
-      <div className="flex min-h-[100dvh] items-center justify-center">
-        <AuthLayout>
+      <div className={`flex min-h-[100dvh] justify-center ${isAndroidNative ? "items-start pt-16" : "items-center"}`}>
+        <AuthLayout showIntro={!isAndroidNative}>
           <AuthCard
-            title={`Welcome to ${COMPANY_LEGAL_NAME}`}
-            description="Sign in to continue, or create an account to access country-aware tax guidance and subscription tools."
+            title={activeTab === "login" ? "Welcome back" : `Join ${COMPANY_LEGAL_NAME}`}
+            description={
+              activeTab === "login"
+                ? "Log in with your email and password to continue."
+                : "Create your account to access country-aware tax guidance and subscription tools."
+            }
             onClose={onClose}
             disableClose={disableClose}
           >

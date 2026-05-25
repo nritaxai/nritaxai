@@ -34,11 +34,11 @@ type FieldProps = {
 function Field({ label, icon: Icon, endAdornment, className, ...props }: FieldProps) {
   return (
     <div className="space-y-2.5">
-      <Label className="text-sm font-medium text-slate-800">{label}</Label>
+      <Label className="text-sm font-medium text-white">{label}</Label>
       <div className="relative">
-        <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+        <Icon className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-[rgba(230,236,244,0.72)]" />
         <Input
-          className={`h-13 rounded-xl border-slate-300 bg-white pl-11 pr-12 text-slate-900 placeholder:text-slate-400 shadow-none focus-visible:border-[#1d4ed8] focus-visible:ring-[#1d4ed8]/10 ${className || ""}`}
+          className={`h-14 rounded-[22px] border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] pl-11 pr-12 text-[#172033] placeholder:text-[#94a3b8] shadow-none focus-visible:border-[rgba(255,255,255,0.4)] focus-visible:ring-white/10 ${className || ""}`}
           {...props}
         />
         {endAdornment ? (
@@ -95,7 +95,7 @@ export function LoginForm({
           <button
             type="button"
             onClick={onTogglePassword}
-            className="inline-flex size-9 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="inline-flex size-9 items-center justify-center rounded-full text-[#334155] transition-colors hover:bg-slate-100 hover:text-slate-900"
             aria-label={showPassword ? "Hide password" : "Show password"}
           >
             {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -104,12 +104,12 @@ export function LoginForm({
       />
 
       <div className="flex items-center justify-between gap-3">
-        <p className="text-xs leading-5 text-slate-500">
+        <p className="text-xs leading-5 text-[rgba(230,236,244,0.70)]">
           Secure sign in to access chats, subscriptions, and tax tools.
         </p>
         <button
           type="button"
-          className="text-sm font-medium text-[#1d4ed8] transition-colors hover:text-[#1e40af]"
+          className="text-sm font-medium text-[#f5ede4] transition-colors hover:text-white"
           onClick={onToggleForgotPassword}
         >
           Forgot password?
@@ -124,9 +124,9 @@ export function LoginForm({
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden"
           >
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-[22px] border border-white/14 bg-white/10 p-4">
               <div className="space-y-2">
-                <Label htmlFor="forgot-password-email" className="text-sm font-medium text-slate-800">
+                <Label htmlFor="forgot-password-email" className="text-sm font-medium text-white">
                   Reset Email
                 </Label>
                 <Input
@@ -135,13 +135,13 @@ export function LoginForm({
                   value={forgotPasswordEmail}
                   onChange={(event) => onForgotPasswordEmailChange(event.target.value)}
                   placeholder="your.email@example.com"
-                  className="h-12 rounded-xl border-slate-300 bg-white text-slate-900 placeholder:text-slate-400 focus-visible:border-[#1d4ed8] focus-visible:ring-[#1d4ed8]/10"
+                  className="h-12 rounded-[20px] border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] text-[#172033] placeholder:text-[#94a3b8] focus-visible:border-[rgba(255,255,255,0.4)] focus-visible:ring-white/10"
                 />
               </div>
               <Button
                 type="button"
                 variant="outline"
-                className="mt-4 h-11 w-full rounded-xl border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                className="mt-4 h-11 w-full rounded-full border-white/18 bg-white/12 text-white hover:bg-white/18"
                 disabled={loading}
                 onClick={onForgotPassword}
               >
@@ -158,7 +158,7 @@ export function LoginForm({
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
-            className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            className="flex items-start gap-3 rounded-[22px] border border-[#f5d7a6]/40 bg-[#f6deb7]/14 px-4 py-3 text-sm text-[#fff0d7]"
           >
             <AlertCircle className="mt-0.5 size-4 shrink-0" />
             <p className="leading-6">{error}</p>
@@ -168,18 +168,18 @@ export function LoginForm({
 
       <Button
         type="submit"
-        className="h-12 w-full rounded-xl bg-[#0f172a] text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)] hover:bg-[#111827]"
+        className="h-14 w-full rounded-full bg-[#f5ede4] text-sm font-semibold text-[#111827] shadow-[0_18px_36px_rgba(245,237,228,0.16)] hover:bg-[#fff7ef]"
         disabled={loading}
       >
-        {loading ? "Processing..." : "Sign In"}
+        {loading ? "Processing..." : "Log in"}
       </Button>
 
       <div className="relative py-1">
         <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-slate-200" />
+          <span className="w-full border-t border-white/12" />
         </div>
         <div className="relative flex justify-center">
-          <span className="bg-white px-3 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">
+          <span className="bg-transparent px-3 text-xs font-medium uppercase tracking-[0.16em] text-[rgba(230,236,244,0.52)]">
             Or continue with
           </span>
         </div>

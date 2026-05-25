@@ -29,8 +29,8 @@ export function CountrySelect({
 
   return (
     <div className="space-y-2.5">
-      <label className="text-sm font-medium text-slate-800">
-        Country of Residence <span className="text-[#1d4ed8]">*</span>
+      <label className="text-sm font-medium text-white">
+        Country of Residence <span className="text-[#f5ede4]">*</span>
       </label>
 
       <Popover open={open} onOpenChange={setOpen}>
@@ -39,9 +39,9 @@ export function CountrySelect({
             type="button"
             disabled={disabled}
             className={cn(
-              "flex h-13 w-full items-center justify-between rounded-xl border border-slate-300 bg-white px-4 text-left shadow-none transition-all",
-              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#1d4ed8]/10",
-              disabled ? "cursor-not-allowed opacity-60" : "hover:border-slate-400",
+              "flex h-14 w-full items-center justify-between rounded-[22px] border border-[rgba(255,255,255,0.14)] bg-[rgba(255,255,255,0.96)] px-4 text-left shadow-none transition-all",
+              "focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-white/10",
+              disabled ? "cursor-not-allowed opacity-60" : "hover:border-white/22",
             )}
             aria-expanded={open}
             aria-label="Select your country of residence"
@@ -51,15 +51,15 @@ export function CountrySelect({
                 {selected ? countryToFlag(selected.code) : <Search className="size-4 text-slate-400" />}
               </div>
               <div className="min-w-0">
-                <p className={cn("truncate text-sm font-medium", selected ? "text-slate-900" : "text-slate-400")}>
+                <p className={cn("truncate text-sm font-medium", selected ? "text-[#172033]" : "text-[#94a3b8]")}>
                   {selected ? selected.name : "Select your country"}
                 </p>
-                <p className="text-xs text-slate-500">
+                <p className="text-xs text-[#64748b]">
                   Determines tax guidance and eligibility
                 </p>
               </div>
             </div>
-            <ChevronsUpDown className="size-4 text-slate-400" />
+            <ChevronsUpDown className="size-4 text-[#64748b]" />
           </button>
         </PopoverTrigger>
 
@@ -106,7 +106,7 @@ export function CountrySelect({
         </PopoverContent>
       </Popover>
 
-      <p className="text-xs leading-5 text-slate-500">
+      <p className="text-xs leading-5 text-[rgba(230,236,244,0.70)]">
         Country determines applicable tax guidance and subscription availability.
       </p>
     </div>

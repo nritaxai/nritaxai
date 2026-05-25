@@ -1,10 +1,11 @@
 import { Button } from "./ui/button";
 import {
   ChevronLeft,
-  Menu,
   LogIn,
   LogOut,
+  Menu,
   User as UserIcon,
+  X,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -12,6 +13,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { renderTextWithShortForms } from "../utils/shortForms";
 import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils/api";
 import { PREMIUM_EASE } from "../utils/motion";
+
 interface HeaderProps {
   onLogin: () => void;
 }
@@ -60,6 +62,8 @@ export function Header({ onLogin }: HeaderProps) {
     { to: "/pricing", label: "Pricing" },
     { to: "/calculators", label: "Tax Calculator" },
   ] as const;
+
+  const isHomeRoute = location.pathname === "/home" || location.pathname === "/";
 
   const isNavItemActive = (to: string) => {
     const [path, hash] = to.split("#");
@@ -132,7 +136,7 @@ export function Header({ onLogin }: HeaderProps) {
 
   useEffect(() => {
     const handleScroll = () => {
-      setHasScrolled(window.scrollY > 12);
+      setHasScrolled(window.scrollY > 8);
     };
 
     handleScroll();
@@ -150,7 +154,7 @@ export function Header({ onLogin }: HeaderProps) {
   };
 
   const renderUserAvatar = (sizeClass: string, iconSizeClass: string) => (
-    <span className={`inline-flex items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 shadow-sm ${sizeClass}`}>
+    <span className={`inline-flex items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 ${sizeClass}`}>
       {user?.profileImage && !avatarFailed ? (
         <img
           key={user.profileImage}
@@ -175,88 +179,57 @@ export function Header({ onLogin }: HeaderProps) {
   };
 
   return (
-    <header className="relative z-50">
-      <div className="border-b border-white/60 bg-white/70 backdrop-blur-xl md:hidden">
-        <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-3 px-4">
-          <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
-            <img
-              src="/logo-transparent.png"
-              alt="NRITAX logo"
-              className="h-16 w-auto object-contain sm:h-18"
-            />
-          </Link>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleGoBack}
-              aria-label="Go back"
-              className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
-            <button
-              className="rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-800 shadow-sm transition-colors hover:text-blue-700"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-              aria-expanded={mobileMenuOpen}
-            >
-              <Menu className="size-6" />
-            </button>
-          </div>
-        </div>
-      </div>
-
+    <header className="sticky top-0 z-50">
       <motion.div
         animate={{
-          backgroundColor: hasScrolled ? "rgba(255,255,255,0.82)" : "rgba(255,255,255,0.68)",
-          boxShadow: hasScrolled ? "0 18px 40px rgba(15, 23, 42, 0.10)" : "0 0 0 rgba(15, 23, 42, 0)",
+          backgroundColor: hasScrolled || !isHomeRoute ? "rgba(255,255,255,0.92)" : "rgba(248,250,252,0.72)",
+          boxShadow: hasScrolled ? "0 12px 32px rgba(15, 23, 42, 0.08)" : "0 0 0 rgba(15, 23, 42, 0)",
         }}
-        transition={{ duration: 0.3, ease: PREMIUM_EASE }}
-        className="sticky top-0 border-b border-white/60 backdrop-blur-xl"
+        transition={{ duration: 0.28, ease: PREMIUM_EASE }}
+        className="border-b border-slate-200/70 backdrop-blur-xl"
       >
-        <div className="mx-auto max-w-6xl px-4 md:px-6">
-          <div className="flex h-20 items-center justify-between gap-6">
-            <div className="flex items-center gap-3 lg:gap-5">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6">
+          <div className="flex h-20 items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={handleGoBack}
                 aria-label="Go back"
-                className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
+                className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
               >
                 <ChevronLeft className="size-5" />
               </button>
-              <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
+
+              <Link to="/home" className="inline-flex items-center gap-3" aria-label="NRITAX home">
                 <img
                   src="/logo-transparent.png"
                   alt="NRITAX logo"
-                  className="h-16 w-auto object-contain sm:h-18"
+                  className="h-14 w-auto object-contain"
                 />
               </Link>
             </div>
 
-            <nav className="hidden items-center gap-4 md:flex lg:gap-6">
+            <nav className="hidden items-center gap-8 lg:flex">
               {navItems.map((item) => {
                 const isActive = isNavItemActive(item.to);
                 return (
                   <motion.div
                     key={item.to}
                     whileHover={shouldReduceMotion ? undefined : { y: -1 }}
-                    transition={{ duration: 0.2, ease: PREMIUM_EASE }}
+                    transition={{ duration: 0.18, ease: PREMIUM_EASE }}
                   >
                     <Link
                       to={item.to}
-                      className={`relative rounded-full px-1 py-2 text-sm font-medium leading-5 transition-colors ${
-                        isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
+                      className={`relative py-2 text-sm font-medium transition-colors ${
+                        isActive ? "text-[#2563EB]" : "text-slate-700 hover:text-[#2563EB]"
                       }`}
                     >
                       {renderTextWithShortForms(item.label)}
                       <motion.span
-                        className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-blue-600"
+                        className="absolute inset-x-0 -bottom-[1px] h-0.5 rounded-full bg-[#2563EB]"
                         initial={false}
-                        animate={{ scaleX: isActive ? 1 : 0.45, opacity: isActive ? 1 : 0 }}
-                        whileHover={shouldReduceMotion ? undefined : { scaleX: 1, opacity: 1 }}
-                        transition={{ duration: 0.22, ease: PREMIUM_EASE }}
+                        animate={{ opacity: isActive ? 1 : 0, scaleX: isActive ? 1 : 0.5 }}
+                        transition={{ duration: 0.2, ease: PREMIUM_EASE }}
                         style={{ originX: 0.5 }}
                       />
                     </Link>
@@ -265,22 +238,22 @@ export function Header({ onLogin }: HeaderProps) {
               })}
             </nav>
 
-            <div className="hidden items-center gap-3 md:flex">
+            <div className="hidden items-center gap-3 lg:flex">
               {user ? (
                 <>
                   <Link
                     to="/profile"
-                    className="flex items-center gap-3 text-sm font-medium text-slate-700 transition-colors hover:text-blue-700"
+                    className="flex items-center gap-3 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:text-[#2563EB]"
                     aria-label="Open profile"
                     title="Open profile"
                   >
-                    {renderUserAvatar("h-11 w-11", "size-5")}
-                    <span className="leading-5">WELCOME! {user.name}</span>
+                    {renderUserAvatar("h-9 w-9", "size-4")}
+                    <span className="max-w-[13rem] truncate">WELCOME! {user.name}</span>
                   </Link>
                   <Button
                     variant="outline"
                     onClick={handleLogout}
-                    className="h-10 border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+                    className="h-11 rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                   >
                     <LogOut className="mr-2 size-4" />
                     Logout
@@ -291,34 +264,44 @@ export function Header({ onLogin }: HeaderProps) {
                   <Button
                     variant="ghost"
                     type="button"
-                    className="h-11 rounded-full px-4 text-slate-800 hover:bg-white/90 hover:text-slate-900"
+                    className="h-11 rounded-xl px-4 text-slate-700 hover:bg-white hover:text-slate-900"
                   >
                     English
                   </Button>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     onClick={onLogin}
-                    className="h-11 rounded-full border border-slate-200/80 bg-white/80 px-5 text-slate-900 shadow-sm hover:bg-white"
+                    className="h-11 rounded-xl border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                   >
                     Login / Sign Up
                   </Button>
                 </>
               )}
             </div>
+
+            <button
+              type="button"
+              className="inline-flex size-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition-colors hover:bg-slate-50 lg:hidden"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              aria-label="Toggle menu"
+              aria-expanded={mobileMenuOpen}
+            >
+              {mobileMenuOpen ? <X className="size-5" /> : <Menu className="size-5" />}
+            </button>
           </div>
         </div>
       </motion.div>
 
       <AnimatePresence initial={false}>
-        {mobileMenuOpen && (
+        {mobileMenuOpen ? (
           <motion.div
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
-            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className="border-b border-white/70 bg-white/92 py-4 backdrop-blur-xl md:hidden"
+            transition={{ duration: 0.2, ease: PREMIUM_EASE }}
+            className="border-b border-slate-200 bg-white/96 backdrop-blur-xl lg:hidden"
           >
-            <div className="mx-auto max-w-6xl px-4">
+            <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6">
               <nav className="space-y-2">
                 {navItems.map((item) => {
                   const isActive = isNavItemActive(item.to);
@@ -326,8 +309,8 @@ export function Header({ onLogin }: HeaderProps) {
                     <Link
                       key={item.to}
                       to={item.to}
-                      className={`block rounded-2xl px-4 py-3 text-sm font-medium leading-5 transition-colors ${
-                        isActive ? "bg-blue-50 text-blue-700" : "text-slate-800 hover:bg-slate-100 hover:text-blue-700"
+                      className={`block rounded-xl px-4 py-3 text-sm font-medium transition-colors ${
+                        isActive ? "bg-blue-50 text-[#2563EB]" : "text-slate-700 hover:bg-slate-50 hover:text-[#2563EB]"
                       }`}
                       onClick={() => setMobileMenuOpen(false)}
                     >
@@ -337,13 +320,13 @@ export function Header({ onLogin }: HeaderProps) {
                 })}
               </nav>
 
-              <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
+              <div className="mt-4 border-t border-slate-200 pt-4">
                 {user ? (
-                  <>
+                  <div className="space-y-3">
                     <Link
                       to="/profile"
                       onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 hover:text-blue-700"
+                      className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-800"
                     >
                       {renderUserAvatar("h-10 w-10", "size-5")}
                       <span>{user.name}</span>
@@ -351,42 +334,39 @@ export function Header({ onLogin }: HeaderProps) {
                     <Button
                       variant="outline"
                       onClick={handleLogout}
-                      className="w-full border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+                      className="h-11 w-full rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-50"
                     >
                       <LogOut className="mr-2 size-4" />
                       Logout
                     </Button>
-                  </>
+                  </div>
                 ) : (
-                  <>
+                  <div className="space-y-3">
                     <Button
                       variant="ghost"
                       type="button"
-                      className="h-11 w-full justify-start rounded-2xl text-slate-800 hover:bg-slate-100 hover:text-slate-900"
+                      className="h-11 w-full justify-start rounded-xl text-slate-700 hover:bg-slate-50 hover:text-slate-900"
                     >
                       English
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       onClick={() => {
                         setMobileMenuOpen(false);
                         onLogin();
                       }}
-                      className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
+                      className="h-11 w-full justify-start rounded-xl border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
                     >
                       <LogIn className="mr-2 size-4" />
                       Login / Sign Up
                     </Button>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
     </header>
   );
 }
-
-
-

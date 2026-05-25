@@ -26,7 +26,7 @@ export function GoogleAuthButton({
         />
       ) : null}
 
-      <div className="w-full overflow-hidden rounded-xl border border-slate-300 bg-white p-1 shadow-none [&>div]:!w-full [&>div>div]:!w-full">
+      <div className="w-full overflow-hidden rounded-full border border-white/12 bg-white p-1 shadow-none [&>div]:!w-full [&>div>div]:!w-full">
         <GoogleLogin
           text={text}
           theme="outline"
