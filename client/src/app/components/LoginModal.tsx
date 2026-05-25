@@ -46,7 +46,6 @@ const getApiErrorMessage = (error: any, fallback: string) =>
 
 export function LoginModal({ onClose, disableClose = false, initialMode = "login" }: LoginModalProps) {
   const [loginData, setLoginData] = useState({ email: "", password: "" });
-  const [loginTermsAccepted, setLoginTermsAccepted] = useState(false);
   const [signupData, setSignupData] = useState({
     name: "",
     email: "",
@@ -76,9 +75,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const canUseLinkedInAuth =
     Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
   const selectedSignupCountry = COUNTRY_OPTIONS.find((country) => country.code === signupData.countryCode);
-  const termsErrorMessage = "You must agree to the Terms & Conditions to continue.";
+  const termsErrorMessage = "Please read and accept the Terms & Conditions and Privacy Policy.";
   const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
-  const loginCanContinue = loginTermsAccepted;
   const signupTermsAcceptedRef = useRef(false);
 
   const resolveAuthUser = (response: any) =>
@@ -86,7 +84,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const sessionAccepted = sessionStorage.getItem("signupTermsAccepted") === "true";
+    const sessionAccepted = sessionStorage.getItem("termsAccepted") === "true";
     signupTermsAcceptedRef.current = sessionAccepted;
     if (sessionAccepted) {
       setSignupData((prev) => ({ ...prev, termsAccepted: true }));
@@ -100,8 +98,8 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const clearSignupTermsSession = () => {
     if (typeof window === "undefined") return;
-    sessionStorage.removeItem("signupTermsAccepted");
-    sessionStorage.removeItem("signupTermsAcceptedAt");
+    sessionStorage.removeItem("termsAccepted");
+    sessionStorage.removeItem("termsAcceptedAt");
   };
 
   const openSignupTermsModal = (type: "terms" | "privacy") => {
@@ -118,10 +116,6 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
 
   const handleLinkedInAuth = (mode: "login" | "signup") => {
     try {
-      if (mode === "login" && !loginTermsAccepted) {
-        setLoginError(termsErrorMessage);
-        return;
-      }
       if (mode === "signup" && !signupCanContinue) {
         setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
         return;
@@ -201,11 +195,6 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError(null);
-
-    if (!loginTermsAccepted) {
-      setLoginError(termsErrorMessage);
-      return;
-    }
 
     if (!loginData.email.trim() || !loginData.password.trim()) {
       setLoginError("Please enter both email and password.");
@@ -293,7 +282,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
         acceptedTerms: true,
         termsAcceptedAt:
           typeof window !== "undefined"
-            ? sessionStorage.getItem("signupTermsAcceptedAt") || new Date().toISOString()
+            ? sessionStorage.getItem("termsAcceptedAt") || new Date().toISOString()
             : new Date().toISOString(),
         policyVersion: CURRENT_POLICY_VERSION,
       });
@@ -315,10 +304,6 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
   };
 
   const handleAppleLogin = async (mode: "login" | "signup") => {
-    if (mode === "login" && !loginTermsAccepted) {
-      setLoginError(termsErrorMessage);
-      return;
-    }
     if (mode === "signup" && !signupCanContinue) {
       setSignupError("Please select your country and accept the Terms & Conditions and Privacy Policy to continue.");
       return;
@@ -393,7 +378,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
               acceptedTerms: true,
               termsAcceptedAt:
                 typeof window !== "undefined"
-                  ? sessionStorage.getItem("signupTermsAcceptedAt") || new Date().toISOString()
+                  ? sessionStorage.getItem("termsAcceptedAt") || new Date().toISOString()
                   : new Date().toISOString(),
               policyVersion: CURRENT_POLICY_VERSION,
               country: selectedSignupCountry?.name,
@@ -401,8 +386,6 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
             }
           : {
               credential: credentialResponse.credential,
-              termsAccepted: loginTermsAccepted,
-              policyVersion: loginTermsAccepted ? CURRENT_POLICY_VERSION : undefined,
             };
 
       const response = await googleLoginUser(payload);
@@ -550,35 +533,9 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                   </div>
                 ) : null}
 
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
-                    <input
-                      type="checkbox"
-                      checked={loginTermsAccepted}
-                      onChange={(e) => {
-                        setLoginTermsAccepted(e.target.checked);
-                        if (e.target.checked && loginError === termsErrorMessage) {
-                          setLoginError(null);
-                        }
-                      }}
-                      className="mt-1"
-                    />
-                    <span>
-                      I agree to the{" "}
-                      <a href="/terms-and-conditions" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
-                        Terms & Conditions
-                      </a>{" "}
-                      and{" "}
-                      <a href="/privacy-policy" target="_blank" rel="noreferrer" className="text-[#2563eb] underline">
-                        Privacy Policy
-                      </a>
-                    </span>
-                  </label>
-                </div>
-
                 {loginError ? <p className="text-sm text-red-600">{loginError}</p> : null}
 
-                <Button type="submit" className="w-full" disabled={loading || !loginCanContinue}>
+                <Button type="submit" className="w-full" disabled={loading}>
                   {loading ? (
                     <span className="inline-flex items-center gap-2">
                       <Loader2 className="size-4 animate-spin" />
@@ -603,7 +560,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     type="button"
                     variant="outline"
                     className="w-full border-slate-900 text-slate-900 hover:bg-slate-900 hover:text-white"
-                    disabled={!loginCanContinue || loading}
+                    disabled={loading}
                     onClick={() => void handleAppleLogin("login")}
                   >
                     Sign in with Apple
@@ -613,7 +570,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                       type="button"
                       variant="outline"
                       className="w-full border-[#0A66C2] text-[#0A66C2] hover:bg-[#0A66C2] hover:text-white"
-                      disabled={!loginCanContinue || loading}
+                      disabled={loading}
                       onClick={() => handleLinkedInAuth("login")}
                     >
                       Sign in with LinkedIn
@@ -757,25 +714,21 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     />
                     <span>
                       I agree to the{" "}
-                      <a
-                        href="/terms-and-conditions"
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => openSignupTermsModal("terms")}
                         className="text-[#2563eb] underline"
-                        onClick={(event) => event.stopPropagation()}
                       >
                         Terms & Conditions
-                      </a>{" "}
+                      </button>{" "}
                       and{" "}
-                      <a
-                        href="/privacy-policy"
-                        target="_blank"
-                        rel="noreferrer"
+                      <button
+                        type="button"
+                        onClick={() => openSignupTermsModal("privacy")}
                         className="text-[#2563eb] underline"
-                        onClick={(event) => event.stopPropagation()}
                       >
                         Privacy Policy
-                      </a>
+                      </button>
                     </span>
                   </label>
                 </div>

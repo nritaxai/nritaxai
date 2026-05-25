@@ -58,8 +58,8 @@ export function TermsModal({
   const handleContinue = () => {
     if (!checked) return;
 
-    sessionStorage.setItem("signupTermsAccepted", "true");
-    sessionStorage.setItem("signupTermsAcceptedAt", new Date().toISOString());
+    sessionStorage.setItem("termsAccepted", "true");
+    sessionStorage.setItem("termsAcceptedAt", new Date().toISOString());
     onAccept();
   };
 
