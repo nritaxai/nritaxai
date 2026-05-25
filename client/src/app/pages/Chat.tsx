@@ -1134,10 +1134,6 @@ export function Chat({ onRequireLogin }: ChatProps) {
                       <Trash2 className="mr-2 size-4" />
                       Start New Chat
                     </Button>
-                    <Button type="button" variant="outline" className="justify-start rounded-2xl border-[#D9E2F0] bg-white px-4 py-6 text-[#0F172A]" onClick={downloadChatTranscript}>
-                      <Download className="mr-2 size-4" />
-                      Download Chat
-                    </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="min-h-0 flex-1 overflow-y-auto p-3">
@@ -1159,10 +1155,7 @@ export function Chat({ onRequireLogin }: ChatProps) {
                               : "border-[#E2E8F0] bg-white hover:border-[#93C5FD] hover:bg-[#F8FBFF]"
                           }`}
                         >
-                          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">
-                            {item.messageCount ? `${item.messageCount} question${item.messageCount === 1 ? "" : "s"}` : "New chat"}
-                          </span>
-                          <span className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-[#0F172A]">
+                          <span className="line-clamp-2 text-sm font-semibold leading-6 text-[#0F172A]">
                             {item.title}
                           </span>
                         </button>

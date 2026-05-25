@@ -334,8 +334,52 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
     theme: "outline" as const,
     shape: "rectangular" as const,
     size: "large" as const,
-    width: "100%",
+    width: "380",
     logo_alignment: "left" as const,
+  };
+
+  const handleGoogleAuthSuccess = async (
+    mode: "login" | "signup",
+    credentialResponse: { credential?: string }
+  ) => {
+    try {
+      if (!credentialResponse.credential) {
+        throw new Error("Missing Google credential.");
+      }
+
+      const payload =
+        mode === "signup"
+          ? {
+              credential: credentialResponse.credential,
+              termsAccepted: true,
+              policyVersion: CURRENT_POLICY_VERSION,
+              country: selectedSignupCountry?.name,
+              countryCode: signupData.countryCode,
+            }
+          : {
+              credential: credentialResponse.credential,
+              termsAccepted: loginTermsAccepted,
+              policyVersion: loginTermsAccepted ? CURRENT_POLICY_VERSION : undefined,
+            };
+
+      const response = await googleLoginUser(payload);
+      const user = resolveAuthUser(response);
+      handleAuthSuccess(
+        response,
+        mode === "signup"
+          ? `Account created successfully! WELCOME ${user?.name || "User"}`
+          : `WELCOME ${user?.name || "User"}!`
+      );
+    } catch (error: any) {
+      const message = getApiErrorMessage(error, mode === "signup" ? "Google signup failed." : "Google login failed.");
+      console.error(`[auth] google ${mode} failed`, { message });
+      if (mode === "signup") {
+        setSignupError(message);
+      } else {
+        setLoginError(message);
+      }
+      showPopup(message, "error");
+    }
   };
 
   const fieldClassName =
@@ -524,37 +568,19 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     </Button>
                   ) : null}
                   {canUseGoogleAuth ? (
-                    <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
-                      {loginCanContinue ? (
+                    <div className="flex w-full justify-center overflow-hidden rounded-md">
+                      <div className="w-full max-w-[380px] overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
                         <GoogleLogin
                           text="signin_with"
                           {...googleButtonProps}
-                          onSuccess={async (credentialResponse) => {
-                            try {
-                              if (!credentialResponse.credential) {
-                                throw new Error("Missing Google credential.");
-                              }
-                              const response = await googleLoginUser(credentialResponse.credential);
-                              const user = resolveAuthUser(response);
-                              handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
-                            } catch (error: any) {
-                              const message = getApiErrorMessage(error, "Google login failed.");
-                              console.error("[auth] google login failed", { message });
-                              setLoginError(message);
-                              showPopup(message, "error");
-                            }
-                          }}
+                          onSuccess={(credentialResponse) => void handleGoogleAuthSuccess("login", credentialResponse)}
                           onError={() => {
                             const message = `Google Sign-In is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setLoginError(message);
                             showPopup(message, "error", 4000);
                           }}
                         />
-                      ) : (
-                        <Button type="button" variant="outline" className="w-full" disabled>
-                          Sign in with Google
-                        </Button>
-                      )}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -732,35 +758,13 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     </Button>
                   ) : null}
                   {canUseGoogleAuth ? (
-                    <div className="w-full overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
+                    <div className="flex w-full justify-center overflow-hidden rounded-md">
+                      <div className="w-full max-w-[380px] overflow-hidden rounded-md [&>div]:!w-full [&>div>div]:!w-full">
                       {signupCanContinue ? (
                         <GoogleLogin
                           text="signup_with"
                           {...googleButtonProps}
-                          onSuccess={async (credentialResponse) => {
-                            try {
-                              if (!credentialResponse.credential) {
-                                throw new Error("Missing Google credential.");
-                              }
-                              const response = await googleLoginUser({
-                                credential: credentialResponse.credential,
-                                termsAccepted: true,
-                                policyVersion: CURRENT_POLICY_VERSION,
-                                country: selectedSignupCountry?.name,
-                                countryCode: signupData.countryCode,
-                              });
-                              const user = resolveAuthUser(response);
-                              handleAuthSuccess(
-                                response,
-                                `Account created successfully! WELCOME ${user?.name || "User"}`
-                              );
-                            } catch (error: any) {
-                              const message = getApiErrorMessage(error, "Google signup failed.");
-                              console.error("[auth] google signup failed", { message });
-                              setSignupError(message);
-                              showPopup(message, "error");
-                            }
-                          }}
+                          onSuccess={(credentialResponse) => void handleGoogleAuthSuccess("signup", credentialResponse)}
                           onError={() => {
                             const message = `Google Sign-Up is blocked for ${GOOGLE_AUTH_CONFIG.origin || window.location.origin}.`;
                             setSignupError(message);
@@ -772,6 +776,7 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                           Sign up with Google
                         </Button>
                       )}
+                      </div>
                     </div>
                   ) : null}
                 </div>

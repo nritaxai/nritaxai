@@ -693,7 +693,9 @@ export const googleLogin = async (req, res) => {
     }
 
     // Check if user already exists
-    let user = await User.findOne({ email: normalizedEmail });
+    let user = await User.findOne({
+      $or: [{ email: normalizedEmail }, { googleId: sub }],
+    });
 
     const isNewUser = !user;
 
@@ -725,6 +727,10 @@ export const googleLogin = async (req, res) => {
       }
       if (!user.provider || user.provider === "local") {
         user.provider = "google";
+        changed = true;
+      }
+      if (!user.termsAccepted && hasTermsAcceptancePayload(req)) {
+        applyTermsAcceptance(user, req);
         changed = true;
       }
       if (changed) {
