@@ -757,21 +757,25 @@ export function LoginModal({ onClose, disableClose = false, initialMode = "login
                     />
                     <span>
                       I agree to the{" "}
-                      <button
-                        type="button"
-                        onClick={() => openSignupTermsModal("terms")}
+                      <a
+                        href="/terms-and-conditions"
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-[#2563eb] underline"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         Terms & Conditions
-                      </button>{" "}
+                      </a>{" "}
                       and{" "}
-                      <button
-                        type="button"
-                        onClick={() => openSignupTermsModal("privacy")}
+                      <a
+                        href="/privacy-policy"
+                        target="_blank"
+                        rel="noreferrer"
                         className="text-[#2563eb] underline"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         Privacy Policy
-                      </button>
+                      </a>
                     </span>
                   </label>
                 </div>
