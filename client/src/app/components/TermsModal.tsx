@@ -45,6 +45,27 @@ export function TermsModal({
     };
   }, [isOpen, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const checkScrollableHeight = () => {
+      const element = contentRef.current;
+      if (!element) return;
+
+      if (element.scrollHeight <= element.clientHeight + 20) {
+        setHasScrolled(true);
+      }
+    };
+
+    const frame = window.requestAnimationFrame(checkScrollableHeight);
+    window.addEventListener("resize", checkScrollableHeight);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.removeEventListener("resize", checkScrollableHeight);
+    };
+  }, [isOpen, type]);
+
   const handleScroll = () => {
     const element = contentRef.current;
     if (!element) return;
@@ -69,7 +90,7 @@ export function TermsModal({
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="terms-modal-title"
@@ -79,7 +100,7 @@ export function TermsModal({
         }
       }}
     >
-      <div className="animate-fadeIn flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div className="animate-fadeIn relative z-[60] flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 id="terms-modal-title" className="text-lg font-semibold text-slate-900">
             {title}
@@ -98,7 +119,7 @@ export function TermsModal({
         <div
           ref={contentRef}
           onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-6 py-5 text-sm leading-relaxed text-slate-700"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 py-4 text-sm leading-relaxed text-slate-700"
           tabIndex={0}
         >
           {type === "terms" ? <TermsContent /> : <PrivacyContent />}
