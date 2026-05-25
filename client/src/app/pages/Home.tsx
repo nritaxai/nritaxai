@@ -219,7 +219,7 @@ export function Home({ onRequireLogin }: HomeProps) {
               variants={fadeUp}
               className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-blue-600"
             >
-              {renderTextWithShortForms(heroContent.badge)}
+              {heroContent.badge}
             </motion.span>
             <motion.h1 variants={fadeUp} className="mt-6 text-5xl font-bold tracking-tight text-gray-900 md:text-6xl">
               {heroContent.headline}
