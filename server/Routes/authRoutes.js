@@ -59,6 +59,7 @@ router.get("/profile", protect, getUserProfile);
 
 router.put("/profile", protect, rejectLockedCountryMutation, updateUserProfile);
 router.post("/country-change-request", protect, requestCountryChange);
+router.post("/request-country-change", protect, requestCountryChange);
 router.get("/admin/country-change-requests", protect, requireCountryAdmin, listCountryChangeRequests);
 router.put("/admin/country-change-requests/:requestId", protect, requireCountryAdmin, decideCountryChangeRequest);
 router.put("/change-password", protect, changePassword);

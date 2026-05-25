@@ -197,12 +197,11 @@ export function Profile() {
       name.trim() !== profile.name.trim() ||
       (profileImage || "").trim() !== (profile.profileImage || "").trim() ||
       phone.trim() !== (profile.phone || "").trim() ||
-      countryOfResidence.trim() !== (profile.countryOfResidence || "").trim() ||
       preferredLanguage !== (profile.preferredLanguage || "english") ||
       bio.trim() !== (profile.bio || "").trim() ||
       linkedinProfile.trim() !== (profile.linkedinProfile || "").trim()
     );
-  }, [name, profileImage, phone, countryOfResidence, preferredLanguage, bio, linkedinProfile, profile]);
+  }, [name, profileImage, phone, preferredLanguage, bio, linkedinProfile, profile]);
 
   useEffect(() => {
     if (!token) {
@@ -351,8 +350,6 @@ export function Profile() {
         name: name.trim(),
         profileImage: profileImage.trim(),
         phone: phone.trim(),
-        countryOfResidence: countryOfResidence.trim(),
-        countryCode: requestedCountryCode || profile?.countryCode || "",
         preferredLanguage,
         bio: bio.trim(),
         linkedinProfile: linkedinProfile.trim(),
@@ -791,7 +788,7 @@ export function Profile() {
                       <Select
                         value={countryOfResidence}
                         onValueChange={setCountryOfResidence}
-                        disabled={Boolean(profile?.countryLocked)}
+                        disabled
                       >
                         <SelectTrigger id="countryOfResidence">
                           <SelectValue placeholder="Select country" />
@@ -805,11 +802,7 @@ export function Profile() {
                         </SelectContent>
                       </Select>
                       <p className="text-xs text-white/60">
-                        {profile?.countryLocked
-                          ? `Locked to ${profile.countryOfResidence || "your signup country"}. Changes now require support or admin approval.`
-                          : countryOfResidence
-                          ? `Selected: ${countryOfResidence}`
-                          : "Auto-detect will be used when available, with manual selection as fallback."}
+                        {`Country changes require approval. Current country: ${profile?.countryOfResidence || "Not set"}.`}
                       </p>
                     </div>
                   </div>
@@ -916,7 +909,7 @@ export function Profile() {
                       <Label htmlFor="country-readonly">Country of Residence</Label>
                       <Input id="country-readonly" value={profile?.countryOfResidence || "Not set"} className="bg-[#F7FAFC]" disabled />
                       <p className="text-xs text-[#475569]">
-                        {profile?.countryLocked ? `Country locked at signup (${profile.countryCode || "N/A"}).` : "Country can still be updated directly."}
+                        {profile?.countryLocked ? `Country locked at signup (${profile.countryCode || "N/A"}).` : "Country changes require approval."}
                       </p>
                     </div>
                   </div>

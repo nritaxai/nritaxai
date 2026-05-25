@@ -465,9 +465,15 @@ const ensureWelcomeEmailSent = async (userDoc) => {
   }
 };
 
+const resolveAcceptanceDate = (value) => {
+  const candidate = value ? new Date(value) : new Date();
+  return Number.isNaN(candidate.getTime()) ? new Date() : candidate;
+};
+
 const buildTermsAcceptance = (req) => ({
   termsAccepted: true,
-  acceptedAt: new Date(),
+  acceptedAt: resolveAcceptanceDate(req.body?.termsAcceptedAt || req.body?.acceptedAt),
+  termsAcceptedAt: resolveAcceptanceDate(req.body?.termsAcceptedAt || req.body?.acceptedAt),
   policyVersion: sanitizeString(req.body?.policyVersion) || CURRENT_POLICY_VERSION,
   acceptedIp: getRequestIp(req),
 });
@@ -478,6 +484,7 @@ const applyTermsAcceptance = (userDoc, req) => {
   const acceptance = buildTermsAcceptance(req);
   userDoc.termsAccepted = acceptance.termsAccepted;
   userDoc.acceptedAt = acceptance.acceptedAt;
+  userDoc.termsAcceptedAt = acceptance.termsAcceptedAt;
   userDoc.policyVersion = acceptance.policyVersion;
   userDoc.acceptedIp = acceptance.acceptedIp;
 };
@@ -515,6 +522,7 @@ const applySignupCountrySelection = (userDoc, countrySelection, { actor = null, 
   userDoc.initialCountryName = userDoc.initialCountryName || selection.country;
   userDoc.countryLocked = true;
   userDoc.countryLockedAt = userDoc.countryLockedAt || new Date();
+  userDoc.countryVerified = Boolean(userDoc.countryVerified);
   userDoc.countryApprovalStatus = "none";
   userDoc.countryChangeStatus = "none";
   userDoc.countryChangeRequest = {
@@ -571,6 +579,7 @@ const toSafeUser = (userDoc) => {
     initialCountry: user.initialCountry || "",
     initialCountryName: user.initialCountryName || "",
     countryLocked: Boolean(user.countryLocked),
+    countryVerified: Boolean(user.countryVerified),
     countryApprovalStatus: toCountryChangeStatus(user),
     countryChangeStatus: toCountryChangeStatus(user),
     countryChangeRequest: user.countryChangeRequest || null,
@@ -582,6 +591,7 @@ const toSafeUser = (userDoc) => {
     provider: user.provider || "local",
     roles: Array.isArray(user.roles) ? user.roles : ["end_user"],
     termsAccepted: Boolean(user.termsAccepted),
+    termsAcceptedAt: user.termsAcceptedAt || user.acceptedAt || null,
     acceptedAt: user.acceptedAt || null,
     policyVersion: user.policyVersion || "",
     plan: user.plan || subscriptionSummary.plan,
@@ -616,6 +626,7 @@ const toAppleAuthResponseUser = (userDoc) => {
     countryApprovalStatus: safeUser.countryApprovalStatus,
     countryChangeStatus: safeUser.countryChangeStatus,
     termsAccepted: safeUser.termsAccepted,
+    termsAcceptedAt: safeUser.termsAcceptedAt,
     acceptedAt: safeUser.acceptedAt,
     policyVersion: safeUser.policyVersion,
   };
@@ -792,7 +803,7 @@ export const googleNativeLogin = async (req, res) => {
     }
 
     let user = await User.findOne({
-      email: normalizedEmail
+      $or: [{ email: normalizedEmail }, { googleId: sub }],
     });
     const isNewUser = !user;
 
@@ -820,6 +831,14 @@ export const googleNativeLogin = async (req, res) => {
       }
       if (!user.profileImage && picture) {
         user.profileImage = picture;
+        changed = true;
+      }
+      if (!user.provider || user.provider === "local") {
+        user.provider = "google";
+        changed = true;
+      }
+      if (!user.termsAccepted && hasTermsAcceptancePayload(req)) {
+        applyTermsAcceptance(user, req);
         changed = true;
       }
       if (changed) await user.save();
@@ -1408,6 +1427,18 @@ export const updateUserProfile = async (req, res) => {
     const phone = normalizePhone(req.body?.phone);
     const linkedinProfile = sanitizeString(req.body?.linkedinProfile);
 
+    if (
+      Object.prototype.hasOwnProperty.call(req.body || {}, "country") ||
+      Object.prototype.hasOwnProperty.call(req.body || {}, "countryCode") ||
+      Object.prototype.hasOwnProperty.call(req.body || {}, "countryOfResidence")
+    ) {
+      return res.status(403).json({
+        success: false,
+        code: "COUNTRY_APPROVAL_REQUIRED",
+        message: "Country change requires approval",
+      });
+    }
+
     if (name && name.length < 2) {
       return res.status(400).json({
         success: false,
@@ -1464,57 +1495,9 @@ export const updateUserProfile = async (req, res) => {
       });
     }
 
-    const requestedCountryCode = normalizeCountryCode(req.body?.countryCode || countryOfResidence);
-    const currentCountryCode = normalizeCountryCode(user.countryCode || user.countryOfResidence);
-
-    if (
-      user.countryLocked &&
-      ((countryOfResidence && countryOfResidence !== (user.countryOfResidence || user.country || "")) ||
-        (requestedCountryCode && requestedCountryCode !== currentCountryCode))
-    ) {
-      user.countryAuditLogs = [
-        ...(Array.isArray(user.countryAuditLogs) ? user.countryAuditLogs : []),
-        buildCountryAuditEntry({
-          action: "country.profile_mutation_blocked",
-          fromCountry: user.countryOfResidence || user.country || "",
-          fromCountryCode: user.countryCode || "",
-          toCountry: countryOfResidence,
-          toCountryCode: requestedCountryCode,
-          status: "blocked",
-          actor: user._id,
-        }),
-      ].slice(-50);
-      await user.save();
-      await writeSecurityAuditLog({
-        req,
-        action: "country.profile_mutation_blocked",
-        category: "country",
-        status: "blocked",
-        severity: "medium",
-        message: "Blocked profile API attempt to mutate locked signup country.",
-        metadata: {
-          requestedCountry: countryOfResidence,
-          requestedCountryCode,
-          currentCountry: user.countryOfResidence || user.country || "",
-          currentCountryCode: user.countryCode || "",
-        },
-      });
-      return res.status(403).json({
-        success: false,
-        code: "COUNTRY_LOCKED",
-        message: "Signup country is locked. Submit a country change request for admin approval.",
-      });
-    }
-
     user.name = name || user.name;
     user.profileImage = profileImage;
     user.phone = phone;
-    if (!user.countryLocked && countryOfResidence) {
-      const unlockedRule = resolveCountryRule(requestedCountryCode || countryOfResidence);
-      user.country = unlockedRule.name;
-      user.countryOfResidence = unlockedRule.name;
-      user.countryCode = unlockedRule.code;
-    }
     user.bio = bio;
     if (linkedinProfile || user.linkedinProfile) {
       user.linkedinProfile = linkedinProfile;
@@ -1554,8 +1537,9 @@ export const requestCountryChange = async (req, res) => {
       });
     }
 
-    const currentCountryCode = normalizeCountryCode(user.countryCode || user.countryOfResidence);
-    if (requestedCountryCode === currentCountryCode) {
+    const hasCurrentCountry = Boolean(normalizeCountryCode(user.countryCode || user.countryOfResidence || user.country));
+    const currentCountryCode = normalizeCountryCode(user.countryCode || user.countryOfResidence || user.country);
+    if (hasCurrentCountry && requestedCountryCode === currentCountryCode) {
       return res.status(400).json({
         success: false,
         code: "COUNTRY_UNCHANGED",
@@ -1574,13 +1558,13 @@ export const requestCountryChange = async (req, res) => {
     }
 
     const requestedRule = resolveCountryRule(requestedCountryCode);
-    const currentRule = resolveCountryRule(currentCountryCode || user.countryOfResidence);
+    const currentRule = hasCurrentCountry ? resolveCountryRule(currentCountryCode || user.countryOfResidence) : null;
     const reason = sanitizeString(req.body?.reason).slice(0, 500);
     const changeRequest = await CountryChangeRequest.create({
       user: user._id,
-      currentCountryCode: currentRule.code,
+      currentCountryCode: currentRule?.code || "UNSET",
       requestedCountryCode: requestedRule.code,
-      currentCountryName: user.countryOfResidence || user.country || currentRule.name,
+      currentCountryName: user.countryOfResidence || user.country || currentRule?.name || "Not set",
       requestedCountryName: requestedRule.name,
       reason,
       requestedBy: "user",
@@ -1604,7 +1588,7 @@ export const requestCountryChange = async (req, res) => {
       buildCountryAuditEntry({
         action: "country.change_requested",
         fromCountry: user.countryOfResidence || user.country || "",
-        fromCountryCode: user.countryCode || "",
+        fromCountryCode: user.countryCode || currentRule?.code || "",
         toCountry: requestedRule.name,
         toCountryCode: requestedRule.code,
         status: "pending",
@@ -1624,7 +1608,7 @@ export const requestCountryChange = async (req, res) => {
       message: "User requested locked country change.",
       metadata: {
         requestId: String(changeRequest._id),
-        fromCountryCode: currentRule.code,
+        fromCountryCode: currentRule?.code || "UNSET",
         toCountryCode: requestedRule.code,
       },
     });

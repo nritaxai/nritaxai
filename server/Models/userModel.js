@@ -49,12 +49,12 @@ const userSchema = new mongoose.Schema(
     countryOfResidence: {
       type: String,
       trim: true,
-      default: "",
+      default: null,
     },
     country: {
       type: String,
       trim: true,
-      default: "",
+      default: null,
     },
     countryCode: {
       type: String,
@@ -80,6 +80,10 @@ const userSchema = new mongoose.Schema(
     countryLockedAt: {
       type: Date,
       default: null,
+    },
+    countryVerified: {
+      type: Boolean,
+      default: false,
     },
     countryApprovalStatus: {
       type: String,
@@ -237,6 +241,10 @@ const userSchema = new mongoose.Schema(
     termsAccepted: {
       type: Boolean,
       default: false,
+    },
+    termsAcceptedAt: {
+      type: Date,
+      default: null,
     },
     acceptedAt: {
       type: Date,

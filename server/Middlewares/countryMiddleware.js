@@ -9,7 +9,7 @@ export const resolveSignupCountrySelection = (body = {}) => {
   const normalizedCountryCode = normalizeCountryCode(rawCountryCode || rawCountry);
 
   if (!normalizedCountryCode) {
-    const error = new Error("Please select a supported country during signup.");
+    const error = new Error(rawCountryCode || rawCountry ? "Please select a supported country during signup." : "Country is required");
     error.statusCode = 400;
     error.code = "COUNTRY_REQUIRED";
     throw error;
@@ -66,7 +66,7 @@ export const rejectLockedCountryMutation = async (req, res, next) => {
 
   return res.status(403).json({
     success: false,
-    code: "COUNTRY_LOCKED",
-    message: "Signup country is locked. Submit a country change request for admin approval.",
+    code: "COUNTRY_APPROVAL_REQUIRED",
+    message: "Country change requires approval",
   });
 };
