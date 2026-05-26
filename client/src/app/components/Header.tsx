@@ -14,6 +14,7 @@ import { clearStoredAuth, getStoredAuthToken, getUserProfile } from "../../utils
 import { PREMIUM_EASE } from "../utils/motion";
 interface HeaderProps {
   onLogin: () => void;
+  onSignup: () => void;
 }
 
 interface User {
@@ -44,7 +45,7 @@ const parseStoredUser = () => {
   }
 };
 
-export function Header({ onLogin }: HeaderProps) {
+export function Header({ onLogin, onSignup }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -60,6 +61,7 @@ export function Header({ onLogin }: HeaderProps) {
     { to: "/pricing", label: "Pricing" },
     { to: "/calculators", label: "Tax Calculator" },
   ] as const;
+  const showBackButton = !["/", "/home", "/hero", "/Hero"].includes(location.pathname);
 
   const isNavItemActive = (to: string) => {
     const [path, hash] = to.split("#");
@@ -187,14 +189,16 @@ export function Header({ onLogin }: HeaderProps) {
           </Link>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleGoBack}
-              aria-label="Go back"
-              className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
-            >
-              <ChevronLeft className="size-5" />
-            </button>
+            {showBackButton ? (
+              <button
+                type="button"
+                onClick={handleGoBack}
+                aria-label="Go back"
+                className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
+              >
+                <ChevronLeft className="size-5" />
+              </button>
+            ) : null}
             <button
               className="rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-800 shadow-sm transition-colors hover:text-blue-700"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -218,14 +222,16 @@ export function Header({ onLogin }: HeaderProps) {
         <div className="mx-auto max-w-6xl px-4 md:px-6">
           <div className="flex h-20 items-center justify-between gap-6">
             <div className="flex items-center gap-3 lg:gap-5">
-              <button
-                type="button"
-                onClick={handleGoBack}
-                aria-label="Go back"
-                className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
-              >
-                <ChevronLeft className="size-5" />
-              </button>
+              {showBackButton ? (
+                <button
+                  type="button"
+                  onClick={handleGoBack}
+                  aria-label="Go back"
+                  className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/80 p-2.5 text-slate-700 shadow-sm transition-colors hover:bg-white hover:text-slate-900"
+                >
+                  <ChevronLeft className="size-5" />
+                </button>
+              ) : null}
               <Link to="/home" className="inline-flex items-center" aria-label="NRITAX home">
                 <img
                   src="/logo-transparent.png"
@@ -287,13 +293,21 @@ export function Header({ onLogin }: HeaderProps) {
                   </Button>
                 </>
               ) : (
-                <Button
-                  variant="ghost"
-                  onClick={onLogin}
-                  className="h-11 rounded-full border border-slate-200/80 bg-white/85 px-5 text-slate-900 shadow-sm hover:bg-white"
-                >
-                  Login / Sign Up
-                </Button>
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="ghost"
+                    onClick={onLogin}
+                    className="h-11 rounded-full border border-slate-200/80 bg-white/80 px-5 text-slate-900 shadow-sm hover:bg-white"
+                  >
+                    Login
+                  </Button>
+                  <Button
+                    onClick={onSignup}
+                    className="h-11 rounded-full bg-[linear-gradient(135deg,#0F172A,#1D4ED8)] px-5 text-white shadow-[0_16px_34px_rgba(29,78,216,0.20)] hover:brightness-110"
+                  >
+                    Sign Up
+                  </Button>
+                </div>
               )}
             </div>
           </div>
@@ -349,17 +363,29 @@ export function Header({ onLogin }: HeaderProps) {
                     </Button>
                   </>
                 ) : (
-                  <Button
-                    variant="ghost"
-                    onClick={() => {
-                      setMobileMenuOpen(false);
-                      onLogin();
-                    }}
-                    className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
-                  >
-                    <LogIn className="mr-2 size-4" />
-                    Login / Sign Up
-                  </Button>
+                  <div className="grid gap-2">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onLogin();
+                      }}
+                      className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
+                    >
+                      <LogIn className="mr-2 size-4" />
+                      Login
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setMobileMenuOpen(false);
+                        onSignup();
+                      }}
+                      className="h-11 w-full justify-start rounded-2xl bg-[linear-gradient(135deg,#0F172A,#1D4ED8)] text-white shadow-[0_16px_34px_rgba(29,78,216,0.20)] hover:brightness-110"
+                    >
+                      <LogIn className="mr-2 size-4" />
+                      Sign Up
+                    </Button>
+                  </div>
                 )}
               </div>
             </div>

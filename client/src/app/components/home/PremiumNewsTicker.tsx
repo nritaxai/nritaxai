@@ -149,14 +149,14 @@ const getCategoryTone = (label?: string) => {
   }
 
   if (normalized.includes("CBDT")) {
-    return "border-violet-300/30 bg-violet-400/12 text-violet-100 shadow-[0_0_20px_rgba(167,139,250,0.12)]";
+    return "border-amber-300/35 bg-amber-300/14 text-amber-50 shadow-[0_0_20px_rgba(251,191,36,0.12)]";
   }
 
   if (normalized.includes("NRI")) {
     return "border-amber-300/30 bg-amber-400/12 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.12)]";
   }
 
-  return "border-sky-200/25 bg-white/10 text-slate-100 shadow-[0_0_18px_rgba(148,163,184,0.10)]";
+  return "border-sky-200/30 bg-sky-300/10 text-slate-50 shadow-[0_0_18px_rgba(56,189,248,0.10)]";
 };
 
 function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) {
@@ -172,7 +172,7 @@ function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) 
       href={href}
       target={href.startsWith("http") ? "_blank" : undefined}
       rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-      className="group/item inline-flex h-10 shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-2.5 pr-3 text-sm text-white/90 shadow-[0_16px_34px_rgba(2,6,23,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-white/18 hover:bg-white/[0.08] hover:shadow-[0_18px_40px_rgba(15,23,42,0.32),0_0_0_1px_rgba(148,163,184,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+      className="group/item inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-white/12 bg-white/[0.055] px-3 pr-3.5 text-sm text-slate-50 shadow-[0_16px_34px_rgba(2,6,23,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200/28 hover:bg-white/[0.09] hover:shadow-[0_18px_40px_rgba(15,23,42,0.32),0_0_0_1px_rgba(148,163,184,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
       tabIndex={clone ? -1 : undefined}
       aria-hidden={clone || undefined}
     >
@@ -181,18 +181,18 @@ function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) 
       >
         {itemLabel}
       </span>
-      <span className="max-w-[180px] truncate text-[13px] font-semibold text-white md:max-w-[340px]">
+      <span className="max-w-[190px] truncate text-[13px] font-semibold text-white md:max-w-[360px]">
         {headline}
       </span>
       <span className="hidden h-1 w-1 shrink-0 rounded-full bg-white/22 sm:inline-flex" aria-hidden="true" />
-      <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/[0.045] px-2 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-slate-300 sm:inline-flex">
+      <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-100 sm:inline-flex">
         {itemCountry}
       </span>
-      <span className="hidden text-[11px] font-medium text-slate-400 lg:inline-flex">
+      <span className="hidden text-[11px] font-medium text-cyan-100/90 lg:inline-flex">
         {itemType}
       </span>
       {item.date ? (
-        <span className="hidden text-[11px] font-medium text-slate-500 xl:inline-flex">
+        <span className="hidden text-[11px] font-medium text-slate-300 xl:inline-flex">
           {formatBannerDate(item.date)}
         </span>
       ) : null}
@@ -260,7 +260,7 @@ export default function PremiumNewsTicker() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: PREMIUM_EASE }}
       aria-label="Live tax intelligence updates"
-      className="relative z-40 w-full border-b border-white/8 bg-[linear-gradient(90deg,rgba(15,23,42,0.94),rgba(16,24,40,0.9),rgba(30,41,59,0.88))] shadow-[0_18px_48px_rgba(2,6,23,0.18)] backdrop-blur-xl"
+      className="relative z-40 w-full border-b border-cyan-200/10 bg-[linear-gradient(90deg,#0F172A_0%,#111C34_52%,#172554_100%)] shadow-[0_18px_48px_rgba(2,6,23,0.22)] backdrop-blur-xl"
     >
       <style>{`
         @keyframes premium-news-ticker-scroll {
@@ -268,14 +268,14 @@ export default function PremiumNewsTicker() {
           to { transform: translate3d(-50%, 0, 0); }
         }
       `}</style>
-      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-200/20 to-transparent" aria-hidden="true" />
-      <div className="mx-auto flex min-h-[52px] max-w-6xl items-center gap-3 px-4 md:px-6">
-        <div className="hidden shrink-0 items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-200 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:inline-flex">
+      <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-cyan-200/25 to-transparent" aria-hidden="true" />
+      <div className="mx-auto flex min-h-[56px] max-w-6xl items-center gap-3 px-4 md:px-6">
+        <div className="hidden shrink-0 items-center gap-2 rounded-full border border-cyan-200/12 bg-white/[0.06] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:inline-flex">
           <span className="relative flex size-2.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-300/55 motion-reduce:hidden" />
             <span className="relative inline-flex size-2.5 rounded-full bg-cyan-300 shadow-[0_0_12px_rgba(34,211,238,0.85)]" />
           </span>
-          Live
+          Live Tax Updates
         </div>
 
         <div className="relative flex min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]">

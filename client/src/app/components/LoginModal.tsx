@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Card,
   CardContent,
@@ -10,7 +11,6 @@ import {
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./ui/tabs";
 import { Checkbox } from "./ui/checkbox";
 import {
   Apple,
@@ -137,6 +137,9 @@ export function LoginModal({
     message: string;
     type: "success" | "error";
   } | null>(null);
+  const loginEmailRef = useRef<HTMLInputElement | null>(null);
+  const signupNameRef = useRef<HTMLInputElement | null>(null);
+  const shouldReduceMotion = useReducedMotion();
 
   const canUseGoogleAuth = Boolean(GOOGLE_AUTH_CONFIG.clientId);
   const canUseLinkedInAuth = Boolean(LINKEDIN_AUTH_CONFIG.authBaseUrl);
@@ -195,6 +198,25 @@ export function LoginModal({
       setSignupData((prev) => ({ ...prev, termsAccepted: true }));
     }
   }, []);
+
+  useEffect(() => {
+    setActiveTab(initialMode);
+    setForgotPasswordMode(false);
+    setLoginError(null);
+    setSignupError(null);
+  }, [initialMode]);
+
+  useEffect(() => {
+    const input = activeTab === "signup" ? signupNameRef.current : loginEmailRef.current;
+    if (!input) return;
+
+    const timeoutId = window.setTimeout(() => {
+      input.focus();
+      input.select?.();
+    }, shouldReduceMotion ? 0 : 170);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeTab, shouldReduceMotion]);
 
   const showPopup = (message: string, type: "success" | "error", duration = 2500) => {
     setPopup({ message, type });
@@ -517,7 +539,14 @@ export function LoginModal({
   };
 
   const fieldClassName =
-    "h-12 rounded-2xl border border-white/12 bg-white/[0.07] px-4 text-[15px] text-white placeholder:text-slate-500 focus-visible:border-[#60A5FA] focus-visible:ring-[#2563EB]/30";
+    "h-11 rounded-2xl border border-white/12 bg-white/[0.07] px-4 text-[15px] text-white placeholder:text-slate-500 focus-visible:border-[#60A5FA] focus-visible:ring-[#2563EB]/30";
+
+  const switchAuthMode = (mode: "login" | "signup") => {
+    setActiveTab(mode);
+    setForgotPasswordMode(false);
+    setLoginError(null);
+    setSignupError(null);
+  };
 
   const renderGoogleButton = (mode: "login" | "signup") => (
     <div className="relative flex w-full justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
@@ -570,7 +599,7 @@ export function LoginModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(125,211,252,0.12),transparent_28%),linear-gradient(180deg,#020617_0%,#081121_52%,#0F172A_100%)]">
+    <div className="fixed inset-0 z-50 min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_top_right,rgba(37,99,235,0.14),transparent_30%),linear-gradient(180deg,#020617_0%,#081121_48%,#0F172A_100%)]">
       <TermsModal
         isOpen={signupTermsModalOpen}
         type={signupTermsModalType}
@@ -584,99 +613,174 @@ export function LoginModal({
         <div className="absolute bottom-[10%] left-[18%] h-48 w-48 rounded-full bg-sky-300/8 blur-3xl" />
       </div>
 
-      <div className="relative flex min-h-dvh items-start justify-center px-4 py-6 sm:items-center sm:px-6 lg:px-8">
-        <Card className="relative max-h-[92dvh] w-full max-w-[34rem] overflow-y-auto rounded-[24px] border-white/8 bg-[rgba(15,23,42,0.72)] text-white shadow-[0_10px_40px_rgba(0,0,0,0.25),inset_0_1px_0_rgba(255,255,255,0.05)] backdrop-blur-[16px]">
+      <div className="relative flex min-h-screen items-center justify-center px-3 py-3 sm:px-5 sm:py-5">
+        <Card className="relative h-[min(100vh-1.5rem,44rem)] w-full max-w-[70rem] overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(8,15,30,0.92)] text-white shadow-[0_32px_90px_rgba(2,6,23,0.52),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[18px]">
           <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/50 to-transparent" aria-hidden="true" />
+          <div className="grid h-full min-h-0 lg:grid-cols-[0.94fr_1.06fr]">
+            <CardHeader className="relative flex min-h-0 flex-col justify-between overflow-hidden border-b border-white/10 px-5 pb-5 pt-5 sm:px-6 lg:border-b-0 lg:border-r lg:px-8 lg:pb-8 lg:pt-7">
+              <div className="space-y-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-3">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-100">
+                      <Sparkles className="size-3.5" />
+                      {authCopy.eyebrow}
+                    </div>
+                    <div className="space-y-2">
+                      <CardTitle className="max-w-[18rem] text-[2rem] font-semibold tracking-tight text-white sm:text-[2.25rem]">
+                        {authCopy.title}
+                      </CardTitle>
+                      <CardDescription className="max-w-[28rem] text-sm leading-6 text-slate-300 sm:text-[15px]">
+                        {authCopy.description}
+                      </CardDescription>
+                    </div>
+                  </div>
 
-          <CardHeader className="space-y-5 pb-0">
-            <div className="flex items-start justify-between gap-4">
+                  {!disableClose ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={onClose}
+                      className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/10 hover:text-white"
+                    >
+                      <X className="size-5" />
+                    </Button>
+                  ) : null}
+                </div>
+
+                {!hideSupportBanner ? (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm leading-6 text-slate-300">
+                    Your sign-in, subscription state, and secure payment workflows stay connected across every NRI tax journey.
+                  </div>
+                ) : null}
+
+                <div className="relative hidden min-h-[15.5rem] lg:block">
+                  {(["signup", "login"] as const).map((mode, index) => {
+                    const isActive = activeTab === mode;
+                    const isSignup = mode === "signup";
+                    return (
+                      <motion.div
+                        key={mode}
+                        animate={{
+                          opacity: isActive ? 1 : 0.56,
+                          scale: isActive ? 1 : 0.97,
+                          x: isActive ? 0 : isSignup ? 30 : 18,
+                          y: isActive ? 0 : index === 0 ? 12 : 26,
+                        }}
+                        transition={{ duration: shouldReduceMotion ? 0 : 0.34, ease: [0.22, 1, 0.36, 1] }}
+                        className={`absolute inset-x-0 rounded-[26px] border px-5 py-5 shadow-[0_22px_60px_rgba(2,6,23,0.35)] ${
+                          isActive
+                            ? "z-20 border-sky-300/25 bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(8,15,30,0.92))]"
+                            : "z-10 border-white/10 bg-white/[0.035]"
+                        } ${index === 0 ? "top-0" : "top-7"}`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-2">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
+                              {isSignup ? "Registration Mode" : "Secure Access"}
+                            </p>
+                            <h3 className="text-xl font-semibold text-white">
+                              {isSignup ? "Create your global tax account" : "Sign back into your workspace"}
+                            </h3>
+                            <p className="max-w-[22rem] text-sm leading-6 text-slate-300">
+                              {isSignup
+                                ? "Start with guided onboarding, treaty context, and a cleaner account setup flow."
+                                : "Return to your dashboard, filings, chat history, and subscription controls."}
+                            </p>
+                          </div>
+                          <div className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
+                            isActive ? "bg-sky-400/14 text-sky-100" : "bg-white/6 text-slate-400"
+                          }`}>
+                            {isActive ? "Active" : "Standby"}
+                          </div>
+                        </div>
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          {trustSignals.map((signal) => {
+                            const Icon = signal.icon;
+                            return (
+                              <span
+                                key={`${mode}-${signal.label}`}
+                                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-medium text-slate-200"
+                              >
+                                <Icon className="size-3.5 text-sky-200" />
+                                {signal.label}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-100">
-                  <Sparkles className="size-3.5" />
-                  {authCopy.eyebrow}
-                </div>
-                <div className="space-y-2">
-                  <CardTitle className="text-3xl font-semibold tracking-tight text-white sm:text-[2rem]">
-                    {authCopy.title}
-                  </CardTitle>
-                  <CardDescription className="max-w-[30rem] text-[15px] leading-7 text-slate-300">
-                    {authCopy.description}
-                  </CardDescription>
-                </div>
-                <p className="text-sm font-medium text-slate-400">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
                   Powered by {COMPANY_LEGAL_NAME}
                 </p>
+                <p className="text-sm leading-6 text-slate-400">
+                  NRITAX.AI brings treaty guidance, FEMA workflows, and expert-assisted next steps into one premium onboarding experience.
+                </p>
               </div>
+            </CardHeader>
 
-              {!disableClose ? (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={onClose}
-                  className="text-slate-300 hover:bg-white/10 hover:text-white"
-                >
-                  <X className="size-5" />
-                </Button>
-              ) : null}
-            </div>
-
-            {!hideSupportBanner ? (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm leading-6 text-slate-300">
-                Your sign-in, session access, subscription state, and payment workflows remain securely connected.
-              </div>
-            ) : null}
-
-            <div className="grid gap-2 sm:grid-cols-3">
-              {trustSignals.map((signal) => {
-                const Icon = signal.icon;
-                return (
-                  <div
-                    key={signal.label}
-                    className="rounded-2xl border border-white/8 bg-white/[0.04] px-3.5 py-3 text-sm text-slate-200"
+            <CardContent className="flex min-h-0 flex-col px-5 pb-5 pt-5 sm:px-6 lg:px-8 lg:pb-7 lg:pt-7">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="relative grid h-12 w-full max-w-[24rem] grid-cols-2 rounded-2xl border border-white/10 bg-white/[0.05] p-1">
+                  <motion.span
+                    aria-hidden="true"
+                    initial={false}
+                    animate={{ x: activeTab === "signup" ? "100%" : "0%" }}
+                    transition={{ duration: shouldReduceMotion ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-[14px] bg-[linear-gradient(135deg,rgba(56,189,248,0.94),rgba(29,78,216,0.94))] shadow-[0_12px_24px_rgba(37,99,235,0.28)]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => switchAuthMode("login")}
+                    className={`relative z-10 rounded-[14px] text-sm font-semibold transition-colors ${
+                      activeTab === "login" ? "text-white" : "text-slate-400"
+                    }`}
                   >
-                    <div className="mb-2 inline-flex size-8 items-center justify-center rounded-full bg-sky-400/10 text-sky-200">
-                      <Icon className="size-4" />
-                    </div>
-                    <p className="text-sm font-medium leading-5">{signal.label}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </CardHeader>
+                    Login
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchAuthMode("signup")}
+                    className={`relative z-10 rounded-[14px] text-sm font-semibold transition-colors ${
+                      activeTab === "signup" ? "text-white" : "text-slate-400"
+                    }`}
+                  >
+                    Sign Up
+                  </button>
+                </div>
 
-          <CardContent className="pb-6 pt-6">
-            <Tabs
-              defaultValue={initialMode}
-              value={activeTab}
-              onValueChange={(value) => {
-                setActiveTab(value as "login" | "signup");
-                setForgotPasswordMode(false);
-                setLoginError(null);
-                setSignupError(null);
-              }}
-              className="w-full"
-            >
-              <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl border border-white/10 bg-white/[0.05] p-1 text-slate-400">
-                <TabsTrigger
-                  value="login"
-                  className="rounded-[14px] text-sm font-semibold data-[state=active]:border-white/10 data-[state=active]:bg-[linear-gradient(135deg,rgba(37,99,235,0.95),rgba(29,78,216,0.88))] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_rgba(37,99,235,0.24)]"
-                >
-                  Login
-                </TabsTrigger>
-                <TabsTrigger
-                  value="signup"
-                  className="rounded-[14px] text-sm font-semibold data-[state=active]:border-white/10 data-[state=active]:bg-[linear-gradient(135deg,rgba(37,99,235,0.95),rgba(29,78,216,0.88))] data-[state=active]:text-white data-[state=active]:shadow-[0_12px_24px_rgba(37,99,235,0.24)]"
-                >
-                  Sign Up
-                </TabsTrigger>
-              </TabsList>
+                <div className="hidden rounded-full border border-sky-300/18 bg-sky-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100 sm:inline-flex">
+                  {activeTab === "signup" ? "You are creating an account" : "You are signing in"}
+                </div>
+              </div>
 
-              <TabsContent value="login" className="space-y-0 pt-5">
-                <form onSubmit={handleLogin} className="space-y-5">
+              <div className="mb-4 sm:hidden">
+                <div className="rounded-2xl border border-sky-300/18 bg-sky-400/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                  {activeTab === "signup" ? "You are creating an account" : "You are signing in"}
+                </div>
+              </div>
+
+              <div className="min-h-0 flex-1 md:overflow-hidden">
+                <AnimatePresence mode="wait" initial={false}>
+                  {activeTab === "login" ? (
+                    <motion.form
+                      key="login"
+                      onSubmit={handleLogin}
+                      initial={shouldReduceMotion ? false : { opacity: 0, x: -24 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={shouldReduceMotion ? undefined : { opacity: 0, x: 24 }}
+                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      className="space-y-4"
+                    >
                   <div className="space-y-2.5">
                     <Label htmlFor="login-email" className="text-slate-100">Email Address</Label>
                     <Input
                       id="login-email"
+                      ref={loginEmailRef}
                       className={fieldClassName}
                       type="email"
                       required
@@ -803,30 +907,38 @@ export function LoginModal({
                     {authCopy.altPrompt}{" "}
                     <button
                       type="button"
-                      onClick={() => setActiveTab("signup")}
+                      onClick={() => switchAuthMode("signup")}
                       className="font-semibold text-sky-300 transition-colors hover:text-sky-200"
                     >
                       {authCopy.altAction}
                     </button>
                   </p>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup" className="space-y-0 pt-5">
-                <form onSubmit={handleSignup} className="space-y-5">
-                  <div className="space-y-2.5">
+                    </motion.form>
+                  ) : (
+                    <motion.form
+                      key="signup"
+                      onSubmit={handleSignup}
+                      initial={shouldReduceMotion ? false : { opacity: 0, x: 24 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={shouldReduceMotion ? undefined : { opacity: 0, x: -24 }}
+                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      className="space-y-4"
+                    >
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2.5">
                     <Label htmlFor="signup-name" className="text-slate-100">Full Name</Label>
                     <Input
                       id="signup-name"
+                      ref={signupNameRef}
                       className={fieldClassName}
                       required
                       value={signupData.name}
                       placeholder="Your full name"
                       onChange={(e) => setSignupData({ ...signupData, name: e.target.value })}
                     />
-                  </div>
+                    </div>
 
-                  <div className="space-y-2.5">
+                    <div className="space-y-2.5">
                     <Label htmlFor="signup-email" className="text-slate-100">Email Address</Label>
                     <Input
                       id="signup-email"
@@ -839,9 +951,9 @@ export function LoginModal({
                       value={signupData.email}
                       onChange={(e) => setSignupData({ ...signupData, email: e.target.value })}
                     />
-                  </div>
+                    </div>
 
-                  <div className="space-y-2.5">
+                    <div className="space-y-2.5">
                     <Label htmlFor="signup-linkedin" className="text-slate-100">LinkedIn Profile (Optional)</Label>
                     <Input
                       id="signup-linkedin"
@@ -851,9 +963,9 @@ export function LoginModal({
                       value={signupData.linkedinProfile}
                       onChange={(e) => setSignupData({ ...signupData, linkedinProfile: e.target.value })}
                     />
-                  </div>
+                    </div>
 
-                  <div className="space-y-2.5">
+                    <div className="space-y-2.5">
                     <Label htmlFor="signup-country" className="text-slate-100">Country</Label>
                     <select
                       id="signup-country"
@@ -869,9 +981,9 @@ export function LoginModal({
                         </option>
                       ))}
                     </select>
-                  </div>
+                    </div>
 
-                  <div className="relative space-y-2.5">
+                    <div className="relative space-y-2.5">
                     <Label htmlFor="signup-password" className="text-slate-100">Password</Label>
                     <Input
                       id="signup-password"
@@ -891,9 +1003,9 @@ export function LoginModal({
                       {showSignupPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                     <p className={`text-xs leading-5 ${passwordHint.tone}`}>{passwordHint.text}</p>
-                  </div>
+                    </div>
 
-                  <div className="relative space-y-2.5">
+                    <div className="relative space-y-2.5">
                     <Label htmlFor="signup-confirm-password" className="text-slate-100">Confirm Password</Label>
                     <Input
                       id="signup-confirm-password"
@@ -915,6 +1027,7 @@ export function LoginModal({
                     {confirmPasswordHint ? (
                       <p className={`text-xs leading-5 ${confirmPasswordHint.tone}`}>{confirmPasswordHint.text}</p>
                     ) : null}
+                  </div>
                   </div>
 
                   {signupError ? (
@@ -1010,25 +1123,24 @@ export function LoginModal({
                     {authCopy.altPrompt}{" "}
                     <button
                       type="button"
-                      onClick={() => setActiveTab("login")}
+                      onClick={() => switchAuthMode("login")}
                       className="font-semibold text-sky-300 transition-colors hover:text-sky-200"
                     >
                       {authCopy.altAction}
                     </button>
                   </p>
-                </form>
-              </TabsContent>
-            </Tabs>
+                    </motion.form>
+                  )}
+                </AnimatePresence>
+              </div>
 
-            <div className="mt-6 flex flex-col items-center gap-2 border-t border-white/10 pt-5 text-center">
-              <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                Trusted onboarding for global NRI tax workflows
-              </p>
-              <p className="text-sm leading-6 text-slate-400">
-                NRITAX.AI helps you access treaty guidance, compliance workflows, and expert-assisted next steps with secure account protection.
-              </p>
-            </div>
-          </CardContent>
+              <div className="mt-4 border-t border-white/10 pt-4 text-center">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
+                  Trusted onboarding for global NRI tax workflows
+                </p>
+              </div>
+            </CardContent>
+          </div>
         </Card>
       </div>
 

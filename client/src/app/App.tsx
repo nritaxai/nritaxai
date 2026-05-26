@@ -4,6 +4,8 @@ import { Capacitor } from "@capacitor/core";
 import { WifiOff } from "lucide-react";
 
 import { Header } from "./components/Header";
+import { AndroidHeader } from "./components/AndroidHeader";
+import { AndroidPageWrapper } from "./components/AndroidPageWrapper";
 import { iOSHeader as IOSHeader } from "./components/iOSHeader";
 import NewsTicker from "./components/NewsTicker";
 import { ComplianceStandards } from "./components/ComplianceStandards";
@@ -11,8 +13,12 @@ import { Footer } from "./components/Footer";
 import { AuthPopup } from "./components/AuthPopup";
 import { TigerBotAvatar } from "./components/TigerBotAvatar";
 import { Button } from "./components/ui/button";
+import { AndroidBottomNav } from "../components/AndroidBottomNav";
+import { AndroidHomePage } from "../components/AndroidHomePage";
+import { AndroidLoginScreen } from "../components/AndroidLoginScreen";
 import { iOSBottomNav as IOSBottomNav } from "../components/iOSBottomNav";
 import { iOSHomePage as IOSHomePage } from "../components/iOSHomePage";
+import { AndroidYuktiPage } from "../pages/AndroidYuktiPage";
 import { iOSYuktiPage as IOSYuktiPage } from "../pages/iOSYuktiPage";
 import { Chat } from "./pages/Chat";
 import { Home } from "./pages/Home";
@@ -21,7 +27,9 @@ import { Pricing } from "./pages/Pricing";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { IS_IOS_NATIVE_APP } from "../config/appConfig";
 import { buildApiUrl, getStoredAuthToken } from "../utils/api";
+import { syncPersistedAuthToLocalStorage } from "../services/authStorage";
 const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
+const AndroidLauncher = lazy(() => import("./pages/AndroidLauncher").then((m) => ({ default: m.AndroidLauncher })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
 const Profile = lazy(() => import("./pages/Profile").then((m) => ({ default: m.Profile })));
@@ -50,6 +58,7 @@ type NativeWrapperWindow = Window & {
 };
 
 export default function App() {
+  const isNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const isIosNativeWrapper =
     typeof window !== "undefined" &&
     (Boolean((window as NativeWrapperWindow).__NRITAX_IOS_WRAPPER__) ||
@@ -60,6 +69,7 @@ export default function App() {
   const stagingPassword = String(import.meta.env.VITE_STAGING_ACCESS_PASSWORD || "");
   const promoUpgradePromptSessionKey = "promo_upgrade_prompt_seen";
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<"login" | "signup">("login");
   const [isAuthenticated, setIsAuthenticated] = useState(() =>
     Boolean(typeof window !== "undefined" && getStoredAuthToken())
   );
@@ -79,6 +89,28 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const routeContentRef = useRef<HTMLDivElement>(null);
+  const openAuthModal = (mode: "login" | "signup" = "login") => {
+    setAuthModalMode(mode);
+    setShowLoginModal(true);
+  };
+
+  useEffect(() => {
+    if (!isNative) return;
+
+    let isCancelled = false;
+
+    const hydrateNativeAuth = async () => {
+      const persisted = await syncPersistedAuthToLocalStorage();
+      if (isCancelled) return;
+      setIsAuthenticated(Boolean(persisted?.token || getStoredAuthToken()));
+    };
+
+    void hydrateNativeAuth();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isNative]);
 
   useEffect(() => {
     if (!isIosNativeApp) return;
@@ -104,7 +136,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const handleRequireLogin = () => setShowLoginModal(true);
+    const handleRequireLogin = () => {
+      if (isNative) {
+        navigate("/login");
+        return;
+      }
+      openAuthModal("login");
+    };
     const syncAuthState = () => setIsAuthenticated(Boolean(getStoredAuthToken()));
     const handleAuthPopup = (event: Event) => {
       const customEvent = event as CustomEvent<{
@@ -140,7 +178,7 @@ export default function App() {
         window.clearTimeout(popupTimeoutRef.current);
       }
     };
-  }, []);
+  }, [isNative, navigate]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -174,14 +212,15 @@ export default function App() {
   }, [isAuthenticated, location.pathname, navigate]);
 
   useEffect(() => {
+    if (isNative) return;
     if (isAuthenticated || location.pathname !== "/home") return;
 
     const timeoutId = window.setTimeout(() => {
-      setShowLoginModal(true);
+      openAuthModal("login");
     }, 350);
 
     return () => window.clearTimeout(timeoutId);
-  }, [isAuthenticated, location.pathname]);
+  }, [isAuthenticated, isNative, location.pathname]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -389,7 +428,9 @@ export default function App() {
   }, [location.pathname]);
 
   const withPageScaffold = (element: ReactNode) =>
-    isIosNativeApp ? (
+    isNative ? (
+      <AndroidPageWrapper>{element}</AndroidPageWrapper>
+    ) : isIosNativeApp ? (
       <div className="min-h-screen bg-white px-4 py-4 pb-[calc(88px+env(safe-area-inset-bottom))]">
         {element}
       </div>
@@ -441,30 +482,58 @@ export default function App() {
     location.pathname === "/ios-yukti" ||
     location.pathname === "/tigerbot-avatar" ||
     location.pathname === "/tigerbot-avator";
-  const protectedPaths = new Set([
-    "/calculators",
-    "/profile",
-    "/chat",
-    "/dashboard",
-    "/compliance",
-    "/builder",
-    "/consult",
-    "/reschedule",
-    "/cancel",
-    "/privacy-policy",
-    "/about-us",
-    "/terms-and-conditions",
-    "/refund-policy",
-    "/disclaimer",
-  ]);
+  const protectedPaths = new Set(
+    isNative
+      ? ["/profile", "/dashboard", "/compliance", "/builder"]
+      : [
+          "/calculators",
+          "/profile",
+          "/chat",
+          "/dashboard",
+          "/compliance",
+          "/builder",
+          "/consult",
+          "/android-yukti",
+          "/reschedule",
+          "/cancel",
+          "/privacy-policy",
+          "/about-us",
+          "/terms-and-conditions",
+          "/refund-policy",
+          "/disclaimer",
+        ]
+  );
   const requiresAuthentication = protectedPaths.has(location.pathname);
   const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
   const isAuthRoute = location.pathname === "/login";
-  const hasSiteHeader = !isIosNativeApp && !isStandaloneRoute;
+  const hasSiteHeader = !isNative && !isIosNativeApp && !isStandaloneRoute;
+  const shouldShowAndroidHeader =
+    isNative &&
+    location.pathname !== "/reset-password" &&
+    location.pathname !== "/login" &&
+    location.pathname !== "/home" &&
+    location.pathname !== "/";
+  const shouldShowAndroidBottomNav =
+    isNative &&
+    location.pathname !== "/reset-password" &&
+    location.pathname !== "/login" &&
+    location.pathname !== "/";
   const shouldShowNewsTicker = !isIosNativeApp && location.pathname === "/home";
-  const nativeHomeRoute = isIosNativeApp ? <IOSHomePage /> : <HeroPage />;
+  const nativeHomeRoute = isIosNativeApp ? <IOSHomePage /> : isNative ? (
+    <AndroidLauncher />
+  ) : (
+    <HeroPage />
+  );
   const nativeHomeScreen = isIosNativeApp
     ? <IOSHomePage />
+    : isNative
+    ? (
+      isAuthenticated ? (
+        <AndroidPageWrapper includeHeaderOffset={false}>
+          <AndroidHomePage onRequireLogin={() => navigate("/login")} />
+        </AndroidPageWrapper>
+      ) : <Navigate to="/login" replace />
+    )
     : withPageScaffold(<Home onRequireLogin={() => setShowLoginModal(true)} />);
 
   return (
@@ -477,9 +546,12 @@ export default function App() {
           </div>
         </div>
       )}
-      {requiresAuthentication && !isAuthenticated ? <Navigate to="/home" replace /> : null}
+      {requiresAuthentication && !isAuthenticated ? <Navigate to={isNative ? "/login" : "/home"} replace /> : null}
       {hasSiteHeader && (
-        <Header onLogin={() => setShowLoginModal(true)} />
+        <Header onLogin={() => openAuthModal("login")} onSignup={() => openAuthModal("signup")} />
+      )}
+      {shouldShowAndroidHeader && (
+        <AndroidHeader onLogin={() => setShowLoginModal(true)} />
       )}
       {isIosNativeApp && !isYuktiRoute && !isAuthRoute && <IOSHeader onLogin={() => setShowLoginModal(true)} />}
       {shouldShowNewsTicker ? <NewsTicker /> : null}
@@ -489,21 +561,22 @@ export default function App() {
           <Routes location={location}>
             <Route
               path="/"
-              element={isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
+              element={isNative ? nativeHomeRoute : isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
             />
             <Route
               path="/Hero"
-              element={isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
+              element={isNative ? nativeHomeRoute : isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
             />
             <Route
               path="/hero"
-              element={isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
+              element={isNative ? nativeHomeRoute : isIosNativeApp ? <Navigate to="/home" replace /> : nativeHomeRoute}
             />
             <Route path="/home" element={nativeHomeScreen} />
-            <Route path="/ios-yukti" element={<IOSYuktiPage />} />
-            <Route path="/yukti" element={<IOSYuktiPage />} />
-            <Route path="/tigerbot-avatar" element={<IOSYuktiPage />} />
-            <Route path="/tigerbot-avator" element={<IOSYuktiPage />} />
+            <Route path="/ios-yukti" element={isNative ? <AndroidYuktiPage /> : <IOSYuktiPage />} />
+            <Route path="/android-yukti" element={isNative ? <AndroidYuktiPage /> : <Navigate to="/yukti" replace />} />
+            <Route path="/yukti" element={isNative ? <AndroidYuktiPage /> : <IOSYuktiPage />} />
+            <Route path="/tigerbot-avatar" element={isNative ? <AndroidYuktiPage /> : <IOSYuktiPage />} />
+            <Route path="/tigerbot-avator" element={isNative ? <AndroidYuktiPage /> : <IOSYuktiPage />} />
 
             <Route
               path="/calculators"
@@ -515,7 +588,7 @@ export default function App() {
               path="/checkout"
               element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
             />
-            <Route path="/login" element={isIosNativeApp ? <Login /> : withPageScaffold(<Login />)} />
+            <Route path="/login" element={isNative ? <Login /> : isIosNativeApp ? <Login /> : withPageScaffold(<Login />)} />
             <Route path="/reset-password" element={withPageScaffold(<ResetPassword />)} />
             <Route path="/profile" element={withPageScaffold(<Profile />)} />
             <Route path="/chat" element={isIosNativeApp ? <Chat onRequireLogin={() => setShowLoginModal(true)} /> : withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
@@ -539,15 +612,29 @@ export default function App() {
       {!isStandaloneRoute && !isYuktiRoute && isAuthenticated && <TigerBotAvatar />}
 
       {hasSiteHeader && <Footer />}
+      {shouldShowAndroidBottomNav && <AndroidBottomNav />}
       {isIosNativeApp && !isAuthRoute && <IOSBottomNav />}
 
-      {showLoginModal && (
+      {!isNative && showLoginModal && (
         <Suspense fallback={null}>
           <LoginModal
+            initialMode={authModalMode}
             onClose={() => setShowLoginModal(false)}
           />
         </Suspense>
       )}
+
+      {isNative && !isAuthRoute && (showLoginModal || requiresHomeLoginGate) ? (
+        <AndroidLoginScreen
+          onClose={() => setShowLoginModal(false)}
+          disableClose={requiresHomeLoginGate}
+          onLoginSuccess={() => {
+            setIsAuthenticated(true);
+            setShowLoginModal(false);
+            navigate("/home", { replace: true });
+          }}
+        />
+      ) : null}
 
       {successPopup && <AuthPopup message={successPopup} type="success" />}
       {showPromoUpgradePrompt ? (
