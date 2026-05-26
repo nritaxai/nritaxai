@@ -27,11 +27,13 @@ void initErrorMonitoring();
 validateSecurityConfiguration();
 
 const allowedOrigins = appConfig.app.allowedOrigins;
+const isAllowedVercelPreviewOrigin = (origin = "") =>
+  /^https:\/\/nritaxai(?:-[a-z0-9]+)*\.vercel\.app$/i.test(String(origin || "").trim());
 
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (allowedOrigins.includes(origin) || isAllowedVercelPreviewOrigin(origin)) return callback(null, true);
     return callback(new Error(`CORS blocked: ${origin}`));
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

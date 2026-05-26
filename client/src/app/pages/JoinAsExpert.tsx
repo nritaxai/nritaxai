@@ -36,11 +36,14 @@ type ExpertFormData = {
 type FieldKey = keyof ExpertFormData;
 type ExpertFormFieldKey = FieldKey | "profile" | "captcha";
 type SubmissionStage = "idle" | "verifying" | "uploading" | "submitting" | "finalizing";
+type CaptchaStatus = "idle" | "verified" | "expired" | "error";
 
 type ExpertOnboardingResponse = {
   success?: boolean;
   message?: string;
   error?: string;
+  code?: string;
+  recaptchaCodes?: string[];
   fieldErrors?: Partial<Record<ExpertFormFieldKey, string>>;
 };
 
@@ -69,6 +72,8 @@ const SUCCESS_MESSAGE = "Your expert profile has been securely submitted to NRIT
 const FALLBACK_SUBMISSION_ERROR = "We couldn't complete your secure onboarding right now. Please try again.";
 const CAPTCHA_MISSING_MESSAGE = "Please complete the security verification before submitting your application.";
 const CAPTCHA_RETRY_MESSAGE = "Please complete a fresh security verification to continue.";
+const CAPTCHA_VERIFIED_MESSAGE = "Identity verification secured";
+const CAPTCHA_RENDER_ERROR_MESSAGE = "Security verification could not be loaded. Please refresh and try again.";
 const PHASE_MESSAGES: Record<Exclude<SubmissionStage, "idle">, string> = {
   verifying: "Verifying security check...",
   uploading: "Encrypting profile package...",
@@ -76,10 +81,11 @@ const PHASE_MESSAGES: Record<Exclude<SubmissionStage, "idle">, string> = {
   finalizing: "Finalizing secure onboarding...",
 };
 
-const isDevelopment = import.meta.env.DEV;
+const isExpertOnboardingDebugEnabled =
+  import.meta.env.DEV || String(import.meta.env.VITE_EXPERT_ONBOARDING_DEBUG || "").trim().toLowerCase() === "true";
 
 const debugLog = (message: string, details?: unknown) => {
-  if (!isDevelopment) return;
+  if (!isExpertOnboardingDebugEnabled) return;
 
   if (details === undefined) {
     console.debug(`[JoinAsExpert] ${message}`);
@@ -166,6 +172,8 @@ export function JoinAsExpertPage() {
   const [errorMessage, setErrorMessage] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
   const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>("idle");
+  const [captchaRenderKey, setCaptchaRenderKey] = useState(0);
   const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
@@ -285,22 +293,28 @@ export function JoinAsExpertPage() {
     }
   };
 
-  const resetCaptcha = () => {
+  const refreshCaptchaWidget = (nextStatus: CaptchaStatus = "idle") => {
     setCaptchaToken("");
-    recaptchaRef.current?.reset();
+    setCaptchaStatus(nextStatus);
+    setCaptchaRenderKey((current) => current + 1);
   };
 
   const handleCaptchaChange = (token: string | null) => {
-    setCaptchaToken(trimValue(token));
+    const normalizedToken = trimValue(token);
+    console.log("[JoinAsExpert] captchaToken", normalizedToken);
+    setCaptchaToken(normalizedToken);
+    setCaptchaStatus(normalizedToken ? "verified" : "idle");
     setErrors((prev) => ({
       ...prev,
       captcha: "",
     }));
     setShowErrorBanner(false);
+    setErrorMessage("");
   };
 
   const handleCaptchaExpired = () => {
     setCaptchaToken("");
+    setCaptchaStatus("expired");
     setErrors((prev) => ({
       ...prev,
       captcha: submitAttempted ? CAPTCHA_RETRY_MESSAGE : "",
@@ -309,9 +323,10 @@ export function JoinAsExpertPage() {
 
   const handleCaptchaErrored = () => {
     setCaptchaToken("");
+    setCaptchaStatus("error");
     setErrors((prev) => ({
       ...prev,
-      captcha: "Security verification could not be loaded. Please refresh and try again.",
+      captcha: CAPTCHA_RENDER_ERROR_MESSAGE,
     }));
   };
 
@@ -438,11 +453,13 @@ export function JoinAsExpertPage() {
       toast.loading(PHASE_MESSAGES.uploading, { id: activeToastId });
 
       const formData = buildMultipartPayload(normalizedValues, profileFile, captchaToken);
+      console.log("[JoinAsExpert] captchaToken", captchaToken);
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
         fields: Array.from(formData.keys()),
         fileName: profileFile.name,
         fileSize: profileFile.size,
+        captchaToken,
       });
 
       setSubmissionStage("submitting");
@@ -476,8 +493,24 @@ export function JoinAsExpertPage() {
         }
 
         const apiMessage = trimValue(data?.message) || trimValue(data?.error);
-        if (/captcha/i.test(apiMessage)) {
-          throw new Error("CAPTCHA expired. Please retry the secure verification.");
+        const apiCode = trimValue(data?.code);
+        const recaptchaCodes = Array.isArray(data?.recaptchaCodes) ? data.recaptchaCodes : [];
+
+        if (
+          apiCode.startsWith("captcha") ||
+          /captcha|security verification/i.test(apiMessage) ||
+          recaptchaCodes.length > 0
+        ) {
+          const isExpired =
+            apiCode === "captcha_expired" ||
+            recaptchaCodes.includes("timeout-or-duplicate") ||
+            recaptchaCodes.includes("invalid-input-response");
+
+          throw new Error(
+            isExpired
+              ? "Security verification expired. Please complete the CAPTCHA again."
+              : trimValue(data?.fieldErrors?.captcha) || "Security verification failed. Please try again."
+          );
         }
         if (/file|upload|resume|document/i.test(apiMessage)) {
           throw new Error("Upload failure. Please reattach your resume and retry.");
@@ -496,14 +529,14 @@ export function JoinAsExpertPage() {
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
-      setCaptchaToken("");
+      setCaptchaStatus("idle");
       setSubmitAttempted(false);
 
       if (resumeInputRef.current) {
         resumeInputRef.current.value = "";
       }
 
-      resetCaptcha();
+      refreshCaptchaWidget("idle");
       toast.success(SUCCESS_MESSAGE, { id: activeToastId });
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
@@ -514,7 +547,7 @@ export function JoinAsExpertPage() {
       setSubmissionStage("idle");
 
       const nextErrors: Partial<Record<ExpertFormFieldKey, string>> = {
-        captcha: /captcha/i.test(message) ? message : CAPTCHA_RETRY_MESSAGE,
+        captcha: /captcha|security verification/i.test(message) ? message : CAPTCHA_RETRY_MESSAGE,
       };
       if (/resume missing|invalid file format|large file upload|upload failure/i.test(message)) {
         nextErrors.profile = message;
@@ -524,7 +557,7 @@ export function JoinAsExpertPage() {
         ...nextErrors,
       }));
 
-      resetCaptcha();
+      refreshCaptchaWidget(/could not be loaded/i.test(message) ? "error" : "expired");
       toast.error(message, { id: activeToastId });
     } finally {
       setLoading(false);
@@ -537,7 +570,8 @@ export function JoinAsExpertPage() {
     submissionStage === "idle"
       ? "Every application is encrypted in transit and reviewed through our controlled expert onboarding workflow."
       : PHASE_MESSAGES[submissionStage];
-  const isSubmitDisabled = loading || !captchaToken || !RECAPTCHA_SITE_KEY;
+  const isCaptchaVerified = Boolean(captchaToken) && captchaStatus === "verified";
+  const isSubmitDisabled = loading || !isCaptchaVerified || !RECAPTCHA_SITE_KEY;
   const showSuccess = Boolean(successMessage);
 
   return (
@@ -906,7 +940,13 @@ export function JoinAsExpertPage() {
                   <div className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(255,255,255,0.72))] p-5 shadow-inner">
                     <div
                       ref={setFieldRef("captcha") as never}
-                      className={`rounded-2xl border px-4 py-4 transition duration-200 ${errors.captcha ? "border-rose-300 bg-rose-50/80" : "border-sky-100 bg-white/85"}`}
+                      className={`rounded-2xl border px-4 py-4 transition duration-200 ${
+                        errors.captcha
+                          ? "border-rose-300 bg-rose-50/80 shadow-[0_12px_30px_rgba(244,63,94,0.10)]"
+                          : captchaStatus === "verified"
+                            ? "border-emerald-300 bg-emerald-50/80 shadow-[0_12px_30px_rgba(16,185,129,0.10)]"
+                            : "border-sky-100 bg-white/85"
+                      }`}
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -915,19 +955,38 @@ export function JoinAsExpertPage() {
                             Complete the live Google verification checkpoint before transmitting sensitive onboarding records.
                           </p>
                         </div>
-                        <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
-                          <ShieldCheck className="size-4 text-sky-700" />
-                          Google reCAPTCHA protected
+                        <div
+                          className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition ${
+                            captchaStatus === "verified"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : errors.captcha || captchaStatus === "error"
+                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                                : "border-slate-200 bg-slate-50 text-slate-700"
+                          }`}
+                          aria-live="polite"
+                        >
+                          {captchaStatus === "verified" ? (
+                            <CheckCircle2 className="size-4 text-emerald-600" />
+                          ) : (
+                            <ShieldCheck className="size-4 text-sky-700" />
+                          )}
+                          {captchaStatus === "verified"
+                            ? "Identity verified"
+                            : captchaStatus === "error"
+                              ? "Verification interrupted"
+                              : "Secure checkpoint pending"}
                         </div>
                       </div>
 
-                      <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-sm transition duration-200">
+                      <div className="mt-4 min-h-[112px] rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-sm transition duration-200">
                         {RECAPTCHA_SITE_KEY ? (
                           <div className="max-w-full overflow-x-auto">
                             <div className="inline-block min-w-[304px]">
                               <ReCAPTCHA
+                                key={captchaRenderKey}
                                 ref={recaptchaRef}
                                 sitekey={RECAPTCHA_SITE_KEY}
+                                theme="light"
                                 onChange={handleCaptchaChange}
                                 onExpired={handleCaptchaExpired}
                                 onErrored={handleCaptchaErrored}
@@ -943,8 +1002,23 @@ export function JoinAsExpertPage() {
 
                       <div className="mt-4 flex flex-col gap-2 text-xs leading-5 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
                         <p>We use visible bot protection to keep expert intake accurate, compliant, and abuse-resistant.</p>
-                        <p className={`font-medium transition ${captchaToken ? "text-emerald-700" : "text-slate-500"}`}>
-                          {captchaToken ? "Verification complete. Secure submission unlocked." : "Complete the checkbox to enable submission."}
+                        <p
+                          className={`inline-flex items-center gap-2 font-medium transition ${
+                            captchaStatus === "verified"
+                              ? "text-emerald-700"
+                              : captchaStatus === "expired" || captchaStatus === "error"
+                                ? "text-rose-700"
+                                : "text-slate-500"
+                          }`}
+                        >
+                          {captchaStatus === "verified" ? <CheckCircle2 className="size-4" /> : <LockKeyhole className="size-4" />}
+                          {captchaStatus === "verified"
+                            ? `✓ ${CAPTCHA_VERIFIED_MESSAGE}`
+                            : captchaStatus === "expired"
+                              ? "Verification expired. Please complete it again."
+                              : captchaStatus === "error"
+                                ? "Verification could not load. Refresh and retry."
+                                : "Complete the checkbox to enable submission."}
                         </p>
                       </div>
 
