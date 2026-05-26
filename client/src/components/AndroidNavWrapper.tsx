@@ -4,6 +4,8 @@ import { Capacitor } from "@capacitor/core";
 import { App as CapApp } from "@capacitor/app";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { ANDROID_THEME } from "./androidTheme";
+
 interface AndroidNavWrapperProps {
   children: ReactNode;
   title?: string;
@@ -12,6 +14,7 @@ interface AndroidNavWrapperProps {
 
 const HOME_ROUTES = ["/", "/home", "/hero", "/Hero"];
 
+// Android only
 export function AndroidNavWrapper({
   children,
   title = "NRITAX.AI",
@@ -45,11 +48,11 @@ export function AndroidNavWrapper({
     const setupBackHandler = async () => {
       listener = await CapApp.addListener("backButton", () => {
         if (isHome) {
-          CapApp.exitApp(); // Android only
+          CapApp.exitApp();
           return;
         }
 
-        handleBackNavigation(); // Android only
+        handleBackNavigation();
       });
     };
 
@@ -74,7 +77,8 @@ export function AndroidNavWrapper({
         flexDirection: "column",
         height: "100dvh",
         overflow: "hidden",
-        backgroundColor: "#f8f9fa",
+        background: ANDROID_THEME.background,
+        fontFamily: ANDROID_THEME.fontFamily,
       }}
     >
       <div
@@ -84,13 +88,15 @@ export function AndroidNavWrapper({
           left: 0,
           right: 0,
           height: headerHeight,
-          backgroundColor: "#1a3cff",
+          background: "rgba(10,31,92,0.95)",
+          borderBottom: "1px solid rgba(255,255,255,0.1)",
+          backdropFilter: "blur(10px)",
           display: "flex",
           alignItems: "center",
-          padding: "0 16px",
-          zIndex: 99999,
+          justifyContent: "center",
           paddingTop: "env(safe-area-inset-top)",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+          paddingInline: "14px",
+          zIndex: 99999,
         }}
       >
         {shouldShowBack ? (
@@ -98,15 +104,12 @@ export function AndroidNavWrapper({
             type="button"
             onClick={handleBackNavigation}
             style={{
-              color: "white",
-              background: "none",
-              border: "none",
-              fontSize: "26px",
-              padding: "8px",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              marginRight: "4px",
+              position: "absolute",
+              left: "14px",
+              background: "transparent",
+              border: 0,
+              color: "#ffffff",
+              fontSize: "20px",
             }}
             aria-label="Go back"
           >
@@ -114,16 +117,7 @@ export function AndroidNavWrapper({
           </button>
         ) : null}
 
-        <span
-          style={{
-            color: "white",
-            fontWeight: "bold",
-            fontSize: "18px",
-            flex: 1,
-          }}
-        >
-          {title}
-        </span>
+        <span style={{ color: "#ffffff", fontWeight: 700, fontSize: "13px" }}>{title}</span>
       </div>
 
       <div

@@ -1,4 +1,5 @@
 import { Capacitor } from "@capacitor/core";
+import { AndroidLoginScreen } from "../../components/AndroidLoginScreen";
 import { LoginModal } from "../components/LoginModal";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
@@ -10,13 +11,18 @@ export function Login() {
 
   return (
     <div className="min-h-dvh bg-[#020617]">
-      <LoginModal
-        initialMode={mode}
-        onClose={() => navigate(isAndroidNative ? "/" : "/home")}
-        disableClose={isAndroidNative}
-        hideSupportBanner={isAndroidNative}
-        hideSocialSection={false}
-      />
+      {isAndroidNative ? (
+        <AndroidLoginScreen
+          onClose={() => navigate("/")}
+          disableClose
+          onLoginSuccess={() => navigate("/home", { replace: true })}
+        />
+      ) : (
+        <LoginModal
+          initialMode={mode}
+          onClose={() => navigate("/home")}
+        />
+      )}
     </div>
   );
 }

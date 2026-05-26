@@ -1,11 +1,11 @@
 import { Capacitor } from "@capacitor/core";
-import { Bot } from "lucide-react";
 import { Navigate } from "react-router-dom";
 
 import { YuktiWidget } from "../app/components/YuktiWidget";
+import { AndroidPageWrapper } from "../app/components/AndroidPageWrapper";
 
 export function AndroidYuktiPage() {
-  const isNative = Capacitor.isNativePlatform(); // Android only
+  const isNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   let storedUser: Record<string, unknown> | null = null;
   if (typeof window !== "undefined") {
     try {
@@ -17,7 +17,7 @@ export function AndroidYuktiPage() {
   const hasAcceptedTerms = Boolean(storedUser?.termsAccepted);
 
   if (!isNative) {
-    return <Navigate to="/home" replace />; // Android only
+    return <Navigate to="/home" replace />;
   }
 
   if (!hasAcceptedTerms) {
@@ -25,78 +25,30 @@ export function AndroidYuktiPage() {
   }
 
   return (
-    <main
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        minHeight: "100%",
-        backgroundColor: "#1a3cff",
-      }}
-    >
-      <div
+    <AndroidPageWrapper className="bg-transparent" scrollable={false}>
+      <main
         style={{
-          backgroundColor: "#1a3cff",
-          padding: "16px",
           display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          color: "white",
-          borderBottom: "1px solid rgba(255,255,255,0.2)",
+          flexDirection: "column",
+          minHeight: "calc(100dvh - 56px - 60px)",
+          background: "linear-gradient(160deg,#F5E6D3,#EDD5B0,#E8C99A)",
+          fontFamily: "system-ui,-apple-system,sans-serif",
         }}
       >
         <div
           style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            backgroundColor: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "#1a3cff",
+            margin: "14px 16px 0",
+            borderRadius: "18px",
+            border: "1px solid rgba(255,255,255,0.9)",
+            background: "rgba(255,255,255,0.65)",
+            overflow: "hidden",
+            flex: 1,
+            minHeight: 0,
           }}
         >
-          <Bot size={20} />
+          <YuktiWidget fullScreen={true} androidMode={true} />
         </div>
-        <div>
-          <div
-            style={{
-              fontWeight: "bold",
-              fontSize: "16px",
-            }}
-          >
-            YUKTI
-          </div>
-          <div
-            style={{
-              fontSize: "12px",
-              opacity: 0.8,
-            }}
-          >
-            Your NRI Tax Assistant
-          </div>
-        </div>
-        <div
-          style={{
-            width: "8px",
-            height: "8px",
-            borderRadius: "50%",
-            backgroundColor: "#22c55e",
-            marginLeft: "auto",
-          }}
-        />
-      </div>
-
-      <div
-        style={{
-          flex: 1,
-          backgroundColor: "#f8f9fa",
-          overflow: "hidden",
-          position: "relative",
-        }}
-      >
-        <YuktiWidget fullScreen={true} androidMode={true} />
-      </div>
-    </main>
+      </main>
+    </AndroidPageWrapper>
   );
 }

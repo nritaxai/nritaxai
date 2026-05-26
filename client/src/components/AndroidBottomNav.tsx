@@ -1,8 +1,9 @@
-﻿import { Capacitor } from "@capacitor/core";
+import { Capacitor } from "@capacitor/core";
 import { Bot, Home, User } from "lucide-react";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { ANDROID_THEME } from "./androidTheme";
 
 type NavItem = {
   label: string;
@@ -12,20 +13,21 @@ type NavItem = {
 };
 
 const navItems: NavItem[] = [
-  { label: "Home", path: "/", icon: Home, protected: false },
+  { label: "Home", path: "/home", icon: Home, protected: false },
   { label: "AI Chat", path: "/chat", icon: Bot, protected: false },
   { label: "Yukti", path: "/android-yukti", icon: Bot, protected: false },
   { label: "Profile", path: "/profile", icon: User, protected: false },
 ];
 
+// Android only
 export function AndroidBottomNav() {
-  const isNative = Capacitor.isNativePlatform(); // Android only
+  const isNative = Capacitor.isNativePlatform();
   const location = useLocation();
   const navigate = useNavigate();
 
   const isActive = useMemo(
     () => (path: string) => {
-      if (path === "/") {
+      if (path === "/home") {
         return location.pathname === "/" || location.pathname === "/home" || location.pathname === "/hero" || location.pathname === "/Hero";
       }
 
@@ -35,54 +37,58 @@ export function AndroidBottomNav() {
   );
 
   if (!isNative) {
-    return null; // Android only
+    return null;
   }
 
   const handleNavigate = (path: string) => {
-    // Android only — debug log
-    console.log('[BottomNav] Tapped:', path);
-    console.log('[BottomNav] Current:', location.pathname);
-    
-    // Skip if already on this path
-    if (location.pathname === path) {
-      console.log('[BottomNav] Already here, skipping');
-      return;
-    }
-    
-    // Navigate using React Router
+    if (location.pathname === path) return;
     navigate(path);
-    console.log('[BottomNav] Navigated to:', path);
   };
 
   return (
     <nav
-      className="android-bottom-nav fixed inset-x-0 bottom-0 z-[50] border-t border-white/10 bg-[#0a1628]/95 backdrop-blur-xl"
+      className="android-bottom-nav fixed inset-x-0 bottom-0 z-[50] backdrop-blur-xl"
       style={{
-        paddingBottom: "env(safe-area-inset-bottom)",
-        height: "calc(60px + env(safe-area-inset-bottom))",
-        backgroundColor: "#0a1628",
+        background: "rgba(10,25,75,0.95)",
         borderTop: "1px solid rgba(255,255,255,0.1)",
+        backdropFilter: "blur(10px)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        fontFamily: ANDROID_THEME.fontFamily,
       }}
     >
-      <div className="mx-auto grid h-[60px] max-w-3xl grid-cols-4">
+      <div
+        style={{
+          maxWidth: "720px",
+          margin: "0 auto",
+          height: "56px",
+          display: "grid",
+          gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+        }}
+      >
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = isActive(item.path);
+          const color = active ? "#4285F4" : "rgba(255,255,255,0.45)";
 
           return (
             <button
               key={item.label}
               type="button"
-              // Android only
               onClick={() => handleNavigate(item.path)}
-              className={`flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors ${
-                active ? "text-[#2563eb]" : "text-white/40"
-              }`}
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "4px",
+                color,
+                background: "transparent",
+                border: 0,
+                fontFamily: ANDROID_THEME.fontFamily,
+              }}
             >
-              {Icon ? (
-                <Icon className={`size-[21px] ${active ? "text-[#2563eb]" : "text-white/40"}`} />
-              ) : null}
-              <span>{item.label}</span>
+              {Icon ? <Icon size={18} color={color} /> : null}
+              <span style={{ fontSize: "8px", fontWeight: 600 }}>{item.label}</span>
             </button>
           );
         })}
@@ -90,4 +96,3 @@ export function AndroidBottomNav() {
     </nav>
   );
 }
-
