@@ -443,53 +443,64 @@ export function JoinAsExpertPage() {
         validationErrors.membershipNumber ||
         validationErrors.pincode ||
         "Please review the highlighted onboarding fields.";
+      setSubmitError(validationMessage);
       toast.warning(validationMessage);
       return;
     }
 
-    if (!profileFile) {
-      return;
-    }
-
-    const normalizedValues = Object.fromEntries(
-      Object.entries(values).map(([key, value]) => [key, trimValue(value)])
-    ) as ExpertFormData;
-
-    let activeToastId: string | number | undefined;
-
     try {
       setSubmitLoading(true);
-      setSubmissionStage("verifying");
-      activeToastId = toast.loading(PHASE_MESSAGES.verifying);
-
+      setUploadLoading(Boolean(profileFile));
+      setSubmissionStage("submitting");
       setErrors((prev) => ({
         ...prev,
         captcha: "",
       }));
 
-      setSubmissionStage("uploading");
-      setUploadLoading(true);
-      toast.loading(PHASE_MESSAGES.uploading, { id: activeToastId });
+      if (!captchaToken) {
+        setSubmitError("Please complete CAPTCHA");
+        return;
+      }
 
-      const formData = buildMultipartPayload(normalizedValues, profileFile, captchaToken);
+      const normalizedValues = Object.fromEntries(
+        Object.entries(values).map(([key, value]) => [key, trimValue(value)])
+      ) as ExpertFormData;
+
+      const formData = new FormData();
+      formData.append("fullName", normalizedValues.fullName || "");
+      formData.append("email", normalizedValues.email || "");
+      formData.append("mobileNumber", normalizedValues.mobileNumber || "");
+      formData.append("pincode", normalizedValues.pincode || "");
+      formData.append("membershipNumber", normalizedValues.membershipNumber || "");
+      formData.append("cop", normalizedValues.cop || "");
+      formData.append(
+        "qualification",
+        resolveSelectedValue(normalizedValues.qualification, normalizedValues.customQualification) || ""
+      );
+      formData.append(
+        "areaOfExpertise",
+        resolveSelectedValue(normalizedValues.areaOfExpertise, normalizedValues.customAreaOfExpertise) || ""
+      );
+
+      if (profileFile) {
+        formData.append("profile", profileFile);
+      }
+
+      formData.append("g-recaptcha-response", captchaToken);
+
       debugLog("Submitting expert onboarding form.", {
-        url: EXPERT_ONBOARDING_WEBHOOK,
+        url: "https://n8n.caloganathan.com/webhook/expert-onboarding",
         fields: Array.from(formData.keys()),
-        fileName: profileFile.name,
-        fileSize: profileFile.size,
-        captchaToken,
+        fileName: profileFile?.name || null,
+        fileSize: profileFile?.size || 0,
       });
-
-      setSubmissionStage("submitting");
-      toast.loading(PHASE_MESSAGES.submitting, { id: activeToastId });
-      setUploadLoading(false);
 
       const abortController = new AbortController();
       const timeoutId = window.setTimeout(() => abortController.abort(), SUBMISSION_TIMEOUT_MS);
 
       let response: Response;
       try {
-        response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
+        response = await fetch("https://n8n.caloganathan.com/webhook/expert-onboarding", {
           method: "POST",
           body: formData,
           signal: abortController.signal,
@@ -498,90 +509,56 @@ export function JoinAsExpertPage() {
         window.clearTimeout(timeoutId);
       }
 
-      const data = await safeParseJson(response);
-      debugLog("Expert onboarding response received.", {
-        status: response.status,
-        ok: response.ok,
-        body: data,
-      });
+      const result = await safeParseJson(response);
 
-      if (!response.ok || !data?.success) {
-        if (data?.fieldErrors && Object.keys(data.fieldErrors).length > 0) {
-          setErrors(data.fieldErrors);
-          scrollToFirstInvalidField(data.fieldErrors);
+      if (
+        response.ok &&
+        (
+          result?.status === "success" ||
+          result?.success === true
+        )
+      ) {
+        toast.success("Expert onboarding submitted successfully");
+        setSubmitSuccess(true);
+        setSuccessMessage(SUCCESS_MESSAGE);
+        setSubmittedName(normalizedValues.fullName);
+        setValues(initialValues);
+        setProfileFile(null);
+        setErrors({});
+        setShowErrorBanner(false);
+        setErrorMessage("");
+        setSubmitError("");
+        setCaptchaToken("");
+        setCaptchaStatus("idle");
+        setSubmitAttempted(false);
+
+        if (resumeInputRef.current) {
+          resumeInputRef.current.value = "";
         }
 
-        const apiMessage = trimValue(data?.message) || trimValue(data?.error);
-        const apiCode = trimValue(data?.code);
-        const recaptchaCodes = Array.isArray(data?.recaptchaCodes) ? data.recaptchaCodes : [];
-
-        if (
-          apiCode.startsWith("captcha") ||
-          /captcha|security verification/i.test(apiMessage) ||
-          recaptchaCodes.length > 0
-        ) {
-          const isExpired =
-            apiCode === "captcha_expired" ||
-            recaptchaCodes.includes("timeout-or-duplicate") ||
-            recaptchaCodes.includes("invalid-input-response");
-
-          throw new Error(
-            isExpired
-              ? "Security verification expired. Please complete the CAPTCHA again."
-              : trimValue(data?.fieldErrors?.captcha) || "Security verification failed. Please try again."
-          );
+        if (recaptchaRef.current) {
+          recaptchaRef.current.reset();
         }
-        if (/file|upload|resume|document/i.test(apiMessage)) {
-          throw new Error("Upload failure. Please reattach your resume and retry.");
-        }
-
-        throw new Error(apiMessage || FALLBACK_SUBMISSION_ERROR);
+      } else {
+        throw new Error(
+          trimValue(result?.message) || "Submission failed"
+        );
       }
-
-      setSubmissionStage("finalizing");
-      toast.loading(PHASE_MESSAGES.finalizing, { id: activeToastId });
-
-      setSubmitSuccess(true);
-      setSuccessMessage(SUCCESS_MESSAGE);
-      setSubmittedName(normalizedValues.fullName);
-      setValues(initialValues);
-      setProfileFile(null);
-      setErrors({});
-      setShowErrorBanner(false);
-      setErrorMessage("");
-      setSubmitError("");
-      setCaptchaStatus("idle");
-      setSubmitAttempted(false);
-
-      if (resumeInputRef.current) {
-        resumeInputRef.current.value = "";
-      }
-
-      refreshCaptchaWidget("idle");
-      toast.success(SUCCESS_MESSAGE, { id: activeToastId });
     } catch (error) {
-      debugLog("Expert onboarding submission failed.", error);
-
+      console.error(error);
       const message = resolveSubmissionErrorMessage(error);
       setSubmitSuccess(false);
-      setSubmitError(message);
+      setSubmitError(message || "Submission failed");
       setErrorMessage(message);
       setShowErrorBanner(true);
       setSubmissionStage("idle");
 
-      const nextErrors: Partial<Record<ExpertFormFieldKey, string>> = {
-        captcha: /captcha|security verification/i.test(message) ? message : CAPTCHA_RETRY_MESSAGE,
-      };
-      if (/resume missing|invalid file format|large file upload|upload failure/i.test(message)) {
-        nextErrors.profile = message;
+      if (recaptchaRef.current) {
+        recaptchaRef.current.reset();
       }
-      setErrors((prev) => ({
-        ...prev,
-        ...nextErrors,
-      }));
 
-      refreshCaptchaWidget(/could not be loaded/i.test(message) ? "error" : "expired");
-      toast.error(message, { id: activeToastId });
+      setCaptchaToken("");
+      setCaptchaStatus("expired");
     } finally {
       setUploadLoading(false);
       setSubmitLoading(false);

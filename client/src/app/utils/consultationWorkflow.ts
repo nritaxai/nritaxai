@@ -5,7 +5,7 @@ export const CONSULTATION_WEBHOOKS = {
 } as const;
 
 export const EXPERT_ONBOARDING_WEBHOOK = String(
-  import.meta.env.VITE_EXPERT_ONBOARDING_WEBHOOK_URL || "https://nritaxai-k94u.onrender.com/api/expert-onboarding/submit"
+  import.meta.env.VITE_EXPERT_ONBOARDING_WEBHOOK_URL || "https://n8n.caloganathan.com/webhook/expert-onboarding"
 ).trim();
 
 export const AVAILABLE_CONSULTATION_TIME_SLOTS = [
