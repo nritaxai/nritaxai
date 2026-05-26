@@ -95,7 +95,7 @@ function SocialAuthButton({
       variant="outline"
       disabled={disabled}
       onClick={onClick}
-      className="h-12 w-full justify-center rounded-2xl border-white/12 bg-white/[0.05] px-4 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all duration-300 hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.09] hover:text-white"
+      className="h-12 w-full justify-center rounded-[18px] border-white/12 bg-white/[0.05] px-4 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)] transition-all duration-200 hover:-translate-y-0.5 hover:border-sky-300/25 hover:bg-white/[0.09] hover:text-white hover:shadow-[0_10px_24px_rgba(56,189,248,0.08)]"
     >
       <span className="inline-flex items-center gap-2.5">
         <span className="inline-flex size-5 items-center justify-center text-slate-200">{icon}</span>
@@ -128,7 +128,7 @@ export function LoginModal({
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [signupError, setSignupError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"login" | "signup">(initialMode);
+  const [mode, setMode] = useState<"login" | "signup">(initialMode);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordMode, setForgotPasswordMode] = useState(false);
   const [signupTermsModalOpen, setSignupTermsModalOpen] = useState(false);
@@ -169,7 +169,7 @@ export function LoginModal({
   }, [signupData.confirmPassword, signupData.password]);
 
   const authCopy =
-    activeTab === "signup"
+    mode === "signup"
       ? {
           eyebrow: "Global NRI Onboarding",
           title: "Create your NRITAX.AI account",
@@ -200,14 +200,14 @@ export function LoginModal({
   }, []);
 
   useEffect(() => {
-    setActiveTab(initialMode);
+    setMode(initialMode);
     setForgotPasswordMode(false);
     setLoginError(null);
     setSignupError(null);
   }, [initialMode]);
 
   useEffect(() => {
-    const input = activeTab === "signup" ? signupNameRef.current : loginEmailRef.current;
+    const input = mode === "signup" ? signupNameRef.current : loginEmailRef.current;
     if (!input) return;
 
     const timeoutId = window.setTimeout(() => {
@@ -216,7 +216,7 @@ export function LoginModal({
     }, shouldReduceMotion ? 0 : 170);
 
     return () => window.clearTimeout(timeoutId);
-  }, [activeTab, shouldReduceMotion]);
+  }, [mode, shouldReduceMotion]);
 
   const showPopup = (message: string, type: "success" | "error", duration = 2500) => {
     setPopup({ message, type });
@@ -539,17 +539,17 @@ export function LoginModal({
   };
 
   const fieldClassName =
-    "h-11 rounded-2xl border border-white/12 bg-white/[0.07] px-4 text-[15px] text-white placeholder:text-slate-500 focus-visible:border-[#60A5FA] focus-visible:ring-[#2563EB]/30";
+    "h-12 rounded-[18px] border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white placeholder:text-slate-500 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-[border-color,box-shadow,background-color] duration-200 focus-visible:border-sky-300/70 focus-visible:bg-white/[0.08] focus-visible:ring-[3px] focus-visible:ring-sky-400/20";
 
   const switchAuthMode = (mode: "login" | "signup") => {
-    setActiveTab(mode);
+    setMode(mode);
     setForgotPasswordMode(false);
     setLoginError(null);
     setSignupError(null);
   };
 
   const renderGoogleButton = (mode: "login" | "signup") => (
-    <div className="relative flex w-full justify-center overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+    <div className="relative flex w-full justify-center overflow-hidden rounded-[18px] border border-white/10 bg-white/[0.04] p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] transition-colors duration-200 hover:border-sky-300/20 hover:bg-white/[0.05]">
       {mode === "signup" && !signupCanContinue ? (
         <div
           className="absolute inset-0 z-10 cursor-pointer"
@@ -599,7 +599,7 @@ export function LoginModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 min-h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_top_right,rgba(37,99,235,0.14),transparent_30%),linear-gradient(180deg,#020617_0%,#081121_48%,#0F172A_100%)]">
+    <div className="fixed inset-0 z-50 min-h-screen overflow-hidden bg-[linear-gradient(180deg,#020617_0%,#07111f_45%,#0f172a_100%)]">
       <TermsModal
         isOpen={signupTermsModalOpen}
         type={signupTermsModalType}
@@ -608,172 +608,110 @@ export function LoginModal({
       />
 
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-        <div className="absolute left-[-8%] top-[8%] h-56 w-56 rounded-full bg-blue-500/15 blur-3xl" />
-        <div className="absolute right-[-6%] top-[16%] h-64 w-64 rounded-full bg-cyan-400/12 blur-3xl" />
-        <div className="absolute bottom-[10%] left-[18%] h-48 w-48 rounded-full bg-sky-300/8 blur-3xl" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_82%_14%,rgba(37,99,235,0.16),transparent_26%),radial-gradient(circle_at_50%_100%,rgba(96,165,250,0.08),transparent_36%)]" />
+        <div className="absolute left-[-8%] top-[10%] h-64 w-64 rounded-full bg-blue-500/12 blur-3xl" />
+        <div className="absolute right-[-10%] top-[12%] h-72 w-72 rounded-full bg-sky-400/10 blur-3xl" />
+        <div className="absolute bottom-[-8%] left-[20%] h-56 w-56 rounded-full bg-cyan-300/8 blur-3xl" />
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "linear-gradient(rgba(148,163,184,0.16) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.12) 1px, transparent 1px)", backgroundSize: "72px 72px" }} />
       </div>
 
-      <div className="relative flex min-h-screen items-center justify-center px-3 py-3 sm:px-5 sm:py-5">
-        <Card className="relative max-h-[min(100dvh-1.5rem,46rem)] w-full max-w-[72rem] overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(8,15,30,0.92)] text-white shadow-[0_32px_90px_rgba(2,6,23,0.52),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[18px] lg:h-[min(100dvh-1.5rem,43rem)]">
-          <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/50 to-transparent" aria-hidden="true" />
-          <div className="grid h-full min-h-0 lg:grid-cols-[0.94fr_1.06fr]">
-            <CardHeader className="relative flex min-h-0 flex-col justify-between overflow-hidden border-b border-white/10 px-5 pb-5 pt-5 sm:px-6 lg:border-b-0 lg:border-r lg:px-8 lg:pb-6 lg:pt-6">
-              <div className="space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-100">
-                      <Sparkles className="size-3.5" />
-                      {authCopy.eyebrow}
-                    </div>
-                    <div className="space-y-2">
-                      <CardTitle className="max-w-[18rem] text-[2rem] font-semibold tracking-tight text-white sm:text-[2.25rem]">
-                        {authCopy.title}
-                      </CardTitle>
-                      <CardDescription className="max-w-[28rem] text-sm leading-6 text-slate-300 sm:text-[15px]">
-                        {authCopy.description}
-                      </CardDescription>
-                    </div>
-                  </div>
-
-                  {!disableClose ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={onClose}
-                      className="shrink-0 rounded-full border border-white/10 bg-white/[0.04] text-slate-300 hover:bg-white/10 hover:text-white"
-                    >
-                      <X className="size-5" />
-                    </Button>
-                  ) : null}
+      <div className="relative flex min-h-screen items-center justify-center px-4 py-4 sm:px-6">
+        <Card className="relative w-full max-w-[460px] overflow-hidden rounded-[24px] border border-white/10 bg-[rgba(15,23,42,0.72)] text-white shadow-[0_10px_40px_rgba(0,0,0,0.25)] backdrop-blur-[16px]">
+          <div className="absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/55 to-transparent" aria-hidden="true" />
+          <CardHeader className="space-y-5 px-4 pb-0 pt-4 sm:px-7 sm:pt-7">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-3">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-100">
+                  <Sparkles className="size-3.5" />
+                  {authCopy.eyebrow}
                 </div>
-
-                {!hideSupportBanner ? (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3 text-sm leading-6 text-slate-300">
-                    Your sign-in, subscription state, and secure payment workflows stay connected across every NRI tax journey.
-                  </div>
-                ) : null}
-
-                <div className="relative hidden min-h-[13.5rem] lg:block">
-                  {(["signup", "login"] as const).map((mode, index) => {
-                    const isActive = activeTab === mode;
-                    const isSignup = mode === "signup";
-                    return (
-                      <motion.div
-                        key={mode}
-                        animate={{
-                          opacity: isActive ? 1 : 0.56,
-                          scale: isActive ? 1 : 0.97,
-                          x: isActive ? 0 : isSignup ? 30 : 18,
-                          y: isActive ? 0 : index === 0 ? 12 : 26,
-                        }}
-                        transition={{ duration: shouldReduceMotion ? 0 : 0.34, ease: [0.22, 1, 0.36, 1] }}
-                        className={`absolute inset-x-0 rounded-[26px] border px-5 py-5 shadow-[0_22px_60px_rgba(2,6,23,0.35)] ${
-                          isActive
-                            ? "z-20 border-sky-300/25 bg-[linear-gradient(180deg,rgba(15,23,42,0.94),rgba(8,15,30,0.92))]"
-                            : "z-10 border-white/10 bg-white/[0.035]"
-                        } ${index === 0 ? "top-0" : "top-7"}`}
-                      >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="space-y-2">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">
-                              {isSignup ? "Registration Mode" : "Secure Access"}
-                            </p>
-                            <h3 className="text-xl font-semibold text-white">
-                              {isSignup ? "Create your global tax account" : "Sign back into your workspace"}
-                            </h3>
-                            <p className="max-w-[22rem] text-sm leading-6 text-slate-300">
-                              {isSignup
-                                ? "Start with guided onboarding, treaty context, and a cleaner account setup flow."
-                                : "Return to your dashboard, filings, chat history, and subscription controls."}
-                            </p>
-                          </div>
-                          <div className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                            isActive ? "bg-sky-400/14 text-sky-100" : "bg-white/6 text-slate-400"
-                          }`}>
-                            {isActive ? "Active" : "Standby"}
-                          </div>
-                        </div>
-                        <div className="mt-5 flex flex-wrap gap-2">
-                          {trustSignals.map((signal) => {
-                            const Icon = signal.icon;
-                            return (
-                              <span
-                                key={`${mode}-${signal.label}`}
-                                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-2 text-xs font-medium text-slate-200"
-                              >
-                                <Icon className="size-3.5 text-sky-200" />
-                                {signal.label}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </motion.div>
-                    );
-                  })}
+                <div className="space-y-1.5">
+                  <CardTitle className="text-[1.8rem] font-semibold tracking-[-0.02em] text-white sm:text-[2rem]">
+                    {authCopy.title}
+                  </CardTitle>
+                  <CardDescription className="max-w-[32rem] text-sm leading-6 text-slate-300">
+                    {authCopy.description}
+                  </CardDescription>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                  Powered by {COMPANY_LEGAL_NAME}
-                </p>
-                <p className="text-sm leading-6 text-slate-400">
-                  NRITAX.AI brings treaty guidance, FEMA workflows, and expert-assisted next steps into one premium onboarding experience.
-                </p>
-              </div>
-            </CardHeader>
+              {!disableClose ? (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={onClose}
+                  className="mt-0.5 shrink-0 rounded-full border border-white/10 bg-white/[0.04] text-slate-300 transition-colors duration-200 hover:bg-white/10 hover:text-white"
+                >
+                  <X className="size-5" />
+                </Button>
+              ) : null}
+            </div>
 
-            <CardContent className="flex min-h-0 flex-col overflow-y-auto px-5 pb-5 pt-5 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
-              <div className="mb-4 flex items-center justify-between gap-3">
-                <div className="relative grid h-12 w-full max-w-[24rem] grid-cols-2 rounded-2xl border border-white/10 bg-white/[0.05] p-1">
-                  <motion.span
-                    aria-hidden="true"
-                    initial={false}
-                    animate={{ x: activeTab === "signup" ? "100%" : "0%" }}
-                    transition={{ duration: shouldReduceMotion ? 0 : 0.3, ease: [0.22, 1, 0.36, 1] }}
-                    className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-[14px] bg-[linear-gradient(135deg,rgba(56,189,248,0.94),rgba(29,78,216,0.94))] shadow-[0_12px_24px_rgba(37,99,235,0.28)]"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => switchAuthMode("login")}
-                    className={`relative z-10 rounded-[14px] text-sm font-semibold transition-colors ${
-                      activeTab === "login" ? "text-white" : "text-slate-400"
-                    }`}
+            <div className="relative grid h-12 grid-cols-2 rounded-[18px] border border-white/10 bg-white/[0.04] p-1">
+              <motion.span
+                aria-hidden="true"
+                initial={false}
+                animate={{ x: mode === "signup" ? "100%" : "0%" }}
+                transition={{ duration: shouldReduceMotion ? 0 : 0.24, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-[14px] bg-[linear-gradient(135deg,rgba(59,130,246,1),rgba(29,78,216,1))] shadow-[0_12px_28px_rgba(37,99,235,0.28)]"
+              />
+              <button
+                type="button"
+                onClick={() => switchAuthMode("login")}
+                className={`relative z-10 rounded-[14px] text-sm font-semibold transition-colors ${
+                  mode === "login" ? "text-white" : "text-slate-400"
+                }`}
+              >
+                Login
+              </button>
+              <button
+                type="button"
+                onClick={() => switchAuthMode("signup")}
+                className={`relative z-10 rounded-[14px] text-sm font-semibold transition-colors ${
+                  mode === "signup" ? "text-white" : "text-slate-400"
+                }`}
+              >
+                Sign Up
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {trustSignals.map((signal) => {
+                const Icon = signal.icon;
+                return (
+                  <span
+                    key={signal.label}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11px] font-medium text-slate-200"
                   >
-                    Login
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => switchAuthMode("signup")}
-                    className={`relative z-10 rounded-[14px] text-sm font-semibold transition-colors ${
-                      activeTab === "signup" ? "text-white" : "text-slate-400"
-                    }`}
-                  >
-                    Sign Up
-                  </button>
-                </div>
+                    <Icon className="size-3.5 text-sky-200" />
+                    {signal.label}
+                  </span>
+                );
+              })}
+            </div>
 
-                <div className="hidden rounded-full border border-sky-300/18 bg-sky-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100 sm:inline-flex">
-                  {activeTab === "signup" ? "You are creating an account" : "You are signing in"}
-                </div>
+            {!hideSupportBanner ? (
+              <div className="rounded-[18px] border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-slate-300">
+                Your sign-in, subscription state, and secure workflows stay connected across every NRI tax journey.
               </div>
+            ) : null}
+          </CardHeader>
 
-              <div className="mb-4 sm:hidden">
-                <div className="rounded-2xl border border-sky-300/18 bg-sky-400/10 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100">
-                  {activeTab === "signup" ? "You are creating an account" : "You are signing in"}
-                </div>
-              </div>
+          <CardContent className="space-y-4 px-4 pb-4 pt-5 sm:px-7 sm:pb-7">
+            <div className="rounded-full border border-sky-300/18 bg-sky-400/10 px-3 py-1 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+              {mode === "signup" ? "Create your account" : "Secure account login"}
+            </div>
 
-              <div className="min-h-0 flex-1 md:overflow-hidden">
+            <div className="min-h-0">
                 <AnimatePresence mode="wait" initial={false}>
-                  {activeTab === "login" ? (
+                  {mode === "login" ? (
                     <motion.form
                       key="login"
                       onSubmit={handleLogin}
-                      initial={shouldReduceMotion ? false : { opacity: 0, x: -24 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={shouldReduceMotion ? undefined : { opacity: 0, x: 24 }}
-                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                       className="space-y-4"
                     >
                   <div className="space-y-2.5">
@@ -828,7 +766,7 @@ export function LoginModal({
                   </div>
 
                   {forgotPasswordMode ? (
-                    <div className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                    <div className="space-y-3 rounded-[18px] border border-white/10 bg-white/[0.045] p-4">
                       <div className="space-y-2">
                         <Label htmlFor="forgot-password-email" className="text-slate-100">Reset Email</Label>
                         <Input
@@ -843,7 +781,7 @@ export function LoginModal({
                       <Button
                         type="button"
                         variant="secondary"
-                        className="h-12 w-full rounded-2xl border-white/10 bg-white/10 text-white hover:bg-white/14"
+                        className="h-12 w-full rounded-[18px] border-white/10 bg-white/10 text-white hover:bg-white/14"
                         disabled={loading}
                         onClick={() => void handleForgotPassword()}
                       >
@@ -853,14 +791,14 @@ export function LoginModal({
                   ) : null}
 
                   {loginError ? (
-                    <p className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+                    <p className="rounded-[18px] border border-rose-300/18 bg-rose-300/8 px-4 py-3 text-sm text-rose-100/95">
                       {loginError}
                     </p>
                   ) : null}
 
                   <Button
                     type="submit"
-                    className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,#3B82F6,#1D4ED8)] text-base font-semibold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(37,99,235,0.32)]"
+                    className="h-12 w-full rounded-[18px] bg-[linear-gradient(135deg,#3B82F6,#1D4ED8)] text-base font-semibold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(37,99,235,0.32)]"
                     disabled={loading}
                   >
                     {loading ? (
@@ -918,13 +856,13 @@ export function LoginModal({
                     <motion.form
                       key="signup"
                       onSubmit={handleSignup}
-                      initial={shouldReduceMotion ? false : { opacity: 0, x: 24 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={shouldReduceMotion ? undefined : { opacity: 0, x: -24 }}
-                      transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                      className="space-y-4"
+                      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={shouldReduceMotion ? undefined : { opacity: 0, y: -8 }}
+                      transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                      className="space-y-3.5"
                     >
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     <div className="space-y-2.5">
                     <Label htmlFor="signup-name" className="text-slate-100">Full Name</Label>
                     <Input
@@ -972,7 +910,7 @@ export function LoginModal({
                       required
                       value={signupData.countryCode}
                       onChange={(e) => setSignupData({ ...signupData, countryCode: e.target.value })}
-                      className="h-12 w-full rounded-2xl border border-white/12 bg-white/[0.07] px-4 text-[15px] text-white outline-none transition-[border-color,box-shadow] focus:border-[#60A5FA] focus:ring-[3px] focus:ring-[#2563EB]/30"
+                      className="h-12 w-full rounded-[18px] border border-white/10 bg-white/[0.06] px-4 text-[15px] text-white outline-none transition-[border-color,box-shadow,background-color] duration-200 focus:border-sky-300/70 focus:bg-white/[0.08] focus:ring-[3px] focus:ring-sky-400/20"
                     >
                       <option value="" className="text-slate-900">Select your country</option>
                       {COUNTRY_OPTIONS.map((country) => (
@@ -1031,12 +969,12 @@ export function LoginModal({
                   </div>
 
                   {signupError ? (
-                    <p className="rounded-2xl border border-rose-400/20 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+                    <p className="rounded-[18px] border border-rose-300/18 bg-rose-300/8 px-4 py-3 text-sm text-rose-100/95">
                       {signupError}
                     </p>
                   ) : null}
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.045] p-4">
+                  <div className="rounded-[18px] border border-white/10 bg-white/[0.04] p-4">
                     <label className="flex cursor-pointer items-start gap-3 text-sm leading-6 text-slate-300">
                       <Checkbox
                         checked={signupData.termsAccepted}
@@ -1049,7 +987,7 @@ export function LoginModal({
                           clearSignupTermsSession();
                           setSignupData({ ...signupData, termsAccepted: false });
                         }}
-                        className="mt-1 border-white/18 bg-white/5 text-[#0F172A] data-[state=checked]:border-sky-400 data-[state=checked]:bg-sky-300"
+                        className="mt-1 border-white/18 bg-white/5 text-[#0F172A] transition-all duration-200 data-[state=checked]:border-sky-400 data-[state=checked]:bg-sky-300"
                         aria-label="Agree to Terms of Service and Privacy Policy"
                       />
                       <span>
@@ -1057,7 +995,7 @@ export function LoginModal({
                         <button
                           type="button"
                           onClick={() => openSignupTermsModal("terms")}
-                          className="font-semibold text-sky-300 transition-colors hover:text-sky-200"
+                          className="font-semibold text-sky-300 underline-offset-4 transition-colors hover:text-sky-200 hover:underline"
                         >
                           Terms of Service
                         </button>{" "}
@@ -1065,7 +1003,7 @@ export function LoginModal({
                         <button
                           type="button"
                           onClick={() => openSignupTermsModal("privacy")}
-                          className="font-semibold text-sky-300 transition-colors hover:text-sky-200"
+                          className="font-semibold text-sky-300 underline-offset-4 transition-colors hover:text-sky-200 hover:underline"
                         >
                           Privacy Policy
                         </button>
@@ -1076,7 +1014,7 @@ export function LoginModal({
 
                   <Button
                     type="submit"
-                    className="h-12 w-full rounded-2xl bg-[linear-gradient(135deg,#3B82F6,#1D4ED8)] text-base font-semibold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(37,99,235,0.32)]"
+                    className="h-12 w-full rounded-[18px] bg-[linear-gradient(135deg,#3B82F6,#1D4ED8)] text-base font-semibold text-white shadow-[0_16px_34px_rgba(37,99,235,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_20px_40px_rgba(37,99,235,0.32)]"
                     disabled={loading || !signupCanContinue}
                   >
                     {loading ? (
@@ -1134,13 +1072,12 @@ export function LoginModal({
                 </AnimatePresence>
               </div>
 
-              <div className="mt-4 border-t border-white/10 pt-4 text-center">
+              <div className="border-t border-white/10 pt-4 text-center">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
-                  Trusted onboarding for global NRI tax workflows
+                  Powered by {COMPANY_LEGAL_NAME}
                 </p>
               </div>
             </CardContent>
-          </div>
         </Card>
       </div>
 
