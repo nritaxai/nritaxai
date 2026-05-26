@@ -64,14 +64,16 @@ const ALLOWED_FILE_TYPES = new Set([
   "application/msword",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
-const RECAPTCHA_SITE_KEY = "6Lf88KIsAAAAAP-460OSQoWiiSIjmRllj644V3tW";
+const RECAPTCHA_SITE_KEY = trimValue(import.meta.env.VITE_RECAPTCHA_SITE_KEY);
 const SUCCESS_MESSAGE = "Your expert profile has been securely submitted to NRITAX.AI";
 const FALLBACK_SUBMISSION_ERROR = "We couldn't complete your secure onboarding right now. Please try again.";
+const CAPTCHA_MISSING_MESSAGE = "Please complete the security verification before submitting your application.";
+const CAPTCHA_RETRY_MESSAGE = "Please complete a fresh security verification to continue.";
 const PHASE_MESSAGES: Record<Exclude<SubmissionStage, "idle">, string> = {
-  verifying: "Verifying CAPTCHA...",
-  uploading: "Uploading secure documents...",
-  submitting: "Submitting application...",
-  finalizing: "Finalizing onboarding...",
+  verifying: "Verifying security check...",
+  uploading: "Encrypting profile package...",
+  submitting: "Submitting Secure Application...",
+  finalizing: "Finalizing secure onboarding...",
 };
 
 const isDevelopment = import.meta.env.DEV;
@@ -163,6 +165,8 @@ export function JoinAsExpertPage() {
   const [submittedName, setSubmittedName] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -281,7 +285,37 @@ export function JoinAsExpertPage() {
     }
   };
 
-  const validateForm = (formValues: ExpertFormData, file: File | null) => {
+  const resetCaptcha = () => {
+    setCaptchaToken("");
+    recaptchaRef.current?.reset();
+  };
+
+  const handleCaptchaChange = (token: string | null) => {
+    setCaptchaToken(trimValue(token));
+    setErrors((prev) => ({
+      ...prev,
+      captcha: "",
+    }));
+    setShowErrorBanner(false);
+  };
+
+  const handleCaptchaExpired = () => {
+    setCaptchaToken("");
+    setErrors((prev) => ({
+      ...prev,
+      captcha: submitAttempted ? CAPTCHA_RETRY_MESSAGE : "",
+    }));
+  };
+
+  const handleCaptchaErrored = () => {
+    setCaptchaToken("");
+    setErrors((prev) => ({
+      ...prev,
+      captcha: "Security verification could not be loaded. Please refresh and try again.",
+    }));
+  };
+
+  const validateForm = (formValues: ExpertFormData, file: File | null, token: string) => {
     const validationErrors: Partial<Record<ExpertFormFieldKey, string>> = {};
     const email = trimValue(formValues.email);
     const qualification = resolveSelectedValue(formValues.qualification, formValues.customQualification);
@@ -324,6 +358,10 @@ export function JoinAsExpertPage() {
       validationErrors.profile = profileError;
     }
 
+    if (!trimValue(token)) {
+      validationErrors.captcha = CAPTCHA_MISSING_MESSAGE;
+    }
+
     return validationErrors;
   };
 
@@ -355,11 +393,12 @@ export function JoinAsExpertPage() {
     event.preventDefault();
     if (loading) return;
 
+    setSubmitAttempted(true);
     setShowErrorBanner(false);
     setSuccessMessage("");
     setErrorMessage("");
 
-    const validationErrors = validateForm(values, profileFile);
+    const validationErrors = validateForm(values, profileFile, captchaToken);
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
       scrollToFirstInvalidField(validationErrors);
@@ -390,13 +429,6 @@ export function JoinAsExpertPage() {
       setSubmissionStage("verifying");
       activeToastId = toast.loading(PHASE_MESSAGES.verifying);
 
-      recaptchaRef.current?.reset();
-      const freshCaptchaToken = await recaptchaRef.current?.executeAsync();
-
-      if (!trimValue(freshCaptchaToken)) {
-        throw new Error("CAPTCHA expired. Please retry the secure verification.");
-      }
-
       setErrors((prev) => ({
         ...prev,
         captcha: "",
@@ -405,7 +437,7 @@ export function JoinAsExpertPage() {
       setSubmissionStage("uploading");
       toast.loading(PHASE_MESSAGES.uploading, { id: activeToastId });
 
-      const formData = buildMultipartPayload(normalizedValues, profileFile, freshCaptchaToken);
+      const formData = buildMultipartPayload(normalizedValues, profileFile, captchaToken);
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
         fields: Array.from(formData.keys()),
@@ -464,12 +496,14 @@ export function JoinAsExpertPage() {
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
+      setCaptchaToken("");
+      setSubmitAttempted(false);
 
       if (resumeInputRef.current) {
         resumeInputRef.current.value = "";
       }
 
-      recaptchaRef.current?.reset();
+      resetCaptcha();
       toast.success(SUCCESS_MESSAGE, { id: activeToastId });
     } catch (error) {
       debugLog("Expert onboarding submission failed.", error);
@@ -479,21 +513,18 @@ export function JoinAsExpertPage() {
       setShowErrorBanner(true);
       setSubmissionStage("idle");
 
-      const nextErrors: Partial<Record<ExpertFormFieldKey, string>> = {};
-      if (/captcha/i.test(message)) {
-        nextErrors.captcha = message;
-      }
+      const nextErrors: Partial<Record<ExpertFormFieldKey, string>> = {
+        captcha: /captcha/i.test(message) ? message : CAPTCHA_RETRY_MESSAGE,
+      };
       if (/resume missing|invalid file format|large file upload|upload failure/i.test(message)) {
         nextErrors.profile = message;
       }
-      if (Object.keys(nextErrors).length > 0) {
-        setErrors((prev) => ({
-          ...prev,
-          ...nextErrors,
-        }));
-      }
+      setErrors((prev) => ({
+        ...prev,
+        ...nextErrors,
+      }));
 
-      recaptchaRef.current?.reset();
+      resetCaptcha();
       toast.error(message, { id: activeToastId });
     } finally {
       setLoading(false);
@@ -501,9 +532,12 @@ export function JoinAsExpertPage() {
     }
   };
 
-  const submitButtonLabel = loading
-    ? PHASE_MESSAGES[submissionStage as Exclude<SubmissionStage, "idle">] || "Submitting application..."
-    : "Submit Secure Application";
+  const submitButtonLabel = loading ? "Submitting Secure Application..." : "Submit Secure Application";
+  const submissionStatusMessage =
+    submissionStage === "idle"
+      ? "Every application is encrypted in transit and reviewed through our controlled expert onboarding workflow."
+      : PHASE_MESSAGES[submissionStage];
+  const isSubmitDisabled = loading || !captchaToken || !RECAPTCHA_SITE_KEY;
   const showSuccess = Boolean(successMessage);
 
   return (
@@ -870,19 +904,50 @@ export function JoinAsExpertPage() {
                   </div>
 
                   <div className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(255,255,255,0.72))] p-5 shadow-inner">
-                    <div ref={setFieldRef("captcha") as never} className={`rounded-2xl border px-4 py-4 ${errors.captcha ? "border-rose-300 bg-rose-50/80" : "border-sky-100 bg-white/85"}`}>
+                    <div
+                      ref={setFieldRef("captcha") as never}
+                      className={`rounded-2xl border px-4 py-4 transition duration-200 ${errors.captcha ? "border-rose-300 bg-rose-50/80" : "border-sky-100 bg-white/85"}`}
+                    >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm font-semibold text-slate-900">Security verification</p>
                           <p className="mt-1 text-xs leading-5 text-slate-600">
-                            reCAPTCHA verification is regenerated during every submit to protect expert onboarding.
+                            Complete the live Google verification checkpoint before transmitting sensitive onboarding records.
                           </p>
                         </div>
                         <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-700">
                           <ShieldCheck className="size-4 text-sky-700" />
-                          Live secure verification
+                          Google reCAPTCHA protected
                         </div>
                       </div>
+
+                      <div className="mt-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-3 shadow-sm transition duration-200">
+                        {RECAPTCHA_SITE_KEY ? (
+                          <div className="max-w-full overflow-x-auto">
+                            <div className="inline-block min-w-[304px]">
+                              <ReCAPTCHA
+                                ref={recaptchaRef}
+                                sitekey={RECAPTCHA_SITE_KEY}
+                                onChange={handleCaptchaChange}
+                                onExpired={handleCaptchaExpired}
+                                onErrored={handleCaptchaErrored}
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            Security verification is unavailable because `VITE_RECAPTCHA_SITE_KEY` is not configured.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-2 text-xs leading-5 text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+                        <p>We use visible bot protection to keep expert intake accurate, compliant, and abuse-resistant.</p>
+                        <p className={`font-medium transition ${captchaToken ? "text-emerald-700" : "text-slate-500"}`}>
+                          {captchaToken ? "Verification complete. Secure submission unlocked." : "Complete the checkbox to enable submission."}
+                        </p>
+                      </div>
+
                       {errors.captcha ? <p id={getFieldErrorId("captcha")} className={errorMessageClassName}>{errors.captcha}</p> : null}
                     </div>
 
@@ -897,7 +962,7 @@ export function JoinAsExpertPage() {
                           </p>
                           <p className="mt-1 text-xs leading-5 text-slate-600">
                             {loading
-                              ? "Please keep this page open while we validate your CAPTCHA and transmit your documents securely."
+                              ? submissionStatusMessage
                               : "Your details are reviewed by the NRITAX onboarding team before activation."}
                           </p>
                         </div>
@@ -906,7 +971,7 @@ export function JoinAsExpertPage() {
                       <Button
                         type="submit"
                         className="h-12 min-w-[220px] rounded-xl bg-slate-950 px-6 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.18)] transition hover:bg-slate-900 disabled:cursor-not-allowed disabled:bg-slate-400"
-                        disabled={loading}
+                        disabled={isSubmitDisabled}
                       >
                         {loading ? (
                           <span className="inline-flex items-center gap-2">
@@ -926,25 +991,6 @@ export function JoinAsExpertPage() {
                     </div>
                   </div>
                 </form>
-
-                <ReCAPTCHA
-                  ref={recaptchaRef}
-                  sitekey={RECAPTCHA_SITE_KEY}
-                  size="invisible"
-                  badge="bottomright"
-                  onExpired={() => {
-                    setErrors((prev) => ({
-                      ...prev,
-                      captcha: "CAPTCHA expired. Please retry the secure verification.",
-                    }));
-                  }}
-                  onErrored={() => {
-                    setErrors((prev) => ({
-                      ...prev,
-                      captcha: "Security verification could not be completed. Please retry.",
-                    }));
-                  }}
-                />
               </>
             )}
           </CardContent>
