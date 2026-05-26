@@ -5,8 +5,8 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { Button } from "./ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "./ui/sheet";
-import { getStoredAuthToken, logoutCurrentSession } from "../../utils/api";
-import { getAuthToken } from "../../services/authStorage";
+import { clearStoredAuth, getStoredAuthToken } from "../../utils/api";
+import { ANDROID_THEME } from "../../components/androidTheme";
 
 interface AndroidHeaderProps {
   onLogin: () => void;
@@ -39,7 +39,7 @@ const androidMenuItems = [
 ] as const;
 
 export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
-  const isNative = Capacitor.isNativePlatform(); // Android only
+  const isNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const location = useLocation();
   const navigate = useNavigate();
   const isHome = location.pathname === "/" || location.pathname === "/home"; // Android only
@@ -124,21 +124,29 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
   };
 
   const handleLogout = async () => {
-    await logoutCurrentSession();
+    clearStoredAuth();
     setDrawerOpen(false);
-    navigate("/", { replace: true });
+    navigate("/home", { replace: true });
   };
 
   const avatarLetter = userName.trim().charAt(0).toUpperCase() || "";
 
   if (location.pathname === "/chat") {
     return (
-      <header className="android-header fixed inset-x-0 top-0 z-[70] border-b border-white/10 bg-[#0a1628]/95 backdrop-blur-xl">
+      <header
+        className="android-header fixed inset-x-0 top-0 z-[70] border-b backdrop-blur-xl"
+        style={{
+          borderColor: "rgba(255,255,255,0.1)",
+          background: "rgba(10,31,92,0.95)",
+          fontFamily: ANDROID_THEME.fontFamily,
+          paddingTop: "env(safe-area-inset-top)",
+        }}
+      >
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
           <button
             type="button"
             onClick={handleBackNavigation}
-            className="inline-flex min-w-0 items-center gap-2 text-white"
+          className="inline-flex min-w-0 items-center gap-2 text-white"
             aria-label="Go back"
           >
             <ArrowLeft className="size-5" />
@@ -155,7 +163,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
               <MoreVertical className="size-5" />
             </button>
             {chatMenuOpen ? (
-              <div className="absolute right-0 top-11 w-44 rounded-2xl border border-white/10 bg-[#132040] p-2 shadow-lg">
+              <div className="absolute right-0 top-11 w-44 rounded-2xl border p-2 shadow-lg" style={{ borderColor: "rgba(255,255,255,0.12)", background: "rgba(10,31,92,0.98)" }}>
                 <button
                   type="button"
                   className="flex w-full rounded-xl px-3 py-2 text-left text-sm text-white transition hover:bg-white/10"
@@ -185,7 +193,15 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
   }
 
   return (
-    <header className="android-header fixed inset-x-0 top-0 z-[70] border-b border-white/10 bg-[#0a1628]/95 backdrop-blur-xl">
+      <header
+        className="android-header fixed inset-x-0 top-0 z-[70] border-b backdrop-blur-xl"
+        style={{
+        borderColor: "rgba(255,255,255,0.1)",
+        background: "rgba(10,31,92,0.95)",
+        fontFamily: ANDROID_THEME.fontFamily,
+        paddingTop: "env(safe-area-inset-top)",
+      }}
+    >
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 md:px-6">
         <div className="flex min-w-0 items-center gap-3">
           {!isHome ? (
@@ -201,15 +217,15 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
           <button
             type="button"
             aria-label="Open profile"
-            onClick={async () => {
-              const token = getStoredAuthToken() || (await getAuthToken());
+            onClick={() => {
+              const token = getStoredAuthToken();
               if (!token) {
                 onLogin();
                 return;
               }
               navigate("/profile");
             }}
-            className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#2563eb] text-sm font-semibold text-white"
+            className="inline-flex h-9 w-9 items-center justify-center overflow-hidden rounded-full border border-[rgba(255,255,255,0.28)] bg-[rgba(255,255,255,0.18)] text-sm font-semibold text-white"
           >
             {profileImage ? (
               <img src={profileImage} alt={userName || "Profile"} className="h-full w-full object-cover" />
@@ -239,12 +255,12 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
               <Menu className="size-6" />
             </button>
           </SheetTrigger>
-          <SheetContent side="right" className="w-[84vw] max-w-sm border-l border-white/10 bg-[#0f1e35] pt-6 text-white">
-            <SheetHeader className="border-b border-white/10 pb-4">
+          <SheetContent side="right" className="w-[84vw] max-w-sm border-l pt-6 text-white" style={{ borderColor: "rgba(255,255,255,0.1)", background: "rgba(10,31,92,0.98)" }}>
+            <SheetHeader className="border-b pb-4" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
               <SheetTitle className="text-left text-lg font-bold tracking-tight text-white">
                 NRITAX.AI
               </SheetTitle>
-              {userName ? <p className="text-left text-sm text-white/60">{userName}</p> : null}
+              {userName ? <p className="text-left text-sm text-[rgba(255,255,255,0.6)]">{userName}</p> : null}
             </SheetHeader>
 
             <nav className="flex flex-1 flex-col gap-2 px-4 py-4">
@@ -256,7 +272,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
                     to={item.to}
                     onClick={() => setDrawerOpen(false)}
                     className={`rounded-md px-3 py-3 text-sm font-medium transition-colors ${
-                      isActive ? "bg-[#2563eb]/15 text-[#60a5fa]" : "text-white/75 hover:bg-white/10 hover:text-white"
+                      isActive ? "bg-[rgba(66,133,244,0.18)] text-[#4285F4]" : "text-white hover:bg-white/10 hover:text-white"
                     }`}
                   >
                     {item.label}
@@ -265,12 +281,12 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
               })}
             </nav>
 
-            <div className="border-t border-white/10 p-4">
+            <div className="border-t p-4" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
               {isAuthenticated ? (
                 <Button
                   variant="outline"
                   onClick={handleLogout}
-                  className="w-full justify-start"
+                  className="w-full justify-start border-white/20 bg-white/10 text-white hover:bg-white/15"
                 >
                   <LogOut className="size-4" />
                   Logout
@@ -282,7 +298,7 @@ export function AndroidHeader({ onLogin }: AndroidHeaderProps) {
                     setDrawerOpen(false);
                     onLogin();
                   }}
-                  className="w-full justify-start"
+                  className="w-full justify-start text-white hover:bg-white/10 hover:text-white"
                 >
                   <LogIn className="size-4" />
                   Login / Sign Up
