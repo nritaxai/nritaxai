@@ -235,7 +235,7 @@ export function Header({ onLogin }: HeaderProps) {
               </Link>
             </div>
 
-            <nav className="hidden items-center gap-4 md:flex lg:gap-6">
+            <nav className="hidden items-center gap-5 md:flex lg:gap-7">
               {navItems.map((item) => {
                 const isActive = isNavItemActive(item.to);
                 return (
@@ -265,7 +265,7 @@ export function Header({ onLogin }: HeaderProps) {
               })}
             </nav>
 
-            <div className="hidden items-center gap-3 md:flex">
+            <div className="hidden items-center md:flex">
               {user ? (
                 <>
                   <Link
@@ -287,22 +287,13 @@ export function Header({ onLogin }: HeaderProps) {
                   </Button>
                 </>
               ) : (
-                <>
-                  <Button
-                    variant="ghost"
-                    type="button"
-                    className="h-11 rounded-full px-4 text-slate-800 hover:bg-white/90 hover:text-slate-900"
-                  >
-                    English
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={onLogin}
-                    className="h-11 rounded-full border border-slate-200/80 bg-white/80 px-5 text-slate-900 shadow-sm hover:bg-white"
-                  >
-                    Login / Sign Up
-                  </Button>
-                </>
+                <Button
+                  variant="ghost"
+                  onClick={onLogin}
+                  className="h-11 rounded-full border border-slate-200/80 bg-white/85 px-5 text-slate-900 shadow-sm hover:bg-white"
+                >
+                  Login / Sign Up
+                </Button>
               )}
             </div>
           </div>
@@ -358,26 +349,17 @@ export function Header({ onLogin }: HeaderProps) {
                     </Button>
                   </>
                 ) : (
-                  <>
-                    <Button
-                      variant="ghost"
-                      type="button"
-                      className="h-11 w-full justify-start rounded-2xl text-slate-800 hover:bg-slate-100 hover:text-slate-900"
-                    >
-                      English
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        onLogin();
-                      }}
-                      className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <LogIn className="mr-2 size-4" />
-                      Login / Sign Up
-                    </Button>
-                  </>
+                  <Button
+                    variant="ghost"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      onLogin();
+                    }}
+                    className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
+                  >
+                    <LogIn className="mr-2 size-4" />
+                    Login / Sign Up
+                  </Button>
                 )}
               </div>
             </div>
