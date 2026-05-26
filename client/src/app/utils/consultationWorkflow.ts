@@ -1,12 +1,12 @@
+import { API_BASE_URL } from "../../config/api";
+
 export const CONSULTATION_WEBHOOKS = {
   booking: "https://n8n.caloganathan.com/webhook/consultation-booking",
   reschedule: "https://n8n.caloganathan.com/webhook/consultation-reschedule",
   cancel: "https://n8n.caloganathan.com/webhook/consultation-cancel",
 } as const;
 
-export const EXPERT_ONBOARDING_WEBHOOK = String(
-  import.meta.env.VITE_EXPERT_ONBOARDING_WEBHOOK_URL || "https://n8n.caloganathan.com/webhook/expert-onboarding"
-).trim();
+export const EXPERT_ONBOARDING_WEBHOOK = `${API_BASE_URL}/api/expert-onboarding/submit`;
 
 export const AVAILABLE_CONSULTATION_TIME_SLOTS = [
   "09:00",

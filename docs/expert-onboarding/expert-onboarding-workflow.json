@@ -20,7 +20,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $json.body || {};\nconst binary = $binary || {};\n\nconst required = [\n  \"fullName\",\n  \"email\",\n  \"membershipNumber\",\n  \"qualification\",\n  \"areaOfExpertise\"\n];\n\nconst missing = required.filter(\n  field => !body[field]\n);\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      message: \"Missing required fields\",\n      fieldErrors: missing.reduce((acc, field) => {\n        acc[field] = `${field} is required`;\n        return acc;\n      }, {})\n    },\n    binary: {\n      data: binary.data\n    }\n  }];\n}\n\nif (!binary.data) {\n  return [{\n    json: {\n      valid: false,\n      message: \"Resume upload missing\",\n      fieldErrors: {\n        profile: \"Resume file is required\"\n      }\n    },\n    binary: {\n      data: binary.data\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    valid: true,\n    ...body\n  },\n  binary: {\n    data: binary.data\n  }\n}];"
+        "jsCode": "const body = $json.body || {};\nconst binary = $binary || {};\n\nconst required = [\n  \"fullName\",\n  \"email\",\n  \"membershipNumber\",\n  \"qualification\",\n  \"areaOfExpertise\"\n];\n\nconst missing = required.filter(\n  field => !body[field]\n);\n\nif (!body['g-recaptcha-response']) {\n  missing.push('g-recaptcha-response');\n}\n\nif (missing.length > 0) {\n  return [{\n    json: {\n      valid: false,\n      message: \"Missing required fields\",\n      fieldErrors: missing.reduce((acc, field) => {\n        acc[field === 'g-recaptcha-response' ? 'captcha' : field] = `${field} is required`;\n        return acc;\n      }, {})\n    },\n    binary: {\n      data: binary.data\n    }\n  }];\n}\n\nif (!binary.data) {\n  return [{\n    json: {\n      valid: false,\n      message: \"Resume upload missing\",\n      fieldErrors: {\n        profile: \"Resume file is required\"\n      }\n    },\n    binary: {\n      data: binary.data\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    valid: true,\n    ...body\n  },\n  binary: {\n    data: binary.data\n  }\n}];"
       },
       "id": "validate-fields-node",
       "name": "Validate Fields",
@@ -43,7 +43,7 @@
           "conditions": [
             {
               "id": "fields-valid-condition",
-              "leftValue": "={{ $json.isValid }}",
+              "leftValue": "={{ $json.valid }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",

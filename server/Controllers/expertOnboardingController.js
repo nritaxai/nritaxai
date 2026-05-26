@@ -4,6 +4,7 @@ const EXPERT_ONBOARDING_WEBHOOK_URL = String(
   process.env.EXPERT_ONBOARDING_WEBHOOK_URL || "https://n8n.caloganathan.com/webhook/expert-onboarding"
 ).trim();
 const EXPERT_ONBOARDING_TIMEOUT_MS = Number(process.env.EXPERT_ONBOARDING_TIMEOUT_MS || 15000);
+const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim();
 const EXPERT_ONBOARDING_DEBUG =
   String(process.env.EXPERT_ONBOARDING_DEBUG || "").trim().toLowerCase() === "true" ||
   process.env.NODE_ENV !== "production";
@@ -26,7 +27,6 @@ const ALLOWED_FILE_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ]);
 
-const DEFAULT_MOBILE_PLACEHOLDER = "Not Provided";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PINCODE_PATTERN = /^\d{6}$/;
 
@@ -48,6 +48,8 @@ const logDebug = (message, details) => {
   console.info(`[expert-onboarding] ${message}`, details);
 };
 
+const isHtmlPayload = (value) => /<!doctype html|<html[\s>]/i.test(clean(value));
+
 const parseWebhookResponse = async (response) => {
   const rawText = await response.text();
   const trimmedBody = rawText.trim();
@@ -59,7 +61,11 @@ const parseWebhookResponse = async (response) => {
   try {
     return JSON.parse(trimmedBody);
   } catch {
-    return { message: trimmedBody };
+    return {
+      message: isHtmlPayload(trimmedBody)
+        ? "Upstream onboarding service returned an unexpected HTML response."
+        : trimmedBody,
+    };
   }
 };
 
@@ -70,7 +76,7 @@ const normalizeRequestBody = (body) => {
   return {
     ...body,
     fullName: clean(body?.fullName),
-    mobileNumber: clean(body?.mobileNumber) || DEFAULT_MOBILE_PLACEHOLDER,
+    mobileNumber: clean(body?.mobileNumber),
     email: clean(body?.email),
     pincode: clean(body?.pincode),
     membershipNumber: clean(body?.membershipNumber),
@@ -112,6 +118,89 @@ const validateUploadedProfile = (file) => {
   }
 
   return "";
+};
+
+const verifyRecaptchaToken = async (token, remoteIp) => {
+  if (!token) {
+    return {
+      ok: false,
+      code: "captcha_missing",
+      message: "Security verification failed",
+      fieldMessage: "Please complete the security verification before submitting your application.",
+      googleCodes: [],
+    };
+  }
+
+  if (!RECAPTCHA_SECRET_KEY) {
+    console.error("[expert-onboarding] RECAPTCHA_SECRET_KEY is not configured");
+    return {
+      ok: false,
+      code: "captcha_unavailable",
+      message: "Security verification failed",
+      fieldMessage: "Security verification is temporarily unavailable. Please try again shortly.",
+      googleCodes: [],
+    };
+  }
+
+  try {
+    const payload = new URLSearchParams();
+    payload.append("secret", RECAPTCHA_SECRET_KEY);
+    payload.append("response", token);
+    if (clean(remoteIp)) {
+      payload.append("remoteip", clean(remoteIp));
+    }
+
+    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: payload,
+    });
+
+    const result = await response.json();
+    const googleCodes = Array.isArray(result?.["error-codes"]) ? result["error-codes"] : [];
+
+    logDebug("Google reCAPTCHA verify response.", {
+      status: response.status,
+      success: Boolean(result?.success),
+      hostname: clean(result?.hostname),
+      errorCodes: googleCodes,
+    });
+
+    if (!response.ok || !result?.success) {
+      const isExpired =
+        googleCodes.includes("timeout-or-duplicate") ||
+        googleCodes.includes("invalid-input-response");
+
+      return {
+        ok: false,
+        code: isExpired ? "captcha_expired" : "captcha_failed",
+        message: "Security verification failed",
+        fieldMessage: isExpired
+          ? "Security verification expired. Please complete the CAPTCHA again."
+          : "Please complete the CAPTCHA verification and try again.",
+        googleCodes,
+      };
+    }
+
+    return {
+      ok: true,
+      code: "captcha_verified",
+      message: "Security verification passed",
+      fieldMessage: "",
+      googleCodes,
+    };
+  } catch (error) {
+    console.error("[expert-onboarding] reCAPTCHA verification error:", error);
+    return {
+      ok: false,
+      code: "captcha_network_error",
+      message: "Security verification failed",
+      fieldMessage: "Unable to validate security verification right now. Please retry in a moment.",
+      googleCodes: [],
+    };
+  }
 };
 
 const buildWebhookFormData = (body, file) => {
@@ -158,8 +247,10 @@ export const submitExpertOnboarding = async (req, res) => {
     logDebug("Received multipart expert onboarding request.", {
       body: req.body,
       recaptchaToken: req.body?.["g-recaptcha-response"],
+      normalizedRecaptchaToken: body["g-recaptcha-response"],
       fileField: req.file?.fieldname || null,
       fileName: req.file?.originalname || null,
+      hasFile: Boolean(req.file),
     });
 
     const profileError = validateUploadedProfile(uploadedFile);
@@ -175,6 +266,10 @@ export const submitExpertOnboarding = async (req, res) => {
       fieldErrors.email = "Please enter your email address.";
     } else if (!EMAIL_PATTERN.test(clean(body.email))) {
       fieldErrors.email = "Please enter a valid email address.";
+    }
+
+    if (!clean(body.mobileNumber)) {
+      fieldErrors.mobileNumber = "Please enter your mobile number.";
     }
 
     if (!clean(body.pincode)) {
@@ -204,7 +299,29 @@ export const submitExpertOnboarding = async (req, res) => {
     }
 
     if (Object.keys(fieldErrors).length > 0) {
+      logDebug("Validation failed before CAPTCHA verification.", {
+        response: buildFieldErrorResponse(fieldErrors),
+      });
       return res.status(400).json(buildFieldErrorResponse(fieldErrors));
+    }
+
+    const recaptchaValidation = await verifyRecaptchaToken(
+      body["g-recaptcha-response"],
+      req.ip || req.headers["x-forwarded-for"]
+    );
+
+    if (!recaptchaValidation.ok) {
+      const captchaFailureResponse = {
+        success: false,
+        message: "Security verification failed",
+        code: recaptchaValidation.code,
+        recaptchaCodes: recaptchaValidation.googleCodes || [],
+      };
+      logDebug("CAPTCHA verification failed.", {
+        token: body["g-recaptcha-response"],
+        response: captchaFailureResponse,
+      });
+      return res.status(400).json(captchaFailureResponse);
     }
 
     const abortController = new AbortController();
@@ -227,38 +344,48 @@ export const submitExpertOnboarding = async (req, res) => {
       });
 
       if (!webhookResponse.ok || !webhookPayload?.success) {
-        return res.status(webhookResponse.ok ? 400 : webhookResponse.status).json({
+        const failurePayload = {
           success: false,
           message: clean(webhookPayload?.message) || "Submission failed. Please try again.",
-        });
+        };
+        logDebug("Sending failure response to frontend.", failurePayload);
+        return res.status(webhookResponse.ok ? 400 : webhookResponse.status).json(failurePayload);
       }
 
-      return res.status(200).json({
+      const successPayload = {
         success: true,
         message: clean(webhookPayload?.message) || "Application submitted successfully.",
         resumeLink: clean(webhookPayload?.resumeLink),
-      });
+      };
+      logDebug("Sending success response to frontend.", successPayload);
+      return res.status(200).json(successPayload);
     } catch (error) {
       if (error?.name === "AbortError") {
-        return res.status(504).json({
+        const timeoutResponse = {
           success: false,
           message: "Submission timed out. Please try again.",
-        });
+        };
+        logDebug("Sending timeout response to frontend.", timeoutResponse);
+        return res.status(504).json(timeoutResponse);
       }
 
       console.error("[expert-onboarding] submit proxy error:", error);
-      return res.status(502).json({
+      const proxyErrorResponse = {
         success: false,
         message: "Unable to reach the onboarding service. Please try again.",
-      });
+      };
+      logDebug("Sending proxy error response to frontend.", proxyErrorResponse);
+      return res.status(502).json(proxyErrorResponse);
     } finally {
       clearTimeout(timeoutId);
     }
   } catch (error) {
     console.error("[expert-onboarding] unexpected error:", error);
-    return res.status(500).json({
+    const unexpectedErrorResponse = {
       success: false,
       message: "Submission failed. Please try again.",
-    });
+    };
+    logDebug("Sending unexpected error response to frontend.", unexpectedErrorResponse);
+    return res.status(500).json(unexpectedErrorResponse);
   }
 };

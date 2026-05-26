@@ -310,6 +310,7 @@ export function JoinAsExpertPage() {
 
   const handleCaptchaChange = (token: string | null) => {
     const normalizedToken = trimValue(token);
+    console.log("captchaToken", normalizedToken);
     setCaptchaToken(normalizedToken);
     setCaptchaStatus(normalizedToken ? "verified" : "idle");
     setErrors((prev) => ({
@@ -487,9 +488,10 @@ export function JoinAsExpertPage() {
       }
 
       formData.append("g-recaptcha-response", captchaToken);
+      console.log("captchaToken", captchaToken);
 
       debugLog("Submitting expert onboarding form.", {
-        url: "https://n8n.caloganathan.com/webhook/expert-onboarding",
+        url: EXPERT_ONBOARDING_WEBHOOK,
         fields: Array.from(formData.keys()),
         fileName: profileFile?.name || null,
         fileSize: profileFile?.size || 0,
@@ -500,7 +502,7 @@ export function JoinAsExpertPage() {
 
       let response: Response;
       try {
-        response = await fetch("https://n8n.caloganathan.com/webhook/expert-onboarding", {
+        response = await fetch(EXPERT_ONBOARDING_WEBHOOK, {
           method: "POST",
           body: formData,
           signal: abortController.signal,
@@ -510,6 +512,12 @@ export function JoinAsExpertPage() {
       }
 
       const result = await safeParseJson(response);
+      debugLog("Expert onboarding response received.", {
+        status: response.status,
+        ok: response.ok,
+        contentType: response.headers.get("content-type"),
+        body: result,
+      });
 
       if (
         response.ok &&
@@ -540,6 +548,12 @@ export function JoinAsExpertPage() {
           recaptchaRef.current.reset();
         }
       } else {
+        if (
+          typeof result?.message === "string" &&
+          /<html|<!doctype html/i.test(result.message)
+        ) {
+          throw new Error("Submission service returned an unexpected HTML response.");
+        }
         throw new Error(
           trimValue(result?.message) || "Submission failed"
         );
@@ -552,6 +566,7 @@ export function JoinAsExpertPage() {
       setErrorMessage(message);
       setShowErrorBanner(true);
       setSubmissionStage("idle");
+      toast.error(message || "Submission failed");
 
       if (recaptchaRef.current) {
         recaptchaRef.current.reset();
