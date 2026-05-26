@@ -208,7 +208,7 @@ export const buildRuntimeConfig = (env = process.env) => {
     commit: sanitizeString(env.APP_COMMIT) || "unknown",
     region: sanitizeString(env.APP_REGION) || sanitizeString(env.RENDER_REGION) || "unknown",
     runtime: sanitizeString(env.APP_RUNTIME) || "nodejs",
-    jsonBodyLimit: sanitizeString(env.JSON_BODY_LIMIT) || "5mb",
+    jsonBodyLimit: sanitizeString(env.JSON_BODY_LIMIT) || "20mb",
     globalRateLimitPerMin: Math.max(parseNumber(env.GLOBAL_RATE_LIMIT_PER_MIN, 120), 1),
     allowedOrigins: unique([...DEFAULT_ALLOWED_ORIGINS, ...parseList(env.ALLOWED_ORIGINS)]),
   };

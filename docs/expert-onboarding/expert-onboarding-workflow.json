@@ -8,15 +8,28 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "1f1a1a9a-3d97-4e3f-a7d0-97b7c8f6c101",
+      "id": "webhook-node",
       "name": "Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        240,
-        300
+        220,
+        320
       ],
       "webhookId": "expert-onboarding"
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $json.body ?? $json;\nconst binary = $binary ?? {};\nconst clean = (value) => String(value ?? '').trim();\nconst errors = [];\n\nif (!clean(source.fullName)) errors.push('Full name is required.');\nif (!clean(source.mobileNumber)) errors.push('Mobile number is required.');\nif (!clean(source.email)) errors.push('Email is required.');\nif (!clean(source.membershipNumber)) errors.push('Membership number is required.');\nif (!clean(source.cop)) errors.push('COP is required.');\nif (!clean(source.qualification || source.profession)) errors.push('Qualification is required.');\nif (!clean(source.areaOfExpertise)) errors.push('Area of expertise is required.');\nif (!clean(source['g-recaptcha-response'])) errors.push('CAPTCHA token is required.');\nif (!binary.data) errors.push('Resume file is required.');\n\nconst body = {\n  ...source,\n  qualification: clean(source.qualification || source.profession),\n  profession: clean(source.profession || source.qualification)\n};\n\nconst output = {\n  json: {\n    ...body,\n    errors,\n    isValid: errors.length === 0\n  }\n};\n\nif (binary.data) {\n  output.binary = {\n    data: binary.data\n  };\n}\n\nreturn [output];"
+      },
+      "id": "validate-fields-node",
+      "name": "Validate Fields",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        320
+      ]
     },
     {
       "parameters": {
@@ -29,53 +42,8 @@
           },
           "conditions": [
             {
-              "id": "4c5ba9de-bd2f-4219-9a5f-1b38914a0f01",
-              "leftValue": "={{ String($json.fullName || '').trim() }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            },
-            {
-              "id": "b424ef2a-c8d2-4eb1-8c77-75149b8e4902",
-              "leftValue": "={{ String($json.mobileNumber || '').trim() }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            },
-            {
-              "id": "d12cde58-3fb9-4a90-a609-5193730a0103",
-              "leftValue": "={{ String($json.email || '').trim() }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            },
-            {
-              "id": "bf502e9d-3d34-4a3d-8f7f-4fe038620104",
-              "leftValue": "={{ String($json.profession || '').trim() }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            },
-            {
-              "id": "e49d84ab-e66d-4781-aa1c-4a7b18e50105",
-              "leftValue": "={{ String($json.areaOfExpertise || '').trim() }}",
-              "rightValue": "",
-              "operator": {
-                "type": "string",
-                "operation": "notEmpty"
-              }
-            },
-            {
-              "id": "f59ea4bc-f77e-4892-ba2d-5a8c29d5c106",
-              "leftValue": "={{ !!$binary.resume }}",
+              "id": "fields-valid-condition",
+              "leftValue": "={{ $json.isValid }}",
               "rightValue": true,
               "operator": {
                 "type": "boolean",
@@ -88,13 +56,91 @@
         },
         "options": {}
       },
-      "id": "2f2b2b0b-4ea8-4701-b8e1-a8c8d9e7d202",
-      "name": "If (Validate)",
+      "id": "fields-valid-node",
+      "name": "Fields Valid?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        500,
-        300
+        700,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://www.google.com/recaptcha/api/siteverify",
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "secret",
+              "value": "={{ $env.RECAPTCHA_SECRET_KEY }}"
+            },
+            {
+              "name": "response",
+              "value": "={{ $node['Webhook'].json.body['g-recaptcha-response'] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "verify-captcha-node",
+      "name": "Verify CAPTCHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "captcha-valid-condition",
+              "leftValue": "={{ $json.success === true }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "captcha-valid-node",
+      "name": "CAPTCHA Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1180,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "id": "merge-binary-node",
+      "name": "Merge Binary Back",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1420,
+        220
       ]
     },
     {
@@ -102,18 +148,18 @@
         "resource": "file",
         "operation": "upload",
         "binaryData": true,
-        "binaryPropertyName": "resume",
-        "name": "={{ $binary.resume.fileName }}",
+        "binaryPropertyName": "data",
+        "name": "={{ $binary.data.fileName }}",
         "parents": "YOUR_GOOGLE_DRIVE_FOLDER_ID",
         "options": {}
       },
-      "id": "7f7f7f70-93fd-4c56-ad06-fd12ed3cf707",
+      "id": "upload-resume-node",
       "name": "Upload Resume",
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        760,
-        180
+        1660,
+        220
       ],
       "credentials": {
         "googleDriveOAuth2Api": {
@@ -127,49 +173,73 @@
         "assignments": {
           "assignments": [
             {
-              "id": "4d7450d1-19d9-4390-914b-87953a5f9201",
+              "id": "merge-full-name",
               "name": "fullName",
-              "value": "={{ $node[\"Webhook\"].json[\"fullName\"] }}",
+              "value": "={{ $node['Validate Fields'].json['fullName'] }}",
               "type": "string"
             },
             {
-              "id": "e0e4a95d-e166-4461-8764-03e38579a102",
+              "id": "merge-mobile-number",
               "name": "mobileNumber",
-              "value": "={{ $node[\"Webhook\"].json[\"mobileNumber\"] }}",
+              "value": "={{ $node['Validate Fields'].json['mobileNumber'] }}",
               "type": "string"
             },
             {
-              "id": "0df85ed1-630f-43ac-a82f-585bebfe9203",
+              "id": "merge-email",
               "name": "email",
-              "value": "={{ $node[\"Webhook\"].json[\"email\"] }}",
+              "value": "={{ $node['Validate Fields'].json['email'] }}",
               "type": "string"
             },
             {
-              "id": "56cd4cd5-d3c2-42bb-bc12-faf2afed9204",
+              "id": "merge-membership",
+              "name": "membershipNumber",
+              "value": "={{ $node['Validate Fields'].json['membershipNumber'] }}",
+              "type": "string"
+            },
+            {
+              "id": "merge-cop",
+              "name": "cop",
+              "value": "={{ $node['Validate Fields'].json['cop'] }}",
+              "type": "string"
+            },
+            {
+              "id": "merge-qualification",
+              "name": "qualification",
+              "value": "={{ $node['Validate Fields'].json['qualification'] }}",
+              "type": "string"
+            },
+            {
+              "id": "merge-profession",
               "name": "profession",
-              "value": "={{ $node[\"Webhook\"].json[\"profession\"] }}",
+              "value": "={{ $node['Validate Fields'].json['profession'] }}",
               "type": "string"
             },
             {
-              "id": "8e676bda-5fe7-4d0e-bf31-c3edb65a9205",
+              "id": "merge-area",
               "name": "areaOfExpertise",
-              "value": "={{ $node[\"Webhook\"].json[\"areaOfExpertise\"] }}",
+              "value": "={{ $node['Validate Fields'].json['areaOfExpertise'] }}",
               "type": "string"
             },
             {
-              "id": "cfbf2473-a6cf-4f4a-9b45-7b51beea9206",
+              "id": "merge-pincode",
+              "name": "pincode",
+              "value": "={{ $node['Validate Fields'].json['pincode'] }}",
+              "type": "string"
+            },
+            {
+              "id": "merge-resume-file",
               "name": "resumeFileName",
-              "value": "={{ $node[\"Upload Resume\"].json[\"name\"] || $node[\"Webhook\"].binary[\"resume\"].fileName }}",
+              "value": "={{ $node['Upload Resume'].json['name'] || $node['Webhook'].binary.data.fileName }}",
               "type": "string"
             },
             {
-              "id": "dfcfe602-b432-4c42-bcb7-9d9d302b9207",
+              "id": "merge-resume-link",
               "name": "resumeLink",
-              "value": "={{ $node[\"Upload Resume\"].json[\"webViewLink\"] || ('https://drive.google.com/file/d/' + $node[\"Upload Resume\"].json[\"id\"] + '/view') }}",
+              "value": "={{ $node['Upload Resume'].json['webViewLink'] || ('https://drive.google.com/file/d/' + $node['Upload Resume'].json['id'] + '/view') }}",
               "type": "string"
             },
             {
-              "id": "e0f44d91-6fcf-4f76-bf5f-570406a59206",
+              "id": "merge-created-at",
               "name": "createdAt",
               "value": "={{ $now }}",
               "type": "string"
@@ -178,13 +248,13 @@
         },
         "options": {}
       },
-      "id": "3f3c3c1c-5fb9-4812-c9f2-b9d9eaf8e303",
-      "name": "Format Data",
+      "id": "merge-data-node",
+      "name": "Merge Data",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        1020,
-        180
+        1900,
+        220
       ]
     },
     {
@@ -203,107 +273,90 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "fullName": "={{ $node[\"Webhook\"].json[\"fullName\"] }}",
-            "mobileNumber": "={{ $node[\"Webhook\"].json[\"mobileNumber\"] }}",
-            "email": "={{ $node[\"Webhook\"].json[\"email\"] }}",
-            "profession": "={{ $node[\"Webhook\"].json[\"profession\"] }}",
-            "areaOfExpertise": "={{ $node[\"Webhook\"].json[\"areaOfExpertise\"] }}",
-            "resumeFileName": "={{ $node[\"Upload Resume\"].json[\"name\"] || $node[\"Webhook\"].binary[\"resume\"].fileName }}",
-            "resumeLink": "={{ $node[\"Upload Resume\"].json[\"webViewLink\"] || ('https://drive.google.com/file/d/' + $node[\"Upload Resume\"].json[\"id\"] + '/view') }}",
-            "createdAt": "={{ $now }}"
+            "fullName": "={{ $json.fullName }}",
+            "mobileNumber": "={{ $json.mobileNumber }}",
+            "email": "={{ $json.email }}",
+            "membershipNumber": "={{ $json.membershipNumber }}",
+            "cop": "={{ $json.cop }}",
+            "qualification": "={{ $json.qualification }}",
+            "profession": "={{ $json.profession }}",
+            "areaOfExpertise": "={{ $json.areaOfExpertise }}",
+            "pincode": "={{ $json.pincode }}",
+            "resumeFileName": "={{ $json.resumeFileName }}",
+            "resumeLink": "={{ $json.resumeLink }}",
+            "createdAt": "={{ $json.createdAt }}"
           },
           "matchingColumns": [],
-          "schema": [
-            {
-              "id": "fullName",
-              "displayName": "fullName",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "mobileNumber",
-              "displayName": "mobileNumber",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "profession",
-              "displayName": "profession",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "areaOfExpertise",
-              "displayName": "areaOfExpertise",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "resumeFileName",
-              "displayName": "resumeFileName",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "resumeLink",
-              "displayName": "resumeLink",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            },
-            {
-              "id": "createdAt",
-              "displayName": "createdAt",
-              "required": false,
-              "defaultMatch": false,
-              "display": true,
-              "type": "string",
-              "canBeUsedToMatch": true
-            }
-          ],
+          "schema": [],
           "attemptToConvertTypes": false,
           "convertFieldsToString": false
         },
         "options": {}
       },
-      "id": "4f4d4d2d-60ca-4923-daf3-caeafb09f404",
-      "name": "Google Sheets (Append Row)",
+      "id": "append-row-node",
+      "name": "Append Row",
       "type": "n8n-nodes-base.googleSheets",
       "typeVersion": 4.5,
       "position": [
-        1280,
-        180
+        2140,
+        220
       ],
       "credentials": {
         "googleSheetsOAuth2Api": {
           "id": "YOUR_GOOGLE_SHEETS_CREDENTIAL_ID",
           "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "email-subject",
+              "name": "subject",
+              "value": "=New expert onboarding: {{$json.fullName}}",
+              "type": "string"
+            },
+            {
+              "id": "email-html",
+              "name": "html",
+              "value": "=<p><strong>Name:</strong> {{$json.fullName}}</p><p><strong>Email:</strong> {{$json.email}}</p><p><strong>Mobile:</strong> {{$json.mobileNumber}}</p><p><strong>Membership:</strong> {{$json.membershipNumber}}</p><p><strong>COP:</strong> {{$json.cop}}</p><p><strong>Qualification:</strong> {{$json.qualification}}</p><p><strong>Area of Expertise:</strong> {{$json.areaOfExpertise}}</p><p><strong>Resume:</strong> <a href='{{$json.resumeLink}}'>{{$json.resumeFileName}}</a></p>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "build-email-node",
+      "name": "Build Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2380,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@nritax.ai",
+        "toEmail": "YOUR_ONBOARDING_TEAM_EMAIL",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "send-email-node",
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        2620,
+        220
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "YOUR_SMTP_CREDENTIAL_ID",
+          "name": "SMTP account"
         }
       }
     },
@@ -315,30 +368,47 @@
           "responseCode": 200
         }
       },
-      "id": "5f5e5e3e-71db-4a34-ebf4-dbf0cb1af505",
-      "name": "Respond to Webhook (Success)",
+      "id": "success-response-node",
+      "name": "Success Response",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.2,
       "position": [
-        1540,
-        180
+        2860,
+        220
       ]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields or resume file\"\n}",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Missing required fields or resume file\",\n  \"errors\": $json.errors || []\n}",
         "options": {
           "responseCode": 400
         }
       },
-      "id": "6f6f6f4f-82ec-4b45-fcf5-ec01dc2bf606",
-      "name": "Respond to Webhook (Error)",
+      "id": "field-error-node",
+      "name": "Field Error",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.2,
       "position": [
-        760,
-        420
+        940,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"success\": false,\n  \"message\": \"Security verification failed\",\n  \"recaptchaCodes\": $json['error-codes'] || []\n}",
+        "options": {
+          "responseCode": 400
+        }
+      },
+      "id": "captcha-error-node",
+      "name": "CAPTCHA Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.2,
+      "position": [
+        1420,
+        440
       ]
     }
   ],
@@ -347,25 +417,81 @@
       "main": [
         [
           {
-            "node": "If (Validate)",
+            "node": "Validate Fields",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "If (Validate)": {
+    "Validate Fields": {
       "main": [
         [
           {
-            "node": "Upload Resume",
+            "node": "Fields Valid?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Merge Binary Back",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Fields Valid?": {
+      "main": [
+        [
+          {
+            "node": "Verify CAPTCHA",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "Respond to Webhook (Error)",
+            "node": "Field Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify CAPTCHA": {
+      "main": [
+        [
+          {
+            "node": "CAPTCHA Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CAPTCHA Valid?": {
+      "main": [
+        [
+          {
+            "node": "Merge Binary Back",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "CAPTCHA Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Binary Back": {
+      "main": [
+        [
+          {
+            "node": "Upload Resume",
             "type": "main",
             "index": 0
           }
@@ -376,29 +502,51 @@
       "main": [
         [
           {
-            "node": "Format Data",
+            "node": "Merge Data",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Format Data": {
+    "Merge Data": {
       "main": [
         [
           {
-            "node": "Google Sheets (Append Row)",
+            "node": "Append Row",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Google Sheets (Append Row)": {
+    "Append Row": {
       "main": [
         [
           {
-            "node": "Respond to Webhook (Success)",
+            "node": "Build Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
             "type": "main",
             "index": 0
           }
@@ -408,10 +556,10 @@
   },
   "active": false,
   "settings": {},
-  "versionId": "7f7f7f5f-93fd-4c56-ad06-fd12ed3cf707",
+  "versionId": "expert-onboarding-v2",
   "meta": {
     "instanceId": "expert-onboarding-template"
   },
-  "id": "8f8f8f6f-a40e-4d67-be17-0e23fe4df808",
+  "id": "expert-onboarding-workflow-v2",
   "tags": []
 }

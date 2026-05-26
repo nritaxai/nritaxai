@@ -1,7 +1,5 @@
 import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
   CheckCircle2,
   ChevronDown,
   FileCheck2,
@@ -24,6 +22,7 @@ import { IS_IOS_NATIVE_APP } from "../../config/appConfig";
 type ExpertFormData = {
   fullName: string;
   email: string;
+  mobileNumber: string;
   pincode: string;
   membershipNumber: string;
   cop: string;
@@ -50,6 +49,7 @@ type ExpertOnboardingResponse = {
 const initialValues: ExpertFormData = {
   fullName: "",
   email: "",
+  mobileNumber: "",
   pincode: "",
   membershipNumber: "",
   cop: "",
@@ -157,7 +157,6 @@ const errorMessageClassName = "mt-1 text-[12px] text-rose-600";
 const requiredAsterisk = <span className="text-rose-500">*</span>;
 
 export function JoinAsExpertPage() {
-  const navigate = useNavigate();
   const formRef = useRef<HTMLFormElement | null>(null);
   const resumeInputRef = useRef<HTMLInputElement | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA | null>(null);
@@ -165,7 +164,8 @@ export function JoinAsExpertPage() {
   const [values, setValues] = useState<ExpertFormData>(initialValues);
   const [errors, setErrors] = useState<Partial<Record<ExpertFormFieldKey, string>>>({});
   const [showErrorBanner, setShowErrorBanner] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
   const [submissionStage, setSubmissionStage] = useState<SubmissionStage>("idle");
   const [successMessage, setSuccessMessage] = useState("");
   const [submittedName, setSubmittedName] = useState("");
@@ -175,6 +175,9 @@ export function JoinAsExpertPage() {
   const [captchaStatus, setCaptchaStatus] = useState<CaptchaStatus>("idle");
   const [captchaRenderKey, setCaptchaRenderKey] = useState(0);
   const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+  const loading = uploadLoading || submitLoading;
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -207,6 +210,7 @@ export function JoinAsExpertPage() {
     const orderedFields: ExpertFormFieldKey[] = [
       "fullName",
       "email",
+      "mobileNumber",
       "pincode",
       "membershipNumber",
       "cop",
@@ -235,7 +239,12 @@ export function JoinAsExpertPage() {
 
   const handleChange = (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
-    const nextValue = name === "pincode" ? value.replace(/\D/g, "").slice(0, 6) : value;
+    const nextValue =
+      name === "pincode"
+        ? value.replace(/\D/g, "").slice(0, 6)
+        : name === "mobileNumber"
+          ? value.replace(/[^\d+\s()-]/g, "").slice(0, 20)
+          : value;
 
     setValues((prev) => ({
       ...prev,
@@ -301,7 +310,6 @@ export function JoinAsExpertPage() {
 
   const handleCaptchaChange = (token: string | null) => {
     const normalizedToken = trimValue(token);
-    console.log("[JoinAsExpert] captchaToken", normalizedToken);
     setCaptchaToken(normalizedToken);
     setCaptchaStatus(normalizedToken ? "verified" : "idle");
     setErrors((prev) => ({
@@ -347,6 +355,10 @@ export function JoinAsExpertPage() {
       validationErrors.email = "Please enter a valid email address.";
     }
 
+    if (!trimValue(formValues.mobileNumber)) {
+      validationErrors.mobileNumber = "Please enter your mobile number.";
+    }
+
     if (!trimValue(formValues.pincode)) {
       validationErrors.pincode = "Please enter your pincode.";
     } else if (!/^\d{6}$/.test(trimValue(formValues.pincode))) {
@@ -387,12 +399,15 @@ export function JoinAsExpertPage() {
 
     formData.append("fullName", trimValue(formValues.fullName));
     formData.append("email", trimValue(formValues.email));
+    formData.append("mobileNumber", trimValue(formValues.mobileNumber));
     formData.append("pincode", trimValue(formValues.pincode));
     formData.append("membershipNumber", trimValue(formValues.membershipNumber));
     formData.append("cop", trimValue(formValues.cop));
     formData.append("qualification", qualification);
     formData.append("areaOfExpertise", areaOfExpertise);
-    formData.append("profile", file);
+    if (file) {
+      formData.append("profile", file);
+    }
     formData.append("g-recaptcha-response", captchaToken);
 
     return formData;
@@ -410,8 +425,10 @@ export function JoinAsExpertPage() {
 
     setSubmitAttempted(true);
     setShowErrorBanner(false);
+    setSubmitSuccess(false);
     setSuccessMessage("");
     setErrorMessage("");
+    setSubmitError("");
 
     const validationErrors = validateForm(values, profileFile, captchaToken);
     if (Object.keys(validationErrors).length > 0) {
@@ -422,6 +439,7 @@ export function JoinAsExpertPage() {
         validationErrors.profile ||
         validationErrors.email ||
         validationErrors.fullName ||
+        validationErrors.mobileNumber ||
         validationErrors.membershipNumber ||
         validationErrors.pincode ||
         "Please review the highlighted onboarding fields.";
@@ -440,7 +458,7 @@ export function JoinAsExpertPage() {
     let activeToastId: string | number | undefined;
 
     try {
-      setLoading(true);
+      setSubmitLoading(true);
       setSubmissionStage("verifying");
       activeToastId = toast.loading(PHASE_MESSAGES.verifying);
 
@@ -450,10 +468,10 @@ export function JoinAsExpertPage() {
       }));
 
       setSubmissionStage("uploading");
+      setUploadLoading(true);
       toast.loading(PHASE_MESSAGES.uploading, { id: activeToastId });
 
       const formData = buildMultipartPayload(normalizedValues, profileFile, captchaToken);
-      console.log("[JoinAsExpert] captchaToken", captchaToken);
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
         fields: Array.from(formData.keys()),
@@ -464,6 +482,7 @@ export function JoinAsExpertPage() {
 
       setSubmissionStage("submitting");
       toast.loading(PHASE_MESSAGES.submitting, { id: activeToastId });
+      setUploadLoading(false);
 
       const abortController = new AbortController();
       const timeoutId = window.setTimeout(() => abortController.abort(), SUBMISSION_TIMEOUT_MS);
@@ -522,6 +541,7 @@ export function JoinAsExpertPage() {
       setSubmissionStage("finalizing");
       toast.loading(PHASE_MESSAGES.finalizing, { id: activeToastId });
 
+      setSubmitSuccess(true);
       setSuccessMessage(SUCCESS_MESSAGE);
       setSubmittedName(normalizedValues.fullName);
       setValues(initialValues);
@@ -529,6 +549,7 @@ export function JoinAsExpertPage() {
       setErrors({});
       setShowErrorBanner(false);
       setErrorMessage("");
+      setSubmitError("");
       setCaptchaStatus("idle");
       setSubmitAttempted(false);
 
@@ -542,6 +563,8 @@ export function JoinAsExpertPage() {
       debugLog("Expert onboarding submission failed.", error);
 
       const message = resolveSubmissionErrorMessage(error);
+      setSubmitSuccess(false);
+      setSubmitError(message);
       setErrorMessage(message);
       setShowErrorBanner(true);
       setSubmissionStage("idle");
@@ -560,7 +583,8 @@ export function JoinAsExpertPage() {
       refreshCaptchaWidget(/could not be loaded/i.test(message) ? "error" : "expired");
       toast.error(message, { id: activeToastId });
     } finally {
-      setLoading(false);
+      setUploadLoading(false);
+      setSubmitLoading(false);
       setSubmissionStage("idle");
     }
   };
@@ -572,7 +596,7 @@ export function JoinAsExpertPage() {
       : PHASE_MESSAGES[submissionStage];
   const isCaptchaVerified = Boolean(captchaToken) && captchaStatus === "verified";
   const isSubmitDisabled = loading || !isCaptchaVerified || !RECAPTCHA_SITE_KEY;
-  const showSuccess = Boolean(successMessage);
+  const showSuccess = submitSuccess && Boolean(successMessage);
 
   return (
     <div
@@ -610,15 +634,6 @@ export function JoinAsExpertPage() {
       ) : null}
 
       <div className={IS_IOS_NATIVE_APP ? "mx-auto w-full max-w-full px-3" : "mx-auto max-w-6xl px-4 sm:px-6 lg:px-8"}>
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="mb-4 inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-white/70 px-4 py-2 text-sm font-medium text-sky-700 shadow-sm backdrop-blur transition hover:border-sky-300 hover:bg-white"
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </button>
-
         <div className={IS_IOS_NATIVE_APP ? "mb-5 w-full max-w-full" : "mb-10 max-w-4xl"}>
           <p className="text-sm font-semibold uppercase tracking-[0.28em] text-sky-700">Expert Onboarding</p>
           <h1 className={IS_IOS_NATIVE_APP ? "mt-3 text-3xl font-semibold text-slate-950" : "mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl"}>
@@ -728,6 +743,25 @@ export function JoinAsExpertPage() {
                         disabled={loading}
                       />
                       {errors.email ? <p id={getFieldErrorId("email")} className={errorMessageClassName}>{errors.email}</p> : null}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="mobileNumber" className="text-sm font-medium text-slate-900">Mobile Number {requiredAsterisk}</Label>
+                      <Input
+                        id="mobileNumber"
+                        name="mobileNumber"
+                        type="tel"
+                        ref={setFieldRef("mobileNumber") as never}
+                        required
+                        value={values.mobileNumber}
+                        onChange={handleChange}
+                        aria-invalid={errors.mobileNumber ? true : undefined}
+                        aria-describedby={errors.mobileNumber ? getFieldErrorId("mobileNumber") : undefined}
+                        placeholder="Enter your mobile number"
+                        className={getFieldClassName("mobileNumber", formFieldClassName)}
+                        disabled={loading}
+                      />
+                      {errors.mobileNumber ? <p id={getFieldErrorId("mobileNumber")} className={errorMessageClassName}>{errors.mobileNumber}</p> : null}
                     </div>
 
                     <div className="space-y-2">
@@ -1013,7 +1047,7 @@ export function JoinAsExpertPage() {
                         >
                           {captchaStatus === "verified" ? <CheckCircle2 className="size-4" /> : <LockKeyhole className="size-4" />}
                           {captchaStatus === "verified"
-                            ? `✓ ${CAPTCHA_VERIFIED_MESSAGE}`
+                            ? CAPTCHA_VERIFIED_MESSAGE
                             : captchaStatus === "expired"
                               ? "Verification expired. Please complete it again."
                               : captchaStatus === "error"
@@ -1023,6 +1057,7 @@ export function JoinAsExpertPage() {
                       </div>
 
                       {errors.captcha ? <p id={getFieldErrorId("captcha")} className={errorMessageClassName}>{errors.captcha}</p> : null}
+                      {submitError && !errors.captcha ? <p className={errorMessageClassName}>{submitError}</p> : null}
                     </div>
 
                     <div className="mt-4 flex flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white/80 px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">

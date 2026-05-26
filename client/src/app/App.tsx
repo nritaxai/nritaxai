@@ -212,17 +212,6 @@ export default function App() {
   }, [isAuthenticated, location.pathname, navigate]);
 
   useEffect(() => {
-    if (isNative) return;
-    if (isAuthenticated || location.pathname !== "/home") return;
-
-    const timeoutId = window.setTimeout(() => {
-      openAuthModal("login");
-    }, 350);
-
-    return () => window.clearTimeout(timeoutId);
-  }, [isAuthenticated, isNative, location.pathname]);
-
-  useEffect(() => {
     let isCancelled = false;
     const pingHealth = async () => {
       try {
@@ -548,7 +537,7 @@ export default function App() {
       )}
       {requiresAuthentication && !isAuthenticated ? <Navigate to={isNative ? "/login" : "/home"} replace /> : null}
       {hasSiteHeader && (
-        <Header onLogin={() => openAuthModal("login")} onSignup={() => openAuthModal("signup")} />
+        <Header onLogin={() => openAuthModal("login")} onSignup={() => navigate("/login?mode=signup")} />
       )}
       {shouldShowAndroidHeader && (
         <AndroidHeader onLogin={() => setShowLoginModal(true)} />

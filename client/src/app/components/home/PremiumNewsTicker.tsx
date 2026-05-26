@@ -141,22 +141,22 @@ const getCategoryTone = (label?: string) => {
   const normalized = (label || "").toUpperCase();
 
   if (normalized.includes("DTAA")) {
-    return "border-cyan-300/30 bg-cyan-400/12 text-cyan-100 shadow-[0_0_20px_rgba(34,211,238,0.12)]";
+    return "border-cyan-200/70 bg-cyan-100 text-cyan-950 shadow-[0_0_20px_rgba(34,211,238,0.12)]";
   }
 
   if (normalized.includes("FEMA") || normalized.includes("RBI")) {
-    return "border-emerald-300/30 bg-emerald-400/12 text-emerald-100 shadow-[0_0_20px_rgba(16,185,129,0.12)]";
+    return "border-emerald-200/70 bg-emerald-100 text-emerald-950 shadow-[0_0_20px_rgba(16,185,129,0.12)]";
   }
 
   if (normalized.includes("CBDT")) {
-    return "border-amber-300/35 bg-amber-300/14 text-amber-50 shadow-[0_0_20px_rgba(251,191,36,0.12)]";
+    return "border-amber-200/80 bg-amber-100 text-amber-950 shadow-[0_0_20px_rgba(251,191,36,0.12)]";
   }
 
   if (normalized.includes("NRI")) {
-    return "border-amber-300/30 bg-amber-400/12 text-amber-100 shadow-[0_0_20px_rgba(251,191,36,0.12)]";
+    return "border-amber-200/80 bg-amber-100 text-amber-950 shadow-[0_0_20px_rgba(251,191,36,0.12)]";
   }
 
-  return "border-sky-200/30 bg-sky-300/10 text-slate-50 shadow-[0_0_18px_rgba(56,189,248,0.10)]";
+  return "border-sky-200/80 bg-sky-100 text-sky-950 shadow-[0_0_18px_rgba(56,189,248,0.10)]";
 };
 
 function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) {
@@ -172,7 +172,7 @@ function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) 
       href={href}
       target={href.startsWith("http") ? "_blank" : undefined}
       rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-      className="group/item inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-white/12 bg-white/[0.055] px-3 pr-3.5 text-sm text-slate-50 shadow-[0_16px_34px_rgba(2,6,23,0.22),inset_0_1px_0_rgba(255,255,255,0.08)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200/28 hover:bg-white/[0.09] hover:shadow-[0_18px_40px_rgba(15,23,42,0.32),0_0_0_1px_rgba(148,163,184,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/70"
+      className="group/item inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-slate-200/14 bg-white/[0.10] px-3 pr-3.5 text-sm text-white shadow-[0_16px_34px_rgba(2,6,23,0.22),inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200/42 hover:bg-white/[0.16] hover:shadow-[0_18px_40px_rgba(15,23,42,0.32),0_0_0_1px_rgba(148,163,184,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-200/80"
       tabIndex={clone ? -1 : undefined}
       aria-hidden={clone || undefined}
     >
@@ -181,18 +181,18 @@ function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) 
       >
         {itemLabel}
       </span>
-      <span className="max-w-[190px] truncate text-[13px] font-semibold text-white md:max-w-[360px]">
+      <span className="max-w-[190px] truncate text-[13px] font-semibold text-slate-50 md:max-w-[360px]">
         {headline}
       </span>
       <span className="hidden h-1 w-1 shrink-0 rounded-full bg-white/22 sm:inline-flex" aria-hidden="true" />
-      <span className="hidden shrink-0 rounded-full border border-white/10 bg-white/[0.05] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-100 sm:inline-flex">
+      <span className="hidden shrink-0 rounded-full border border-white/14 bg-white/[0.14] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white sm:inline-flex">
         {itemCountry}
       </span>
-      <span className="hidden text-[11px] font-medium text-cyan-100/90 lg:inline-flex">
+      <span className="hidden text-[11px] font-medium text-cyan-50 lg:inline-flex">
         {itemType}
       </span>
       {item.date ? (
-        <span className="hidden text-[11px] font-medium text-slate-300 xl:inline-flex">
+        <span className="hidden text-[11px] font-medium text-slate-200 xl:inline-flex">
           {formatBannerDate(item.date)}
         </span>
       ) : null}
@@ -260,7 +260,7 @@ export default function PremiumNewsTicker() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: PREMIUM_EASE }}
       aria-label="Live tax intelligence updates"
-      className="relative z-40 w-full border-b border-cyan-200/10 bg-[linear-gradient(90deg,#0F172A_0%,#111C34_52%,#172554_100%)] shadow-[0_18px_48px_rgba(2,6,23,0.22)] backdrop-blur-xl"
+      className="relative z-40 w-full border-b border-slate-200/12 bg-[linear-gradient(90deg,#111827_0%,#172033_52%,#1e293b_100%)] shadow-[0_18px_48px_rgba(2,6,23,0.22)] backdrop-blur-xl"
     >
       <style>{`
         @keyframes premium-news-ticker-scroll {

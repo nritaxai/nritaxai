@@ -4,7 +4,6 @@ const EXPERT_ONBOARDING_WEBHOOK_URL = String(
   process.env.EXPERT_ONBOARDING_WEBHOOK_URL || "https://n8n.caloganathan.com/webhook/expert-onboarding"
 ).trim();
 const EXPERT_ONBOARDING_TIMEOUT_MS = Number(process.env.EXPERT_ONBOARDING_TIMEOUT_MS || 15000);
-const RECAPTCHA_SECRET_KEY = String(process.env.RECAPTCHA_SECRET_KEY || "").trim();
 const EXPERT_ONBOARDING_DEBUG =
   String(process.env.EXPERT_ONBOARDING_DEBUG || "").trim().toLowerCase() === "true" ||
   process.env.NODE_ENV !== "production";
@@ -115,87 +114,6 @@ const validateUploadedProfile = (file) => {
   return "";
 };
 
-const verifyRecaptchaToken = async (token, remoteIp) => {
-  if (!token) {
-    return {
-      ok: false,
-      message: "Security verification failed",
-      fieldMessage: "Please complete the security verification before submitting your application.",
-      code: "captcha_missing",
-      googleCodes: [],
-    };
-  }
-
-  if (!RECAPTCHA_SECRET_KEY) {
-    console.error("[expert-onboarding] RECAPTCHA_SECRET_KEY is not configured");
-    return {
-      ok: false,
-      message: "Security verification failed",
-      fieldMessage: "Security verification is temporarily unavailable. Please try again shortly.",
-      code: "captcha_unavailable",
-      googleCodes: [],
-    };
-  }
-
-  try {
-    const payload = new URLSearchParams();
-    payload.append("secret", RECAPTCHA_SECRET_KEY);
-    payload.append("response", token);
-    if (clean(remoteIp)) {
-      payload.append("remoteip", clean(remoteIp));
-    }
-
-    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: payload,
-    });
-
-    const result = await response.json();
-    const googleCodes = Array.isArray(result?.["error-codes"]) ? result["error-codes"] : [];
-
-    logDebug("reCAPTCHA verification response received.", {
-      status: response.status,
-      success: Boolean(result?.success),
-      hostname: clean(result?.hostname),
-      "error-codes": googleCodes,
-    });
-
-    if (!response.ok || !result?.success) {
-      const isExpired =
-        googleCodes.includes("timeout-or-duplicate") ||
-        googleCodes.includes("invalid-input-response");
-
-      return {
-        ok: false,
-        message: "Security verification failed",
-        fieldMessage: isExpired
-          ? "Security verification expired. Please complete the CAPTCHA again."
-          : "Please complete the CAPTCHA verification and try again.",
-        code: isExpired ? "captcha_expired" : "captcha_failed",
-        googleCodes,
-      };
-    }
-
-    return {
-      ok: true,
-      message: "Security verification secured",
-      googleCodes,
-    };
-  } catch (error) {
-    console.error("[expert-onboarding] reCAPTCHA verification error:", error);
-    return {
-      ok: false,
-      message: "Security verification failed",
-      fieldMessage: "Unable to validate security verification right now. Please retry in a moment.",
-      code: "captcha_network_error",
-      googleCodes: [],
-    };
-  }
-};
-
 const buildWebhookFormData = (body, file) => {
   const formData = new FormData();
 
@@ -209,14 +127,12 @@ const buildWebhookFormData = (body, file) => {
   formData.append("membershipNumber", clean(body?.membershipNumber));
   formData.append("cop", clean(body?.cop));
   formData.append("verificationProvider", "google-recaptcha-v2");
-  formData.append("verificationStatus", "verified");
+  formData.append("g-recaptcha-response", clean(body?.["g-recaptcha-response"]));
 
   const blob = new Blob([file.buffer], { type: file.mimetype || "application/octet-stream" });
   const fileName = file.originalname || "profile";
 
-  // Keep both names for n8n compatibility while treating `profile` as the source field.
   formData.append("profile", blob, fileName);
-  formData.append("resume", blob, fileName);
 
   return formData;
 };
@@ -283,28 +199,12 @@ export const submitExpertOnboarding = async (req, res) => {
       fieldErrors.areaOfExpertise = "Please select your area of expertise.";
     }
 
-    if (Object.keys(fieldErrors).length > 0) {
-      return res.status(400).json(buildFieldErrorResponse(fieldErrors));
+    if (!clean(body["g-recaptcha-response"])) {
+      fieldErrors.captcha = "Please complete the security verification before submitting your application.";
     }
 
-    const recaptchaValidation = await verifyRecaptchaToken(
-      body["g-recaptcha-response"],
-      req.ip || req.headers["x-forwarded-for"]
-    );
-
-    if (!recaptchaValidation.ok) {
-      return res.status(400).json(
-        buildFieldErrorResponse(
-          {
-            captcha: clean(recaptchaValidation.fieldMessage) || "Security verification failed",
-          },
-          "Security verification failed",
-          {
-            code: recaptchaValidation.code,
-            recaptchaCodes: recaptchaValidation.googleCodes || [],
-          }
-        )
-      );
+    if (Object.keys(fieldErrors).length > 0) {
+      return res.status(400).json(buildFieldErrorResponse(fieldErrors));
     }
 
     const abortController = new AbortController();

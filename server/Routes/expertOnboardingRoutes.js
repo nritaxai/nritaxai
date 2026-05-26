@@ -11,6 +11,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: Number(process.env.EXPERT_ONBOARDING_MAX_FILE_BYTES || 10 * 1024 * 1024),
+    files: 1,
   },
 });
 

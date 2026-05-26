@@ -22,6 +22,7 @@ import { getRedisConnection, isQueueingConfigured, isRedisConfigured } from "./q
 import { getSecurityReadiness, validateSecurityConfiguration } from "./services/securityConfig.js";
 
 const app = express();
+const requestBodyLimit = "20mb";
 
 void initErrorMonitoring();
 validateSecurityConfiguration();
@@ -78,7 +79,7 @@ app.use("/api", globalRateLimiter);
 
 app.use(
   express.json({
-    limit: appConfig.app.jsonBodyLimit,
+    limit: requestBodyLimit,
     verify: (req, _res, buf) => {
       if (
         req.originalUrl.startsWith("/api/subscription/razorpay-webhook") ||
@@ -89,7 +90,7 @@ app.use(
     },
   })
 );
-app.use(express.urlencoded({ extended: true, limit: appConfig.app.jsonBodyLimit }));
+app.use(express.urlencoded({ extended: true, limit: requestBodyLimit }));
 
 // Keep health checks independent from the database so Render can verify the
 // process is alive even if MongoDB is temporarily unavailable.

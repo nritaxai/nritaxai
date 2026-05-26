@@ -614,11 +614,11 @@ export function LoginModal({
       </div>
 
       <div className="relative flex min-h-screen items-center justify-center px-3 py-3 sm:px-5 sm:py-5">
-        <Card className="relative h-[min(100vh-1.5rem,44rem)] w-full max-w-[70rem] overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(8,15,30,0.92)] text-white shadow-[0_32px_90px_rgba(2,6,23,0.52),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[18px]">
+        <Card className="relative max-h-[min(100dvh-1.5rem,46rem)] w-full max-w-[72rem] overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(8,15,30,0.92)] text-white shadow-[0_32px_90px_rgba(2,6,23,0.52),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-[18px] lg:h-[min(100dvh-1.5rem,43rem)]">
           <div className="absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-sky-300/50 to-transparent" aria-hidden="true" />
           <div className="grid h-full min-h-0 lg:grid-cols-[0.94fr_1.06fr]">
-            <CardHeader className="relative flex min-h-0 flex-col justify-between overflow-hidden border-b border-white/10 px-5 pb-5 pt-5 sm:px-6 lg:border-b-0 lg:border-r lg:px-8 lg:pb-8 lg:pt-7">
-              <div className="space-y-5">
+            <CardHeader className="relative flex min-h-0 flex-col justify-between overflow-hidden border-b border-white/10 px-5 pb-5 pt-5 sm:px-6 lg:border-b-0 lg:border-r lg:px-8 lg:pb-6 lg:pt-6">
+              <div className="space-y-4">
                 <div className="flex items-start justify-between gap-4">
                   <div className="space-y-3">
                     <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-100">
@@ -653,7 +653,7 @@ export function LoginModal({
                   </div>
                 ) : null}
 
-                <div className="relative hidden min-h-[15.5rem] lg:block">
+                <div className="relative hidden min-h-[13.5rem] lg:block">
                   {(["signup", "login"] as const).map((mode, index) => {
                     const isActive = activeTab === mode;
                     const isSignup = mode === "signup";
@@ -713,7 +713,7 @@ export function LoginModal({
                 </div>
               </div>
 
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-slate-500">
                   Powered by {COMPANY_LEGAL_NAME}
                 </p>
@@ -723,7 +723,7 @@ export function LoginModal({
               </div>
             </CardHeader>
 
-            <CardContent className="flex min-h-0 flex-col px-5 pb-5 pt-5 sm:px-6 lg:px-8 lg:pb-7 lg:pt-7">
+            <CardContent className="flex min-h-0 flex-col overflow-y-auto px-5 pb-5 pt-5 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="relative grid h-12 w-full max-w-[24rem] grid-cols-2 rounded-2xl border border-white/10 bg-white/[0.05] p-1">
                   <motion.span
