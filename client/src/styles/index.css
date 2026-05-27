@@ -106,7 +106,7 @@ section[class*="dark"],
 [class*="alert-bar"],
 [class*="announcement"] {
   color: #f8fafc !important;
-  background-color: #0b1f3a !important;
+  background-color: #081524 !important;
 }
 
 [class*="marquee"] [class*="badge"],
@@ -117,15 +117,15 @@ section[class*="dark"],
 [class*="ticker"] span[class*="label"] {
   color: #ffffff !important;
   background-color: #1d4ed8 !important;
-  border: 1px solid #93c5fd !important;
+  border: 1px solid #bfdbfe !important;
   font-weight: 600 !important;
 }
 
 [class*="ticker"] [class*="country"],
 [class*="ticker"] [class*="region"],
 [class*="marquee"] [class*="country"] {
-  color: #eff6ff !important;
-  background-color: #164e63 !important;
+  color: #f8fafc !important;
+  background-color: #1e3a5f !important;
 }
 
 [class*="ticker"] [class*="title"],

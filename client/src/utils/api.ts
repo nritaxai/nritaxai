@@ -3,7 +3,7 @@ import { API_BASE_URL } from "../config/api";
 import { BANNER_API_BASE_URL } from "../config/appConfig";
 
 export const API_URL = API_BASE_URL;
-export const buildApiUrl = (path: string) => `${API_URL}${path}`;
+export const buildApiUrl = (path: string) => new URL(path, `${API_URL}/`).toString();
 export const getStoredAuthToken = () =>
   typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
@@ -20,7 +20,7 @@ export const getAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
-const apiClient = axios.create({
+export const apiClient = axios.create({
   baseURL: API_URL,
   timeout: 20000,
   withCredentials: true,
@@ -30,6 +30,35 @@ const logClientApiError = (method: string, path: string, error: any) => {
   const status = error?.response?.status || "NO_RESPONSE";
   const message = error?.response?.data?.message || error?.message || "Unknown error";
   console.error(`[api:${method}] ${path}`, { status, message });
+};
+
+const AUTH_ERROR_MESSAGES: Record<number, string> = {
+  400: "Please check your details and try again.",
+  401: "Invalid credentials. Please check your email and password.",
+  403: "Your account cannot access this service right now.",
+  404: "Authentication service is unavailable right now.",
+  409: "An account with this email already exists.",
+  429: "Too many attempts. Please wait a moment and try again.",
+  500: "Server unavailable. Please try again shortly.",
+  502: "Server unavailable. Please try again shortly.",
+  503: "Server unavailable. Please try again shortly.",
+  504: "Server unavailable. Please try again shortly.",
+};
+
+export const getApiErrorMessage = (error: any, fallback = "Unable to complete this request right now") => {
+  const responseMessage = String(error?.response?.data?.message || "").trim();
+  if (responseMessage) return responseMessage;
+
+  const status = Number(error?.response?.status);
+  if (Number.isFinite(status) && AUTH_ERROR_MESSAGES[status]) {
+    return AUTH_ERROR_MESSAGES[status];
+  }
+
+  if (error?.code === "ERR_NETWORK" || !error?.response) {
+    return "Network error. Please check your connection and try again.";
+  }
+
+  return String(error?.message || fallback).trim() || fallback;
 };
 
 const postRequest = async (path: string, payload: unknown) => {

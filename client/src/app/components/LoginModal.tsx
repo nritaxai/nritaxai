@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useNavigate } from "react-router-dom";
 import {
   Apple,
   ArrowRight,
@@ -33,6 +34,7 @@ import { startAppleAuth } from "../../utils/appleAuth";
 import {
   appleLoginUser,
   forgotPassword,
+  getApiErrorMessage,
   googleLoginUser,
   loginUser,
   signupUser,
@@ -46,14 +48,13 @@ interface LoginModalProps {
   hideSupportBanner?: boolean;
   hideSocialSection?: boolean;
   presentation?: "modal" | "page";
+  redirectTo?: string;
+  onModeChange?: (mode: "login" | "signup") => void;
 }
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const linkedInUrlPattern = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
 const MIN_PASSWORD_LENGTH = 8;
-
-const getApiErrorMessage = (error: any, fallback: string) =>
-  error?.response?.data?.message || error?.message || fallback;
 
 const trustSignals = [
   { icon: ShieldCheck, label: "Secure Authentication" },
@@ -124,7 +125,10 @@ export function LoginModal({
   hideSupportBanner = false,
   hideSocialSection = false,
   presentation = "modal",
+  redirectTo,
+  onModeChange,
 }: LoginModalProps) {
+  const navigate = useNavigate();
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({
     name: "",
@@ -290,6 +294,17 @@ export function LoginModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [disableClose, isPagePresentation, onClose, signupTermsModalOpen]);
 
+  useEffect(() => {
+    if (!dialogRef.current) return;
+
+    if (signupTermsModalOpen) {
+      dialogRef.current.setAttribute("inert", "");
+      return;
+    }
+
+    dialogRef.current.removeAttribute("inert");
+  }, [signupTermsModalOpen]);
+
   const showPopup = (message: string, type: "success" | "error", duration = 2500) => {
     setPopup({ message, type });
     window.setTimeout(() => setPopup(null), duration);
@@ -356,9 +371,15 @@ export function LoginModal({
         detail: { message, type: "success", duration: 1500 },
       })
     );
+
+    const nextRoute = redirectTo || "/home";
     window.setTimeout(() => {
+      if (isPagePresentation) {
+        navigate(nextRoute, { replace: true });
+        return;
+      }
       onClose();
-    }, 900);
+    }, 500);
   };
 
   const handleForgotPassword = async () => {
@@ -409,7 +430,7 @@ export function LoginModal({
       const user = resolveAuthUser(response);
       handleAuthSuccess(response, `WELCOME ${user?.name || "User"}!`);
     } catch (error: any) {
-      const message = getApiErrorMessage(error, "Login failed.");
+      const message = getApiErrorMessage(error, "Unable to login right now");
       setLoginError(message);
       showPopup(message, "error");
     } finally {
@@ -479,7 +500,7 @@ export function LoginModal({
       clearSignupTermsSession();
       handleAuthSuccess(response, `Account created successfully! WELCOME ${user?.name || "User"}`);
     } catch (error: any) {
-      const message = getApiErrorMessage(error, "Signup failed.");
+      const message = getApiErrorMessage(error, "Unable to create your account right now");
       setSignupError(message);
       showPopup(message, "error");
     } finally {
@@ -596,6 +617,7 @@ export function LoginModal({
     setForgotPasswordMode(false);
     setLoginError(null);
     setSignupError(null);
+    onModeChange?.(nextMode);
   };
 
   const renderGoogleButton = (currentMode: "login" | "signup") => (
@@ -649,11 +671,17 @@ export function LoginModal({
   );
 
   const formStatus = mode === "signup" ? signupError : loginError;
+  const redirectContext =
+    redirectTo && redirectTo !== "/home"
+      ? `You'll continue to ${redirectTo.replace(/^\//, "").replace(/-/g, " ") || "your destination"} after ${mode === "signup" ? "signup" : "login"}.`
+      : mode === "signup"
+        ? "Create your account and continue directly into onboarding."
+        : "Login securely and continue where you left off.";
   const pageShellClassName = isPagePresentation
     ? "relative min-h-[calc(100dvh-5rem)] overflow-hidden bg-[linear-gradient(180deg,#020617_0%,#07111f_42%,#0f172a_100%)]"
     : "fixed inset-0 z-50 overflow-hidden bg-[#020617]/72 backdrop-blur-sm";
   const cardClassName = isPagePresentation
-    ? "relative overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(15,23,42,0.76)] text-white shadow-[0_30px_90px_rgba(2,6,23,0.48)] backdrop-blur-[20px]"
+    ? "relative w-full overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(15,23,42,0.76)] text-white shadow-[0_30px_90px_rgba(2,6,23,0.48)] backdrop-blur-[20px]"
     : "relative w-full max-w-[1080px] overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(15,23,42,0.78)] text-white shadow-[0_30px_90px_rgba(2,6,23,0.55)] backdrop-blur-[20px]";
 
   const formContent = (
@@ -786,9 +814,7 @@ export function LoginModal({
 
             {!hideSupportBanner ? (
               <div className="rounded-[18px] border border-sky-300/15 bg-sky-400/10 px-4 py-3 text-sm leading-6 text-slate-200">
-                {mode === "signup"
-                  ? "Registration opens directly here. Complete the fields below and use the primary CTA to continue."
-                  : "Use your existing account to continue with secure tax workflows and subscriptions."}
+                {redirectContext}
               </div>
             ) : null}
           </CardHeader>
@@ -1203,7 +1229,7 @@ export function LoginModal({
       </div>
 
       {isPagePresentation ? (
-        <div className="relative mx-auto flex min-h-[calc(100dvh-5rem)] max-w-6xl items-center px-4 py-6 sm:px-6 lg:px-8">
+        <div className="relative mx-auto flex min-h-[calc(100dvh-5rem)] max-w-6xl items-center px-4 py-5 sm:px-6 lg:px-8">
           {formContent}
         </div>
       ) : (

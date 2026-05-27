@@ -154,7 +154,7 @@ function AnimatedStatValue({ label, fallback }: { label: string; fallback: strin
 }
 
 interface HomeProps {
-  onRequireLogin: () => void;
+  onRequireLogin: (redirectTo?: string) => void;
 }
 
 export function Home({ onRequireLogin }: HomeProps) {
@@ -194,7 +194,7 @@ export function Home({ onRequireLogin }: HomeProps) {
 
   const requireAuthFor = (path: string, state?: Record<string, unknown>) => {
     if (!getStoredAuthToken()) {
-      onRequireLogin();
+      onRequireLogin(path);
       return;
     }
     navigate(path, state ? { state } : undefined);

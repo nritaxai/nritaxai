@@ -15,20 +15,17 @@ import { TigerBotAvatar } from "./components/TigerBotAvatar";
 import { Button } from "./components/ui/button";
 import { AndroidBottomNav } from "../components/AndroidBottomNav";
 import { AndroidHomePage } from "../components/AndroidHomePage";
-import { AndroidLoginScreen } from "../components/AndroidLoginScreen";
 import { iOSBottomNav as IOSBottomNav } from "../components/iOSBottomNav";
 import { iOSHomePage as IOSHomePage } from "../components/iOSHomePage";
 import { AndroidYuktiPage } from "../pages/AndroidYuktiPage";
 import { iOSYuktiPage as IOSYuktiPage } from "../pages/iOSYuktiPage";
 import { Chat } from "./pages/Chat";
 import { Home } from "./pages/Home";
-import { HeroPage } from "./pages/HeroPage";
 import { Pricing } from "./pages/Pricing";
 import { PrivacyPolicy } from "./pages/PrivacyPolicy";
 import { IS_IOS_NATIVE_APP } from "../config/appConfig";
 import { buildApiUrl, getStoredAuthToken } from "../utils/api";
 import { syncPersistedAuthToLocalStorage } from "../services/authStorage";
-const LoginModal = lazy(() => import("./components/LoginModal").then((m) => ({ default: m.LoginModal })));
 const AndroidLauncher = lazy(() => import("./pages/AndroidLauncher").then((m) => ({ default: m.AndroidLauncher })));
 const Calculators = lazy(() => import("./pages/Calculators").then((m) => ({ default: m.Calculators })));
 const Login = lazy(() => import("./pages/Login").then((m) => ({ default: m.Login })));
@@ -68,8 +65,6 @@ export default function App() {
   const stagingModeEnabled = import.meta.env.VITE_STAGING_MODE === "true";
   const stagingPassword = String(import.meta.env.VITE_STAGING_ACCESS_PASSWORD || "");
   const promoUpgradePromptSessionKey = "promo_upgrade_prompt_seen";
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [authModalMode, setAuthModalMode] = useState<"login" | "signup">("login");
   const [isAuthenticated, setIsAuthenticated] = useState(() =>
     Boolean(typeof window !== "undefined" && getStoredAuthToken())
   );
@@ -89,9 +84,14 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
   const routeContentRef = useRef<HTMLDivElement>(null);
-  const openAuthModal = (mode: "login" | "signup" = "login") => {
-    setAuthModalMode(mode);
-    setShowLoginModal(true);
+
+  const openWebAuthPage = (mode: "login" | "signup" = "login", redirectTo?: string) => {
+    const params = new URLSearchParams();
+    params.set("mode", mode);
+    if (redirectTo) {
+      params.set("redirect", redirectTo);
+    }
+    navigate(`/login?${params.toString()}`);
   };
 
   useEffect(() => {
@@ -141,7 +141,7 @@ export default function App() {
         navigate("/login");
         return;
       }
-      openAuthModal("login");
+      openWebAuthPage("login", `${location.pathname}${location.search}${location.hash}`);
     };
     const syncAuthState = () => setIsAuthenticated(Boolean(getStoredAuthToken()));
     const handleAuthPopup = (event: Event) => {
@@ -178,13 +178,7 @@ export default function App() {
         window.clearTimeout(popupTimeoutRef.current);
       }
     };
-  }, [isNative, navigate]);
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      setShowLoginModal(false);
-    }
-  }, [isAuthenticated]);
+  }, [isNative, location.hash, location.pathname, location.search, navigate]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -494,7 +488,6 @@ export default function App() {
         ]
   );
   const requiresAuthentication = protectedPaths.has(location.pathname);
-  const requiresHomeLoginGate = !isAuthenticated && location.pathname === "/home";
   const isAuthRoute = location.pathname === "/login";
   const hasSiteHeader = !isNative && !isIosNativeApp && !isStandaloneRoute;
   const shouldShowAndroidHeader =
@@ -513,7 +506,7 @@ export default function App() {
   const nativeHomeRoute = isIosNativeApp ? <IOSHomePage /> : isNative ? (
     <AndroidLauncher />
   ) : (
-    <HeroPage />
+    <Navigate to="/home" replace />
   );
   const nativeHomeScreen = isIosNativeApp
     ? <IOSHomePage />
@@ -525,7 +518,7 @@ export default function App() {
         </AndroidPageWrapper>
       ) : <Navigate to="/login" replace />
     )
-    : withPageScaffold(<Home onRequireLogin={() => setShowLoginModal(true)} />);
+    : withPageScaffold(<Home onRequireLogin={(redirectTo) => openWebAuthPage("login", redirectTo || "/home")} />);
 
   return (
     <div className="app-shell">
@@ -537,14 +530,29 @@ export default function App() {
           </div>
         </div>
       )}
-      {requiresAuthentication && !isAuthenticated ? <Navigate to={isNative ? "/login" : "/home"} replace /> : null}
+      {requiresAuthentication && !isAuthenticated ? (
+        <Navigate
+          to={
+            isNative
+              ? "/login"
+              : `/login?${new URLSearchParams({
+                  mode: "login",
+                  redirect: `${location.pathname}${location.search}${location.hash}`,
+                }).toString()}`
+          }
+          replace
+        />
+      ) : null}
       {hasSiteHeader && (
-        <Header onLogin={() => openAuthModal("login")} onSignup={() => navigate("/login?mode=signup")} />
+        <Header
+          onLogin={() => openWebAuthPage("login", `${location.pathname}${location.search}${location.hash}`)}
+          onSignup={() => openWebAuthPage("signup")}
+        />
       )}
       {shouldShowAndroidHeader && (
-        <AndroidHeader onLogin={() => setShowLoginModal(true)} />
+        <AndroidHeader onLogin={() => navigate("/login")} />
       )}
-      {isIosNativeApp && !isYuktiRoute && !isAuthRoute && <IOSHeader onLogin={() => setShowLoginModal(true)} />}
+      {isIosNativeApp && !isYuktiRoute && !isAuthRoute && <IOSHeader onLogin={() => navigate("/login")} />}
       {shouldShowNewsTicker ? <NewsTicker /> : null}
 
       <div ref={routeContentRef}>
@@ -571,22 +579,22 @@ export default function App() {
 
             <Route
               path="/calculators"
-              element={withPageScaffold(<Calculators onRequireLogin={() => setShowLoginModal(true)} />)}
+              element={withPageScaffold(<Calculators onRequireLogin={() => openWebAuthPage("login", "/calculators")} />)}
             />
-            <Route path="/Pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
-            <Route path="/pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/Pricing" element={withPageScaffold(<Pricing onRequireLogin={() => openWebAuthPage("login", "/pricing")} />)} />
+            <Route path="/pricing" element={withPageScaffold(<Pricing onRequireLogin={() => openWebAuthPage("login", "/pricing")} />)} />
             <Route
               path="/checkout"
-              element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
+              element={withPageScaffold(<CheckoutPage onRequireLogin={() => openWebAuthPage("login", "/checkout")} />)}
             />
             <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={withPageScaffold(<ResetPassword />)} />
             <Route path="/profile" element={withPageScaffold(<Profile />)} />
-            <Route path="/chat" element={isIosNativeApp ? <Chat onRequireLogin={() => setShowLoginModal(true)} /> : withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/chat" element={isIosNativeApp ? <Chat onRequireLogin={() => openWebAuthPage("login", "/chat")} /> : withPageScaffold(<Chat onRequireLogin={() => openWebAuthPage("login", "/chat")} />)} />
             <Route path="/dashboard" element={isIosNativeApp ? <Navigate to="/home" replace /> : withPageScaffold(<AdminDashboard />)} />
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
-            <Route path="/consult" element={withPageScaffold(<Consult onRequireLogin={() => setShowLoginModal(true)} />)} />
+            <Route path="/consult" element={withPageScaffold(<Consult onRequireLogin={() => openWebAuthPage("login", "/consult")} />)} />
             <Route path="/join-as-expert" element={isNative || isIosNativeApp ? withPageScaffold(<JoinAsExpertPage />) : <JoinAsExpertPage />} />
             <Route path="/reschedule" element={withPageScaffold(<Reschedule />)} />
             <Route path="/cancel" element={withPageScaffold(<Cancel />)} />
@@ -605,27 +613,6 @@ export default function App() {
       {hasSiteHeader && <Footer />}
       {shouldShowAndroidBottomNav && <AndroidBottomNav />}
       {isIosNativeApp && !isAuthRoute && <IOSBottomNav />}
-
-      {!isNative && showLoginModal && (
-        <Suspense fallback={null}>
-          <LoginModal
-            initialMode={authModalMode}
-            onClose={() => setShowLoginModal(false)}
-          />
-        </Suspense>
-      )}
-
-      {isNative && !isAuthRoute && (showLoginModal || requiresHomeLoginGate) ? (
-        <AndroidLoginScreen
-          onClose={() => setShowLoginModal(false)}
-          disableClose={requiresHomeLoginGate}
-          onLoginSuccess={() => {
-            setIsAuthenticated(true);
-            setShowLoginModal(false);
-            navigate("/home", { replace: true });
-          }}
-        />
-      ) : null}
 
       {successPopup && <AuthPopup message={successPopup} type="success" />}
       {showPromoUpgradePrompt ? (

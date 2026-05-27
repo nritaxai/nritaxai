@@ -18,17 +18,19 @@ export function TermsModal({
   const contentRef = useRef<HTMLDivElement | null>(null);
   const dialogRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocusedRef = useRef<HTMLElement | null>(null);
+  const originalOverflowRef = useRef("");
 
   useEffect(() => {
-    if (isOpen) {
-      setChecked(false);
-      setHasScrolled(false);
-      previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-      document.body.style.overflow = "hidden";
-    }
+    if (!isOpen) return;
+
+    setChecked(false);
+    setHasScrolled(false);
+    previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    originalOverflowRef.current = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.body.style.overflow = "auto";
+      document.body.style.overflow = originalOverflowRef.current;
       previouslyFocusedRef.current?.focus?.();
     };
   }, [isOpen]);
@@ -131,6 +133,7 @@ export function TermsModal({
   if (!isOpen) return null;
 
   const title = type === "terms" ? "Terms & Conditions" : "Privacy Policy";
+  const descriptionId = "terms-modal-description";
 
   return (
     <div
@@ -138,6 +141,7 @@ export function TermsModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="terms-modal-title"
+      aria-describedby={descriptionId}
       onClick={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -157,7 +161,7 @@ export function TermsModal({
             type="button"
             onClick={onClose}
             aria-label="Close modal"
-            className="text-2xl leading-none text-slate-500 transition-colors hover:text-slate-700"
+            className="rounded-full p-1 text-2xl leading-none text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
           >
             x
           </button>
@@ -169,6 +173,9 @@ export function TermsModal({
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y px-6 py-4 text-sm leading-relaxed text-slate-700"
           tabIndex={0}
         >
+          <p id={descriptionId} className="sr-only">
+            Review the full {title} before accepting and continuing.
+          </p>
           {type === "terms" ? <TermsContent /> : <PrivacyContent />}
         </div>
 

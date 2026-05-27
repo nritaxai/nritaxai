@@ -1,13 +1,15 @@
 import { Capacitor } from "@capacitor/core";
 import { SITE_URL, SUPPORT_EMAIL } from "./branding";
 
-const PROD_API_URL_DEFAULT = "https://nritax.ai";
+const PROD_API_URL_DEFAULT = "https://api.nritax.ai";
+const NATIVE_PROD_API_URL_DEFAULT = "https://api.nritax.ai";
 const DEV_API_URL_DEFAULT = "http://localhost:5000";
 
 const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
 
 const envApiUrl = String(import.meta.env.VITE_API_URL || "").trim();
 const envProdApiUrl = String(import.meta.env.VITE_API_URL_PROD || "").trim();
+const envNativeProdApiUrl = String(import.meta.env.VITE_API_URL_NATIVE_PROD || "").trim();
 const envDevApiUrl = String(import.meta.env.VITE_API_URL_DEV || "").trim();
 const envBannerApiUrl = String(import.meta.env.VITE_BANNER_API_URL || "").trim();
 const envLinkedInAuthBaseUrl = String(import.meta.env.VITE_LINKEDIN_AUTH_BASE_URL || "").trim();
@@ -28,10 +30,16 @@ export const IS_IOS_NATIVE_APP = (IS_NATIVE_APP && PLATFORM === "ios") || isIosW
 export const IOS_EXTERNAL_PURCHASES_DISABLED = IS_IOS_NATIVE_APP;
 
 const resolvedProdApiUrl = normalizeUrl(envProdApiUrl || PROD_API_URL_DEFAULT);
+const resolvedNativeProdApiUrl = normalizeUrl(envNativeProdApiUrl || NATIVE_PROD_API_URL_DEFAULT);
 const resolvedDevApiUrl = normalizeUrl(envDevApiUrl || DEV_API_URL_DEFAULT);
 
 export const API_BASE_URL = normalizeUrl(
-  envApiUrl || (import.meta.env.DEV && !IS_NATIVE_APP ? resolvedDevApiUrl : resolvedProdApiUrl)
+  envApiUrl ||
+    (import.meta.env.DEV && !IS_NATIVE_APP
+      ? resolvedDevApiUrl
+      : Capacitor.isNativePlatform()
+        ? resolvedNativeProdApiUrl // Android only
+        : resolvedProdApiUrl)
 );
 
 const getBannerOrigin = () => {

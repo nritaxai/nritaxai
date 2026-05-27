@@ -172,7 +172,7 @@ function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) 
       href={href}
       target={href.startsWith("http") ? "_blank" : undefined}
       rel={href.startsWith("http") ? "noopener noreferrer" : undefined}
-      className="group/item inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-[#31517f] bg-[rgba(248,250,252,0.14)] px-3 pr-3.5 text-sm text-white shadow-[0_16px_34px_rgba(2,6,23,0.22),inset_0_1px_0_rgba(255,255,255,0.12)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-cyan-200/60 hover:bg-[rgba(248,250,252,0.22)] hover:shadow-[0_18px_40px_rgba(15,23,42,0.32),0_0_0_1px_rgba(148,163,184,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-100"
+      className="group/item inline-flex h-11 shrink-0 items-center gap-2.5 rounded-full border border-[#89a9d8] bg-[rgba(15,23,42,0.88)] px-3 pr-3.5 text-sm text-white shadow-[0_16px_34px_rgba(2,6,23,0.26),inset_0_1px_0_rgba(255,255,255,0.10)] transition-all duration-300 ease-out hover:-translate-y-0.5 hover:border-[#fcd34d] hover:bg-[rgba(30,41,59,0.96)] hover:shadow-[0_18px_40px_rgba(15,23,42,0.34),0_0_0_1px_rgba(250,204,21,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#fde68a]"
       tabIndex={clone ? -1 : undefined}
       aria-hidden={clone || undefined}
     >
@@ -181,18 +181,18 @@ function TickerItem({ item, clone = false }: { item: Banner; clone?: boolean }) 
       >
         {itemLabel}
       </span>
-      <span className="max-w-[190px] truncate text-[13px] font-semibold text-white md:max-w-[360px]">
+      <span className="max-w-[190px] truncate text-[13px] font-semibold text-slate-50 md:max-w-[360px]">
         {headline}
       </span>
-      <span className="hidden h-1 w-1 shrink-0 rounded-full bg-white/22 sm:inline-flex" aria-hidden="true" />
-      <span className="hidden shrink-0 rounded-full border border-slate-200/20 bg-white/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-50 sm:inline-flex">
+      <span className="hidden h-1 w-1 shrink-0 rounded-full bg-[#f8fafc]/40 sm:inline-flex" aria-hidden="true" />
+      <span className="hidden shrink-0 rounded-full border border-[#bfdbfe]/45 bg-[#1e3a5f] px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#f8fafc] sm:inline-flex">
         {itemCountry}
       </span>
-      <span className="hidden text-[11px] font-medium text-cyan-100 lg:inline-flex">
+      <span className="hidden text-[11px] font-medium text-[#fde68a] lg:inline-flex">
         {itemType}
       </span>
       {item.date ? (
-        <span className="hidden text-[11px] font-medium text-slate-100 xl:inline-flex">
+        <span className="hidden text-[11px] font-medium text-[#dbeafe] xl:inline-flex">
           {formatBannerDate(item.date)}
         </span>
       ) : null}
@@ -260,7 +260,7 @@ export default function PremiumNewsTicker() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: shouldReduceMotion ? 0 : 0.45, ease: PREMIUM_EASE }}
       aria-label="Live tax intelligence updates"
-      className="relative z-40 w-full border-b border-[#36507b] bg-[linear-gradient(90deg,#0b1f3a_0%,#123761_48%,#164e63_100%)] shadow-[0_18px_48px_rgba(2,6,23,0.24)] backdrop-blur-xl"
+      className="relative z-40 w-full border-b border-[#5b7aa8] bg-[linear-gradient(90deg,#081524_0%,#102b47_42%,#133557_100%)] shadow-[0_18px_48px_rgba(2,6,23,0.24)] backdrop-blur-xl"
     >
       <style>{`
         @keyframes premium-news-ticker-scroll {
