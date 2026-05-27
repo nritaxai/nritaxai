@@ -26,6 +26,42 @@ export const apiClient = axios.create({
   withCredentials: true,
 });
 
+const AUTH_BASE_FALLBACKS = ["https://api.nritax.ai", "https://nritax.ai", "https://www.nritax.ai"] as const;
+
+const normalizeUrl = (value: string) => value.trim().replace(/\/+$/, "");
+
+const getAuthBaseCandidates = () => {
+  const candidates = new Set<string>();
+
+  if (API_URL) {
+    candidates.add(normalizeUrl(API_URL));
+  }
+
+  if (typeof window !== "undefined") {
+    const origin = normalizeUrl(window.location.origin);
+    if (origin) {
+      candidates.add(origin);
+    }
+  }
+
+  AUTH_BASE_FALLBACKS.forEach((origin) => candidates.add(origin));
+  return Array.from(candidates);
+};
+
+const getAuthPathCandidates = (path: string) => {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  if (!normalizedPath.startsWith("/api/auth/")) {
+    return [normalizedPath];
+  }
+
+  return Array.from(
+    new Set([
+      normalizedPath,
+      normalizedPath.replace(/^\/api\/auth\//, "/auth/"),
+    ])
+  );
+};
+
 const logClientApiError = (method: string, path: string, error: any) => {
   const status = error?.response?.status || "NO_RESPONSE";
   const message = error?.response?.data?.message || error?.message || "Unknown error";
@@ -61,6 +97,47 @@ export const getApiErrorMessage = (error: any, fallback = "Unable to complete th
   return String(error?.message || fallback).trim() || fallback;
 };
 
+const shouldRetryAuthRequest = (error: any) => {
+  const status = Number(error?.response?.status);
+  return error?.code === "ERR_NETWORK" || !error?.response || status === 404 || status === 405;
+};
+
+const requestAuthEndpoint = async (
+  method: "GET" | "POST" | "PUT" | "DELETE",
+  path: string,
+  payload?: unknown
+) => {
+  const headers = getAuthHeaders();
+  const baseCandidates = getAuthBaseCandidates();
+  const pathCandidates = getAuthPathCandidates(path);
+  let lastError: any = null;
+
+  for (const baseURL of baseCandidates) {
+    for (const candidatePath of pathCandidates) {
+      try {
+        const response = await axios.request({
+          method,
+          baseURL,
+          url: candidatePath,
+          data: payload,
+          headers,
+          timeout: 20000,
+          withCredentials: true,
+        });
+        return response.data;
+      } catch (error: any) {
+        lastError = error;
+        logClientApiError(method, `${baseURL}${candidatePath}`, error);
+        if (!shouldRetryAuthRequest(error)) {
+          throw error;
+        }
+      }
+    }
+  }
+
+  throw lastError;
+};
+
 const postRequest = async (path: string, payload: unknown) => {
   try {
     const response = await apiClient.post(path, payload, {
@@ -72,6 +149,11 @@ const postRequest = async (path: string, payload: unknown) => {
     throw error;
   }
 };
+
+const postAuthRequest = (path: string, payload: unknown) => requestAuthEndpoint("POST", path, payload);
+const getAuthRequest = (path: string) => requestAuthEndpoint("GET", path);
+const putAuthRequest = (path: string, payload: unknown) => requestAuthEndpoint("PUT", path, payload);
+const deleteAuthRequest = (path: string) => requestAuthEndpoint("DELETE", path);
 
 const getRequest = async (path: string) => {
   try {
@@ -110,15 +192,15 @@ const deleteRequest = async (path: string) => {
 };
 
 export const signupUser = async (signupData: any) => {
-  return postRequest("/api/auth/register", signupData);
+  return postAuthRequest("/api/auth/register", signupData);
 };
 
 export const loginUser = async (loginData: any) => {
-  return postRequest("/api/auth/login", loginData);
+  return postAuthRequest("/api/auth/login", loginData);
 };
 
 export const forgotPassword = async (payload: { email: string }) => {
-  return postRequest("/api/auth/forgot-password", payload);
+  return postAuthRequest("/api/auth/forgot-password", payload);
 };
 
 export const resetPassword = async (payload: {
@@ -126,7 +208,7 @@ export const resetPassword = async (payload: {
   newPassword: string;
   confirmNewPassword: string;
 }) => {
-  return postRequest("/api/auth/reset-password", payload);
+  return postAuthRequest("/api/auth/reset-password", payload);
 };
 
 export const googleLoginUser = async (
@@ -140,7 +222,7 @@ export const googleLoginUser = async (
         countryCode?: string;
       }
 ) => {
-  return postRequest(
+  return postAuthRequest(
     "/api/auth/google-login",
     typeof credential === "string" ? { credential } : credential
   );
@@ -159,7 +241,7 @@ export const appleLoginUser = async (payload: {
   country?: string;
   countryCode?: string;
 }) => {
-  return postRequest("/api/auth/apple", payload);
+  return postAuthRequest("/api/auth/apple", payload);
 };
 
 export const linkedinLoginUser = async (payload: {
@@ -170,11 +252,11 @@ export const linkedinLoginUser = async (payload: {
   country?: string;
   countryCode?: string;
 }) => {
-  return postRequest("/api/auth/linkedin", payload);
+  return postAuthRequest("/api/auth/linkedin", payload);
 };
 
 export const acceptTerms = async (payload: { termsAccepted: boolean; policyVersion?: string }) => {
-  return postRequest("/api/auth/accept-terms", payload);
+  return postAuthRequest("/api/auth/accept-terms", payload);
 };
 
 export const submitYuktiGrievance = async (payload: {
@@ -210,11 +292,11 @@ export const getBannerUpdates = async (country?: string) => {
 };
 
 export const getUserProfile = async () => {
-  return getRequest("/api/auth/profile");
+  return getAuthRequest("/api/auth/profile");
 };
 
 export const getUserPrivacyStatus = async () => {
-  return getRequest("/api/auth/privacy-status");
+  return getAuthRequest("/api/auth/privacy-status");
 };
 
 export const updatePrivacyConsent = async (payload: {
@@ -227,7 +309,7 @@ export const updatePrivacyConsent = async (payload: {
   analyticsTracking?: boolean;
   consultationDataProcessing?: boolean;
 }) => {
-  return putRequest("/api/auth/consent", payload);
+  return putAuthRequest("/api/auth/consent", payload);
 };
 
 export const updateUserProfile = async (payload: {
@@ -240,25 +322,25 @@ export const updateUserProfile = async (payload: {
   bio?: string;
   linkedinProfile?: string;
 }) => {
-  return putRequest("/api/auth/profile", payload);
+  return putAuthRequest("/api/auth/profile", payload);
 };
 
 export const requestCountryChange = async (payload: {
   countryCode: string;
   reason?: string;
 }) => {
-  return postRequest("/api/auth/country-change-request", payload);
+  return postAuthRequest("/api/auth/country-change-request", payload);
 };
 
 export const getAdminCountryChangeRequests = async () => {
-  return getRequest("/api/auth/admin/country-change-requests");
+  return getAuthRequest("/api/auth/admin/country-change-requests");
 };
 
 export const decideAdminCountryChangeRequest = async (
   requestId: string,
   payload: { decision: "approved" | "rejected"; decisionNotes?: string }
 ) => {
-  return putRequest(`/api/auth/admin/country-change-requests/${encodeURIComponent(requestId)}`, payload);
+  return putAuthRequest(`/api/auth/admin/country-change-requests/${encodeURIComponent(requestId)}`, payload);
 };
 
 export const getSubscriptionStatus = async () => {
@@ -282,11 +364,11 @@ export const changePassword = async (payload: {
   newPassword: string;
   confirmNewPassword: string;
 }) => {
-  return putRequest("/api/auth/change-password", payload);
+  return putAuthRequest("/api/auth/change-password", payload);
 };
 
 export const deleteAccount = async () => {
-  return deleteRequest("/api/auth/delete-account");
+  return deleteAuthRequest("/api/auth/delete-account");
 };
 
 export const calculateIncomeTax = async (payload: {
