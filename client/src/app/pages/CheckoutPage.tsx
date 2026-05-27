@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import {
@@ -182,6 +183,7 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
     () => resolveStoredCheckoutCurrency(currencyFromQuery || localStorage.getItem("pricing_currency_override"))
   );
   const [browserCountryCode] = useState(() => detectBrowserCountryCode());
+  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 
   React.useEffect(() => {
     applyDocumentMetadata(`Checkout | ${COMPANY_LEGAL_NAME}`);
@@ -637,9 +639,9 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
   }
 
   return (
-    <div className="py-12 px-4 sm:px-6">
+    <div className={isAndroidNative ? "px-4 py-4 sm:px-5" : "px-4 py-12 sm:px-6"}>
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-10">
+        <div className={isAndroidNative ? "text-center mb-6" : "text-center mb-10"}>
           <Badge className="bg-[#2563eb]/12 text-[#0F172A] border-[#2563eb]/40 mb-4">Secure Checkout</Badge>
           <h1 className="text-3xl sm:text-4xl text-[#0F172A] tracking-tight mb-3">Complete Your Subscription</h1>
           <p className="text-[#0F172A] max-w-2xl mx-auto">
@@ -649,16 +651,18 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
 
         <div className="grid lg:grid-cols-[1.05fr_1fr] gap-6 lg:gap-8 items-start">
           <aside className="rounded-2xl border border-[#E2E8F0] bg-[#F7FAFC] shadow-lg p-6 sm:p-7 lg:sticky lg:top-24">
-            <div className="flex items-center gap-3 mb-5">
+            <div className={`mb-5 flex gap-3 ${isAndroidNative ? "flex-wrap items-start" : "items-center"}`}>
               <div className="size-10 rounded-lg bg-[#3b82f6] border border-[#E2E8F0] flex items-center justify-center">
                 <ReceiptText className="size-5 text-[#0F172A]" />
               </div>
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-sm text-[#0F172A]">Order Summary</p>
                 <h2 className="text-lg font-semibold text-[#0F172A]">{selectedPlan.label}</h2>
               </div>
               {selectedPlan.badge && (
-                <Badge className="ml-auto bg-[#2563eb] text-[#0F172A]">{selectedPlan.badge}</Badge>
+                <Badge className={`${isAndroidNative ? "" : "ml-auto"} bg-[#2563eb] text-[#0F172A]`}>
+                  {selectedPlan.badge}
+                </Badge>
               )}
             </div>
 
@@ -703,17 +707,17 @@ const CheckoutPage: React.FC<CheckoutPageProps> = ({ onRequireLogin }) => {
             <div className="space-y-3 border-y border-[#E2E8F0] py-5">
               <div className="flex items-center justify-between text-[#0F172A]">
                 <span>{billing === "monthly" ? "Monthly Subscription" : "Yearly Subscription"}</span>
-                <span className="text-[#0F172A] font-medium">{formatDisplayAmount(price)}</span>
+                <span className="text-[#0F172A] font-medium shrink-0 pl-3">{formatDisplayAmount(price)}</span>
               </div>
               {appliedPromo && (
                 <div className="flex items-center justify-between text-[#2563eb]">
                   <span>Discount ({appliedPromo.code})</span>
-                  <span>- {formatDisplayAmount(discountAmount)}</span>
+                  <span className="shrink-0 pl-3">- {formatDisplayAmount(discountAmount)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Total</span>
-                <span className="text-[#2563eb]">{formatDisplayAmount(finalTotal)}</span>
+                <span className="text-[#2563eb] shrink-0 pl-3">{formatDisplayAmount(finalTotal)}</span>
               </div>
               <p className="text-xs text-[#0F172A] text-right">Charged in INR: {formatInr(finalTotal)}</p>
             </div>

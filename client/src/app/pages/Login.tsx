@@ -8,11 +8,11 @@ export function Login() {
   const [searchParams, setSearchParams] = useSearchParams();
   const mode = searchParams.get("mode") === "signup" ? "signup" : "login";
   const redirectTo = searchParams.get("redirect") || "/home";
-  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
+  const isNativePlatform = Capacitor.isNativePlatform();
 
   return (
     <div className="min-h-dvh bg-[#020617]">
-      {isAndroidNative ? (
+      {isNativePlatform ? (
         <AndroidLoginScreen
           onClose={() => navigate("/")}
           disableClose

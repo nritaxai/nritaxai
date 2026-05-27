@@ -1,3 +1,4 @@
+import { Capacitor } from "@capacitor/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { User, Mail, Image as ImageIcon, Save, Pencil, Crown, CalendarDays, Sparkles, LogOut, Trash2 } from "lucide-react";
@@ -148,6 +149,8 @@ const normalizeProfileImage = async (dataUrl: string) => {
 };
 
 export function Profile() {
+  // Android only
+  const isNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const navigate = useNavigate();
   const location = useLocation();
   const routeState = (location.state || null) as { returnTo?: string } | null;
@@ -190,6 +193,27 @@ export function Profile() {
   const [deleteAccountStep, setDeleteAccountStep] = useState<"phrase" | "confirm">("phrase");
   const [deleteAccountConfirmationInput, setDeleteAccountConfirmationInput] = useState("");
   const [deleteAccountDialogError, setDeleteAccountDialogError] = useState("");
+  // Android only
+  const androidCardStyle = isNative
+    ? {
+        background: "rgba(255,255,255,0.10)",
+        border: "1px solid rgba(255,255,255,0.18)",
+        borderRadius: "14px",
+        color: "#ffffff",
+      }
+    : undefined;
+  // Android only
+  const androidMutedTextStyle = isNative ? { color: "rgba(255,255,255,0.45)" } : undefined;
+  // Android only
+  const androidSecondaryTextStyle = isNative ? { color: "rgba(255,255,255,0.6)" } : undefined;
+  // Android only
+  const androidSurfaceStyle = isNative
+    ? {
+        background: "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.15)",
+        color: "#ffffff",
+      }
+    : undefined;
 
   const isDirty = useMemo(() => {
     if (!profile) return false;
@@ -548,7 +572,19 @@ export function Profile() {
   };
 
   return (
-    <div className="py-16 text-white">
+    <div
+      className="py-16 text-white"
+      style={
+        isNative
+          ? {
+              background: "linear-gradient(160deg, #0a1f5c 0%, #0d2878 40%, #0a1a4a 100%)",
+              minHeight: "100dvh",
+              color: "#ffffff",
+              paddingBottom: "calc(60px + env(safe-area-inset-bottom, 16px))",
+            }
+          : undefined
+      }
+    >
       {isProfileImagePreviewOpen && profileImage ? (
         <button
           type="button"
@@ -575,7 +611,7 @@ export function Profile() {
         onChange={handleProfileImageFileChange}
       />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
-        <Card className="rounded-2xl border border-white/10 shadow-sm bg-[#132040]/88">
+        <Card className="rounded-2xl border border-white/10 shadow-sm bg-[#132040]/88" style={androidCardStyle}>
           <CardContent className="p-6 sm:p-8">
             {loading ? (
               <p className="text-white/70">Loading profile...</p>
@@ -651,16 +687,19 @@ export function Profile() {
                     </DropdownMenu>
                   </div>
                   <div>
-                    <p className="text-sm text-white/55">WELCOME</p>
-                    <h1 className="text-2xl text-white sm:text-3xl">{profile?.name}</h1>
-                    <p className="text-white/80">{profile?.email}</p>
-                    <p className="mt-1 text-xs text-white/55">
+                    <p className="text-sm text-white/55" style={androidMutedTextStyle}>WELCOME</p>
+                    <h1 className="text-2xl text-white sm:text-3xl" style={isNative ? { fontSize: "20px", fontWeight: 700 } : undefined}>{profile?.name}</h1>
+                    <p className="text-white/80" style={isNative ? { color: "rgba(255,255,255,0.7)", fontSize: "12px" } : undefined}>{profile?.email}</p>
+                    <p className="mt-1 text-xs text-white/55" style={androidMutedTextStyle}>
                       Click the photo to preview it. Use the pencil button to change it.
                     </p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Badge className="border-[#2563eb]/40 bg-[#2563eb]/12 text-white">
+                  <Badge
+                    className="border-[#2563eb]/40 bg-[#2563eb]/12 text-white"
+                    style={isNative ? { background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)", color: "#ffffff" } : undefined}
+                  >
                     <Crown className="size-3 mr-1" />
                     {getPlanLabel(subscription?.plan)} Plan
                   </Badge>
@@ -703,14 +742,19 @@ export function Profile() {
         ) : null}
 
         <div className="grid lg:grid-cols-3 gap-6">
-          <Card className="lg:col-span-2 rounded-2xl border border-white/10 shadow-sm">
+          <Card className="lg:col-span-2 rounded-2xl border border-white/10 shadow-sm" style={androidCardStyle}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-white">User Details</CardTitle>
-                <CardDescription>Basic identity and account details</CardDescription>
+                <CardTitle className="text-white" style={isNative ? { color: "#ffffff" } : undefined}>User Details</CardTitle>
+                <CardDescription style={androidSecondaryTextStyle}>Basic identity and account details</CardDescription>
               </div>
               {!isEditingProfile && (
-                <Button variant="ghost" size="sm" onClick={() => setIsEditingProfile(true)}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsEditingProfile(true)}
+                  style={isNative ? { color: "#4285F4", background: "transparent" } : undefined}
+                >
                   <Pencil className="size-4 mr-2" />
                   Edit
                 </Button>
@@ -908,17 +952,28 @@ export function Profile() {
                     <div className="space-y-2">
                       <Label htmlFor="country-readonly">Country of Residence</Label>
                       <Input id="country-readonly" value={profile?.countryOfResidence || "Not set"} className="bg-[#F7FAFC]" disabled />
-                      <p className="text-xs text-[#475569]">
+                      <p className="text-xs text-[#475569]" style={androidSecondaryTextStyle}>
                         {profile?.countryLocked ? `Country locked at signup (${profile.countryCode || "N/A"}).` : "Country changes require approval."}
                       </p>
                     </div>
                   </div>
                   {profile?.countryLocked ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                    <div
+                      className="rounded-2xl border border-amber-200 bg-amber-50 p-4"
+                      style={
+                        isNative
+                          ? {
+                              background: "rgba(255,255,255,0.10)",
+                              border: "1px solid rgba(255,255,255,0.18)",
+                              color: "#ffffff",
+                            }
+                          : undefined
+                      }
+                    >
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <p className="text-sm font-medium text-[#0F172A]">Request country change</p>
-                          <p className="text-xs text-[#475569]">
+                          <p className="text-sm font-medium text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined}>Request country change</p>
+                          <p className="text-xs text-[#475569]" style={androidSecondaryTextStyle}>
                             Pricing, tax workflow, and AI compliance behavior are tied to your signup country.
                           </p>
                         </div>
@@ -931,6 +986,7 @@ export function Profile() {
                           value={requestedCountryCode}
                           onChange={(e) => setRequestedCountryCode(e.target.value)}
                           className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                          style={androidSurfaceStyle}
                         >
                           <option value="">Select requested country</option>
                           {COUNTRY_OPTIONS.map((country) => (
@@ -949,6 +1005,7 @@ export function Profile() {
                         rows={3}
                         maxLength={500}
                         className="mt-3 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background"
+                        style={androidSurfaceStyle}
                         placeholder="Reason for changing your locked country"
                       />
                     </div>
@@ -972,46 +1029,51 @@ export function Profile() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-2xl border border-[#E2E8F0] shadow-sm">
+          <Card className="rounded-2xl border border-[#E2E8F0] shadow-sm" style={androidCardStyle}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
-                <CardTitle className="text-[#0F172A]">Plan Details</CardTitle>
-                <CardDescription>Subscription and billing lifecycle</CardDescription>
+                <CardTitle className="text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined}>Plan Details</CardTitle>
+                <CardDescription style={androidSecondaryTextStyle}>Subscription and billing lifecycle</CardDescription>
               </div>
-              <Button variant="ghost" size="sm" onClick={() => navigate("/pricing")}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate("/pricing")}
+                style={isNative ? { color: "#4285F4", background: "transparent" } : undefined}
+              >
                 <Pencil className="size-4 mr-2" />
                 {IOS_EXTERNAL_PURCHASES_DISABLED ? "View Access" : "Manage"}
               </Button>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-lg border border-[#E2E8F0] p-3">
-                <p className="text-xs text-[#0F172A] mb-1">Current Plan</p>
-                <p className="text-lg text-[#0F172A]">{subscriptionLoading ? "Loading..." : getPlanLabel(subscription?.plan)}</p>
+              <div className="rounded-lg border border-[#E2E8F0] p-3" style={androidSurfaceStyle}>
+                <p className="text-xs text-[#0F172A] mb-1" style={androidSecondaryTextStyle}>Current Plan</p>
+                <p className="text-lg text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined}>{subscriptionLoading ? "Loading..." : getPlanLabel(subscription?.plan)}</p>
               </div>
 
-              <div className="rounded-lg border border-[#E2E8F0] p-3 space-y-3">
-                <div className="flex items-center gap-2 text-sm text-[#0F172A]">
-                  <CalendarDays className="size-4 text-[#0F172A]" />
+              <div className="rounded-lg border border-[#E2E8F0] p-3 space-y-3" style={androidSurfaceStyle}>
+                <div className="flex items-center gap-2 text-sm text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined}>
+                  <CalendarDays className="size-4 text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined} />
                   <span>Start: {formatDate(subscription?.subscriptionStartDate)}</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-[#0F172A]">
-                  <CalendarDays className="size-4 text-[#0F172A]" />
+                <div className="flex items-center gap-2 text-sm text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined}>
+                  <CalendarDays className="size-4 text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined} />
                   <span>Renewal: {formatDate(subscription?.subscriptionEndDate)}</span>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-[#E2E8F0] p-3">
-                <p className="text-xs text-[#0F172A] mb-1">Usage</p>
-                <p className="text-[#0F172A] flex items-center gap-2">
+              <div className="rounded-lg border border-[#E2E8F0] p-3" style={androidSurfaceStyle}>
+                <p className="text-xs text-[#0F172A] mb-1" style={androidSecondaryTextStyle}>Usage</p>
+                <p className="text-[#0F172A] flex items-center gap-2" style={isNative ? { color: "#ffffff" } : undefined}>
                   <Sparkles className="size-4 text-[#2563eb]" />
                   Chat used this month: {subscription?.usage?.chatUsageCount ?? 0}
                 </p>
-                <p className="text-xs text-[#0F172A] mt-2">
+                <p className="text-xs text-[#0F172A] mt-2" style={androidSecondaryTextStyle}>
                   Remaining messages: {subscription?.remaining?.chatMessages === null ? "Unlimited" : subscription?.remaining?.chatMessages ?? 0}
                 </p>
               </div>
 
-              <p className="text-xs text-[#0F172A]">
+              <p className="text-xs text-[#0F172A]" style={androidMutedTextStyle}>
                 Member since {formatDate(profile?.createdAt)}
               </p>
             </CardContent>
@@ -1019,10 +1081,10 @@ export function Profile() {
         </div>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          <Card className="rounded-2xl border border-red-200 shadow-sm lg:col-start-3">
+          <Card className="rounded-2xl border border-red-200 shadow-sm lg:col-start-3" style={androidCardStyle}>
             <CardHeader>
-              <CardTitle className="text-[#0F172A]">Account Actions</CardTitle>
-              <CardDescription>Session and account-level controls</CardDescription>
+              <CardTitle className="text-[#0F172A]" style={isNative ? { color: "#ffffff" } : undefined}>Account Actions</CardTitle>
+              <CardDescription style={androidSecondaryTextStyle}>Session and account-level controls</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <Button variant="outline" className="w-full justify-start" onClick={handleLogout}>
@@ -1104,7 +1166,7 @@ export function Profile() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
-              <p className="text-xs text-red-600">
+              <p className="text-xs text-red-600" style={isNative ? { color: "rgba(255,255,255,0.6)" } : undefined}>
                 Deleting account is permanent. Your profile and subscription mapping will be removed.
               </p>
             </CardContent>

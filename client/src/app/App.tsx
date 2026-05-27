@@ -54,6 +54,11 @@ type NativeWrapperWindow = Window & {
   __NRITAX_IOS_WRAPPER__?: boolean;
 };
 
+const isTransientWelcomeMessage = (message?: string | null) => {
+  if (!message) return false;
+  return /^welcome\b/i.test(message.trim());
+};
+
 export default function App() {
   const isNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const isIosNativeWrapper =
@@ -153,6 +158,9 @@ export default function App() {
       const message = customEvent.detail?.message;
       const duration = customEvent.detail?.duration ?? 1000;
       if (!message) return;
+      if (location.pathname === "/home" && isTransientWelcomeMessage(message)) {
+        return;
+      }
 
       setSuccessPopup(message);
       if (popupTimeoutRef.current) {
@@ -246,9 +254,14 @@ export default function App() {
       sessionStorage.getItem("subscription_popup");
     if (!message) return;
 
-    setSuccessPopup(message);
     sessionStorage.removeItem("auth_popup");
     sessionStorage.removeItem("subscription_popup");
+    if (isTransientWelcomeMessage(message)) {
+      setSuccessPopup(null);
+      return;
+    }
+
+    setSuccessPopup(message);
 
     const timeout = window.setTimeout(() => {
       setSuccessPopup(null);

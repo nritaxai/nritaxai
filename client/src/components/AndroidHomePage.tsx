@@ -5,7 +5,9 @@ import {
   Calculator,
   CircleDollarSign,
   Menu,
+  Newspaper,
   Search,
+  UserCheck,
   UserRound,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -32,10 +34,18 @@ type StatItem = {
   value: string;
 };
 
+type TaxUpdateItem = {
+  label: string;
+  title: string;
+  source: string;
+};
+
 const quickActions: QuickAction[] = [
   { title: "AI Chat", subtitle: "Ask Yukti", icon: Bot, to: "/chat", requiresAuth: true, tint: "rgba(66,133,244,0.3)" },
-  { title: "Consult", subtitle: "Expert support", icon: BriefcaseBusiness, to: "/consult", requiresAuth: true, tint: "rgba(52,168,83,0.3)" },
-  { title: "Calc", subtitle: "Tax estimators", icon: Calculator, to: "/calculators", tint: "rgba(251,188,4,0.25)" },
+  { title: "Consult a CPA", subtitle: "Expert support", icon: UserCheck, to: "/consult", requiresAuth: true, tint: "rgba(52,168,83,0.3)" },
+  { title: "Calculate", subtitle: "Tax estimators", icon: Calculator, to: "/calculators", tint: "rgba(251,188,4,0.25)" },
+  { title: "Tax Updates", subtitle: "Latest guidance", icon: Newspaper, to: "#android-tax-updates", tint: "rgba(66,133,244,0.22)" },
+  { title: "Join Expert", subtitle: "Advisor onboarding", icon: BriefcaseBusiness, to: "/join-as-expert", tint: "rgba(255,255,255,0.15)" },
   { title: "Pricing", subtitle: "Plans & access", icon: CircleDollarSign, to: "/pricing", tint: "rgba(255,255,255,0.15)" },
 ];
 
@@ -44,6 +54,12 @@ const stats: StatItem[] = [
   { label: "Questions", value: "24" },
   { label: "Availability", value: "24/7" },
   { label: "Languages", value: "4" },
+];
+
+const taxUpdates: TaxUpdateItem[] = [
+  { label: "DTAA UPDATE", title: "DTAA filing checklist refresh for FY 2025-26", source: "CBDT" },
+  { label: "TAX ALERT", title: "Updated NRI tax residency documentation guidance", source: "Gazette" },
+  { label: "REMITTANCE", title: "Revised notes for Form 15CA and 15CB compliance", source: "NRITAX Research" },
 ];
 
 // Android only
@@ -82,6 +98,11 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
   }
 
   const handleNavigate = (path: string, requiresAuth = false) => {
+    if (path === "#android-tax-updates") {
+      document.getElementById("android-tax-updates")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
     if (requiresAuth && !getStoredAuthToken()) {
       onRequireLogin();
       return;
@@ -98,14 +119,18 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
         color: ANDROID_THEME.primaryText,
         fontFamily: ANDROID_THEME.fontFamily,
         position: "relative",
-        overflow: "hidden",
+        overflow: "visible",
+        touchAction: "pan-y",
       }}
     >
       <AndroidDecorBackground />
 
-      <div style={{ position: "relative", zIndex: 2, paddingBottom: "112px" }}>
+      <div style={{ position: "relative", zIndex: 2 }}>
         <section
           style={{
+            position: "sticky",
+            top: 0,
+            zIndex: 9999,
             padding: "12px 14px",
             paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
             background: "rgba(255,255,255,0.08)",
@@ -151,7 +176,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
           </div>
         </section>
 
-        <div style={{ padding: "16px 14px 0" }}>
+        <div style={{ padding: "12px 14px 16px", display: "flex", flexDirection: "column", flex: 1 }}>
           <div
             style={{
               background: "rgba(255,255,255,0.08)",
@@ -179,7 +204,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
               marginTop: "10px",
               display: "grid",
               gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: "10px",
+              gap: "8px",
             }}
           >
             {quickActions.map((item) => {
@@ -193,9 +218,9 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                     background: ANDROID_THEME.cardBackground,
                     border: ANDROID_THEME.cardBorder,
                     borderRadius: ANDROID_THEME.cardRadius,
-                    padding: "10px",
+                    padding: "10px 12px",
                     textAlign: "left",
-                    minHeight: "104px",
+                    minHeight: "88px",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent: "space-between",
@@ -203,8 +228,8 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                 >
                   <div
                     style={{
-                      width: "28px",
-                      height: "28px",
+                      width: "32px",
+                      height: "32px",
                       borderRadius: "8px",
                       background: item.tint,
                       display: "flex",
@@ -216,10 +241,10 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                     <Icon size={15} />
                   </div>
                   <div>
-                    <div style={{ fontSize: "10px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
+                    <div style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
                       {item.title}
                     </div>
-                    <div style={{ marginTop: "4px", fontSize: "8px", color: "rgba(255,255,255,0.55)" }}>
+                    <div style={{ marginTop: "4px", fontSize: "9px", color: "rgba(255,255,255,0.55)" }}>
                       {item.subtitle}
                     </div>
                   </div>
@@ -235,6 +260,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
               border: "1px solid rgba(255,255,255,0.15)",
               borderRadius: "14px",
               padding: "12px 10px",
+              marginBottom: "8px",
             }}
           >
             <div
@@ -247,7 +273,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
               {stats.map((item) => (
                 <div key={item.label} style={{ textAlign: "center" }}>
                   <div style={{ fontSize: "12px", fontWeight: 800, color: ANDROID_THEME.accent }}>
-                    {item.value}
+                    {item.label === "Savings guided" ? "Rs 3.8L" : item.value}
                   </div>
                   <div style={{ marginTop: "4px", fontSize: "8px", color: "rgba(255,255,255,0.55)" }}>
                     {item.label}
@@ -255,6 +281,48 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div
+            id="android-tax-updates"
+            style={{ marginTop: "10px", fontSize: "13px", fontWeight: 700, color: ANDROID_THEME.primaryText }}
+          >
+            Tax Updates
+          </div>
+
+          <div style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+            {taxUpdates.map((item) => (
+              <article
+                key={item.label + item.title}
+                style={{
+                  background: "rgba(255,255,255,0.1)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  borderRadius: "14px",
+                  padding: "12px",
+                }}
+              >
+                <span
+                  style={{
+                    display: "inline-flex",
+                    padding: "4px 8px",
+                    borderRadius: "999px",
+                    background: "rgba(255,255,255,0.14)",
+                    color: ANDROID_THEME.primaryText,
+                    fontSize: "8px",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                  }}
+                >
+                  {item.label}
+                </span>
+                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
+                  {item.title}
+                </div>
+                <div style={{ marginTop: "6px", fontSize: "9px", color: ANDROID_THEME.secondaryText }}>
+                  Source: {item.source}
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </div>

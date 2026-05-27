@@ -1,21 +1,13 @@
 import { Capacitor } from "@capacitor/core";
-import { AnimatePresence, motion } from "framer-motion";
-import {
-  Eye,
-  EyeOff,
-  Mail,
-  UserPlus,
-  X,
-} from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { Eye, EyeOff, Lock, Mail, User, X } from "lucide-react";
+import { type ReactNode, useMemo, useRef, useState } from "react";
 
-import { CURRENT_POLICY_VERSION } from "../config/legal";
+import { COUNTRY_OPTIONS } from "../app/utils/countries";
 import { LINKEDIN_AUTH_CONFIG } from "../config/appConfig";
-import { signupUser, loginUser, forgotPassword } from "../utils/api";
+import { CURRENT_POLICY_VERSION } from "../config/legal";
 import { persistAuth } from "../services/authStorage";
 import { signInWithNativeGoogle } from "../services/googleSignIn";
-import { AndroidDecorBackground, ANDROID_THEME } from "./androidTheme";
-import { COUNTRY_OPTIONS } from "../app/utils/countries";
+import { forgotPassword, loginUser, signupUser } from "../utils/api";
 
 type AndroidLoginScreenProps = {
   onClose: () => void;
@@ -23,52 +15,47 @@ type AndroidLoginScreenProps = {
   onLoginSuccess?: () => void;
 };
 
-type ActivePanel = "landing" | "email" | "signup";
+type AuthMode = "login" | "register";
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const linkedInUrlPattern = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
+const LINKEDIN_URL_PATTERN = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
 
-const buttonBaseStyle = {
-  width: "100%",
-  borderRadius: ANDROID_THEME.buttonRadius,
-  padding: "10px 14px",
-  display: "flex",
-  alignItems: "center",
-  gap: "7px",
-  fontFamily: ANDROID_THEME.fontFamily,
+const TOKENS = {
+  primaryGreen: "#5B8A3C",
+  greenHover: "#4a7230",
+  greenLight: "#f0f7eb",
+  background: "#ffffff",
+  inputBorder: "#e2e8f0",
+  inputFocus: "#5B8A3C",
+  textPrimary: "#1a1a1a",
+  textSecondary: "#64748b",
+  textMuted: "#94a3b8",
+  tabBg: "#f1f5f9",
+  fontFamily: "system-ui,-apple-system,sans-serif",
 } as const;
 
-const inlinePromptStyle = {
-  paddingTop: "0",
-  fontSize: "10px",
-  color: "rgba(255,255,255,0.5)",
-  fontFamily: ANDROID_THEME.fontFamily,
-  textAlign: "center",
-} as const;
-
-const inputStyle = {
+const baseInputStyle = {
   width: "100%",
-  background: "rgba(255,255,255,0.1)",
-  border: "1px solid rgba(255,255,255,0.2)",
-  borderRadius: "12px",
-  padding: "10px 14px",
-  color: ANDROID_THEME.primaryText,
-  fontSize: "12px",
+  border: "none",
   outline: "none",
-  fontFamily: ANDROID_THEME.fontFamily,
+  background: "transparent",
+  color: TOKENS.textPrimary,
+  fontSize: "13px",
+  fontFamily: TOKENS.fontFamily,
+  padding: 0,
 } as const;
 
-// Android only
 export function AndroidLoginScreen({
   onClose,
   disableClose = false,
   onLoginSuccess,
 }: AndroidLoginScreenProps) {
-  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
-  const [activePanel, setActivePanel] = useState<ActivePanel>("landing");
+  const isNativePlatform = Capacitor.isNativePlatform();
+
+  const [mode, setMode] = useState<AuthMode>("login");
   const [authError, setAuthError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
@@ -81,15 +68,14 @@ export function AndroidLoginScreen({
     confirmPassword: "",
     termsAccepted: true,
   });
-  const forgotEmailRef = useRef(loginData.email);
-  const isLandingPanel = activePanel === "landing";
+  const forgotEmailRef = useRef("");
 
   const selectedSignupCountry = useMemo(
     () => COUNTRY_OPTIONS.find((country) => country.code === signupData.countryCode),
     [signupData.countryCode],
   );
 
-  if (!isAndroidNative) {
+  if (!isNativePlatform) {
     return null;
   }
 
@@ -107,14 +93,17 @@ export function AndroidLoginScreen({
       window.dispatchEvent(new Event("auth-changed"));
       window.dispatchEvent(
         new CustomEvent("nritax:auth-popup", {
-          detail: { message: `WELCOME ${String((user as any)?.name || "User")}!`, type: "success", duration: 1200 },
+          detail: {
+            message: `WELCOME ${String((user as { name?: string })?.name || "User")}!`,
+            type: "success",
+            duration: 1200,
+          },
         }),
       );
     }
     onLoginSuccess?.();
   };
 
-  // Android only
   const handleGoogleSignIn = async () => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -126,24 +115,27 @@ export function AndroidLoginScreen({
       onLoginSuccess?.();
     } catch (error: any) {
       console.error("[google-auth] failed:", error);
-      setAuthError(error?.message || "Google Sign-In failed. Please try again.");
+      setAuthError(
+        error?.code === "USER_CANCELLED" || String(error?.message || "").includes("could not reach Google services")
+          ? "Google Sign-In could not reach Google services. Please check the emulator internet and try again."
+          : error?.message || "Google Sign-In failed. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Android only
-  const handleLinkedInAuth = (mode: "login" | "signup") => {
+  const handleLinkedInAuth = (authMode: AuthMode) => {
     try {
       if (!LINKEDIN_AUTH_CONFIG.authBaseUrl) {
         throw new Error("LinkedIn Sign-In is not configured.");
       }
 
       const authUrl = new URL("/auth/linkedin", `${LINKEDIN_AUTH_CONFIG.authBaseUrl}/`);
-      authUrl.searchParams.set("mode", mode);
+      authUrl.searchParams.set("mode", authMode === "register" ? "signup" : "login");
       authUrl.searchParams.set("origin", window.location.origin);
 
-      if (mode === "signup") {
+      if (authMode === "register") {
         if (!selectedSignupCountry?.name || !signupData.countryCode) {
           setAuthError("Please select your country before creating an account.");
           return;
@@ -160,7 +152,6 @@ export function AndroidLoginScreen({
     }
   };
 
-  // Android only
   const handleEmailLogin = async () => {
     setAuthError("");
 
@@ -187,7 +178,6 @@ export function AndroidLoginScreen({
     }
   };
 
-  // Android only
   const handleSignup = async () => {
     setAuthError("");
 
@@ -195,7 +185,7 @@ export function AndroidLoginScreen({
       setAuthError("Please add your name and a valid email address.");
       return;
     }
-    if (signupData.linkedinProfile.trim() && !linkedInUrlPattern.test(signupData.linkedinProfile.trim())) {
+    if (signupData.linkedinProfile.trim() && !LINKEDIN_URL_PATTERN.test(signupData.linkedinProfile.trim())) {
       setAuthError("LinkedIn profile must be a valid linkedin.com URL.");
       return;
     }
@@ -235,9 +225,8 @@ export function AndroidLoginScreen({
     }
   };
 
-  // Android only
   const handleForgotPassword = async () => {
-    const email = forgotEmailRef.current?.trim() || loginData.email.trim();
+    const email = forgotEmailRef.current.trim() || loginData.email.trim();
 
     if (!EMAIL_PATTERN.test(email)) {
       setAuthError("Please enter a valid email address first.");
@@ -256,8 +245,16 @@ export function AndroidLoginScreen({
     }
   };
 
+  const renderLayersIcon = () => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 3 4 7l8 4 8-4-8-4Z" fill="#fff" opacity="0.95" />
+      <path d="M4 12l8 4 8-4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 16.5l8 4 8-4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" opacity="0.8" />
+    </svg>
+  );
+
   const renderGoogleIcon = () => (
-    <svg width="13" height="13" viewBox="0 0 48 48" aria-hidden="true">
+    <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
       <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.6 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5Z" />
       <path fill="#FF3D00" d="M6.3 14.7 12.9 19.5C14.7 15.2 19 12 24 12c3 0 5.8 1.1 7.9 2.9l5.7-5.7C34.1 6.1 29.3 4 24 4c-7.7 0-14.3 4.3-17.7 10.7Z" />
       <path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.5-5.3l-6.2-5.2C29.3 35 26.8 36 24 36c-5.2 0-9.6-3.3-11.2-8l-6.5 5C9.6 39.5 16.3 44 24 44Z" />
@@ -265,26 +262,34 @@ export function AndroidLoginScreen({
     </svg>
   );
 
-  const signupPrompt = (
-    <div style={inlinePromptStyle}>
-      <button
-        type="button"
-        onClick={() => setActivePanel("signup")}
-        style={{
-          background: "transparent",
-          border: 0,
-          padding: 0,
-          fontSize: "10px",
-          color: "rgba(255,255,255,0.5)",
-          fontFamily: ANDROID_THEME.fontFamily,
-          textAlign: "center",
-        }}
-      >
-        Need an account?{" "}
-        <span style={{ color: "rgba(255,255,255,0.8)", textDecoration: "underline", fontWeight: 600 }}>
-          {"Sign up ->"}
-        </span>
-      </button>
+  const fieldShell = (icon: ReactNode, label: string, child: ReactNode, withBottomMargin = true) => (
+    <div
+      style={{
+        border: `1.5px solid ${TOKENS.inputBorder}`,
+        borderRadius: "10px",
+        padding: "10px 12px",
+        display: "flex",
+        alignItems: "center",
+        gap: "8px",
+        marginBottom: withBottomMargin ? "8px" : 0,
+        background: TOKENS.background,
+      }}
+    >
+      <div style={{ color: TOKENS.textMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontSize: "8px",
+            fontWeight: 600,
+            color: TOKENS.textMuted,
+            letterSpacing: "0.3px",
+            marginBottom: "4px",
+          }}
+        >
+          {label}
+        </div>
+        {child}
+      </div>
     </div>
   );
 
@@ -292,394 +297,289 @@ export function AndroidLoginScreen({
     <main
       style={{
         height: "100dvh",
-        background: ANDROID_THEME.background,
+        background: TOKENS.background,
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        position: "relative",
-        fontFamily: ANDROID_THEME.fontFamily,
+        paddingTop: "env(safe-area-inset-top)",
+        fontFamily: TOKENS.fontFamily,
       }}
     >
-      <AndroidDecorBackground />
-
-      <div
+      <section
         style={{
-          zIndex: 2,
-          padding: "env(safe-area-inset-top,14px) 14px 0",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
+          background: TOKENS.primaryGreen,
+          padding: "28px 20px 28px",
+          textAlign: "center",
+          position: "relative",
         }}
       >
-        <div
-          style={{
-            fontSize: "11px",
-            fontWeight: 800,
-            letterSpacing: "2.5px",
-            color: ANDROID_THEME.primaryText,
-          }}
-        >
-          NRITAX.AI
-        </div>
         {!disableClose ? (
           <button
             type="button"
             onClick={onClose}
-            style={{ background: "transparent", border: 0, padding: 0, color: "rgba(255,255,255,0.6)" }}
             aria-label="Close login screen"
-          >
-            <X size={20} />
-          </button>
-        ) : null}
-      </div>
-
-      <div style={{ zIndex: 2, padding: "16px 16px 12px" }}>
-        <div
-          style={{
-            fontSize: "22px",
-            fontWeight: 900,
-            letterSpacing: "-0.5px",
-            lineHeight: 1.1,
-            color: ANDROID_THEME.primaryText,
-            marginBottom: "4px",
-          }}
-        >
-          Welcome back
-        </div>
-        <div
-          style={{
-            fontSize: "11px",
-            fontWeight: 400,
-            color: "rgba(255,255,255,0.55)",
-            lineHeight: 1.5,
-          }}
-        >
-          Sign in to manage your NRI taxes with AI.
-        </div>
-      </div>
-
-      <div
-        style={{
-          zIndex: 2,
-          padding: "0 12px env(safe-area-inset-bottom,12px)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-          flex: isLandingPanel ? "0 0 auto" : 1,
-          minHeight: 0,
-        }}
-      >
-        <button
-          type="button"
-          onClick={() => void handleGoogleSignIn()}
-          disabled={loading}
-          style={{
-            ...buttonBaseStyle,
-            background: "#ffffff",
-            border: "none",
-            color: "#000000",
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {renderGoogleIcon()}
-          <span style={{ fontSize: "11px", fontWeight: 700, color: "#000000", letterSpacing: "0.1px" }}>
-            {"Google sign in ->"}
-          </span>
-        </button>
-        {authError ? (
-          <div style={{ fontSize: "10px", color: "#ff6b6b", marginTop: "-4px", padding: "0 4px" }}>{authError}</div>
-        ) : null}
-
-        <button
-          type="button"
-          onClick={() => handleLinkedInAuth("login")}
-          style={{
-            ...buttonBaseStyle,
-            background: "rgba(255,255,255,0.10)",
-            border: "1px solid rgba(255,255,255,0.20)",
-            color: ANDROID_THEME.primaryText,
-          }}
-        >
-          <span
             style={{
-              width: "13px",
-              height: "13px",
-              borderRadius: "2px",
-              background: "#0077B5",
-              color: "#ffffff",
-              fontSize: "7px",
-              fontWeight: 800,
+              position: "absolute",
+              top: "18px",
+              right: "16px",
+              border: 0,
+              background: "transparent",
+              color: "rgba(255,255,255,0.9)",
+              padding: 0,
               display: "inline-flex",
               alignItems: "center",
               justifyContent: "center",
-              lineHeight: 1,
             }}
           >
-            in
-          </span>
-          <span style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
-            {"LinkedIn sign in ->"}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAuthError("");
-            setActivePanel("email");
-          }}
-          style={{
-            ...buttonBaseStyle,
-            background: "rgba(255,255,255,0.08)",
-            border: "1px solid rgba(255,255,255,0.15)",
-            color: ANDROID_THEME.primaryText,
-          }}
-        >
-          <Mail size={12} />
-          <span style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
-            {"Log in with email ->"}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            setAuthError("");
-            setActivePanel("signup");
-          }}
-          style={{
-            ...buttonBaseStyle,
-            background: "rgba(255,255,255,0.06)",
-            border: "1px solid rgba(255,255,255,0.10)",
-            color: ANDROID_THEME.primaryText,
-          }}
-        >
-          <UserPlus size={12} />
-          <span style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
-            {"Create account ->"}
-          </span>
-        </button>
-        {isLandingPanel ? (
-          <div style={{ marginTop: "-2px" }}>
-            {signupPrompt}
-          </div>
+            <X size={18} />
+          </button>
         ) : null}
+
         <div
           style={{
-            zIndex: 2,
-            paddingTop: isLandingPanel ? "0" : "10px",
-            flex: isLandingPanel ? "0 0 auto" : 1,
-            minHeight: 0,
-            overflowY: isLandingPanel ? "visible" : "auto",
+            fontSize: "11px",
+            fontWeight: 800,
+            color: "rgba(255,255,255,0.85)",
+            letterSpacing: "3px",
+            marginBottom: "12px",
           }}
         >
-        <AnimatePresence mode="wait">
-          {activePanel === "email" ? (
-            <motion.div
-              key="email-form"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.2 }}
-              style={{ display: "flex", flexDirection: "column", gap: "9px" }}
-            >
+          NRITAX.AI
+        </div>
+
+        <div
+          style={{
+            width: "48px",
+            height: "48px",
+            margin: "0 auto 12px",
+            borderRadius: "14px",
+            background: "rgba(255,255,255,0.2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {renderLayersIcon()}
+        </div>
+
+        <div
+          style={{
+            fontSize: "20px",
+            fontWeight: 800,
+            color: "#ffffff",
+            letterSpacing: "-0.4px",
+            lineHeight: 1.2,
+            marginBottom: "6px",
+          }}
+        >
+          Sign in to your NRI Tax account
+        </div>
+
+        <div
+          style={{
+            fontSize: "12px",
+            fontWeight: 400,
+            color: "rgba(255,255,255,0.75)",
+          }}
+        >
+          Manage your taxes with AI
+        </div>
+      </section>
+
+      <section
+        style={{
+          background: TOKENS.background,
+          borderRadius: "24px 24px 0 0",
+          flex: 1,
+          padding: "20px 18px 0",
+          overflowY: "auto",
+          marginTop: "-8px",
+        }}
+      >
+        <div
+          style={{
+            background: TOKENS.tabBg,
+            borderRadius: "10px",
+            padding: "3px",
+            display: "flex",
+            marginBottom: "16px",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setMode("login");
+              setAuthError("");
+            }}
+            style={{
+              flex: 1,
+              border: 0,
+              borderRadius: "8px",
+              padding: "9px",
+              background: mode === "login" ? TOKENS.primaryGreen : "transparent",
+              color: mode === "login" ? "#ffffff" : TOKENS.textSecondary,
+              fontSize: "12px",
+              fontWeight: mode === "login" ? 700 : 600,
+            }}
+          >
+            Login
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("register");
+              setAuthError("");
+            }}
+            style={{
+              flex: 1,
+              border: 0,
+              borderRadius: "8px",
+              padding: "9px",
+              background: mode === "register" ? TOKENS.primaryGreen : "transparent",
+              color: mode === "register" ? "#ffffff" : TOKENS.textSecondary,
+              fontSize: "12px",
+              fontWeight: mode === "register" ? 700 : 600,
+            }}
+          >
+            Register
+          </button>
+        </div>
+
+        {mode === "login" ? (
+          <>
+            {fieldShell(
+              <Mail size={14} />,
+              "EMAIL ADDRESS",
               <input
                 type="email"
-                placeholder="Email address"
+                placeholder="Enter your email"
                 value={loginData.email}
                 onChange={(event) => {
                   forgotEmailRef.current = event.target.value;
                   setLoginData((prev) => ({ ...prev, email: event.target.value }));
                 }}
-                style={inputStyle}
-              />
-              <div style={{ position: "relative" }}>
+                style={baseInputStyle}
+              />,
+            )}
+
+            {fieldShell(
+              <Lock size={14} />,
+              "PASSWORD",
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Password"
+                  type={showLoginPassword ? "text" : "password"}
+                  placeholder="Enter your password"
                   value={loginData.password}
                   onChange={(event) => setLoginData((prev) => ({ ...prev, password: event.target.value }))}
-                  style={{ ...inputStyle, paddingRight: "42px" }}
+                  style={{ ...baseInputStyle, flex: 1 }}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((prev) => !prev)}
+                  onClick={() => setShowLoginPassword((prev) => !prev)}
+                  aria-label={showLoginPassword ? "Hide password" : "Show password"}
                   style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "transparent",
                     border: 0,
-                    color: ANDROID_THEME.primaryText,
+                    background: "transparent",
+                    color: TOKENS.textMuted,
+                    padding: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
                 >
-                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  {showLoginPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
-              </div>
-              <button
-                type="button"
-                onClick={() => void handleEmailLogin()}
-                disabled={loading}
-                style={{
-                  width: "100%",
-                  background: "#ffffff",
-                  color: "#0a1f5c",
-                  borderRadius: ANDROID_THEME.buttonRadius,
-                  padding: "11px",
-                  border: "none",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  fontFamily: ANDROID_THEME.fontFamily,
-                }}
-              >
-                {loading ? "Signing in..." : "Sign in ->"}
-              </button>
+              </div>,
+            )}
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "12px" }}>
               <button
                 type="button"
                 onClick={() => void handleForgotPassword()}
+                disabled={loading}
                 style={{
                   border: 0,
                   background: "transparent",
-                  color: "rgba(255,255,255,0.55)",
-                  fontSize: "10px",
-                  textAlign: "right",
-                  fontFamily: ANDROID_THEME.fontFamily,
+                  padding: 0,
+                  color: TOKENS.primaryGreen,
+                  fontSize: "12px",
+                  fontWeight: 600,
                 }}
               >
                 Forgot password?
               </button>
-              {signupPrompt}
-            </motion.div>
-          ) : null}
+            </div>
 
-          {activePanel === "signup" ? (
-            <motion.div
-              key="signup-form"
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              transition={{ duration: 0.2 }}
-              style={{ display: "flex", flexDirection: "column", gap: "9px" }}
+            <button
+              type="button"
+              onClick={() => void handleEmailLogin()}
+              disabled={loading}
+              style={{
+                width: "100%",
+                border: 0,
+                borderRadius: "12px",
+                padding: "12px 16px",
+                background: TOKENS.primaryGreen,
+                color: "#ffffff",
+                fontSize: "14px",
+                fontWeight: 700,
+                marginBottom: "12px",
+              }}
             >
-              <input
-                type="text"
-                placeholder="Full name"
-                value={signupData.name}
-                onChange={(event) => setSignupData((prev) => ({ ...prev, name: event.target.value }))}
-                style={inputStyle}
-              />
-              <input
-                type="email"
-                placeholder="Email address"
-                value={signupData.email}
-                onChange={(event) => setSignupData((prev) => ({ ...prev, email: event.target.value }))}
-                style={inputStyle}
-              />
-              <input
-                type="url"
-                placeholder="LinkedIn profile (optional)"
-                value={signupData.linkedinProfile}
-                onChange={(event) => setSignupData((prev) => ({ ...prev, linkedinProfile: event.target.value }))}
-                style={inputStyle}
-              />
-              <select
-                value={signupData.countryCode}
-                onChange={(event) => setSignupData((prev) => ({ ...prev, countryCode: event.target.value }))}
-                style={{ ...inputStyle, color: signupData.countryCode ? "#ffffff" : "rgba(255,255,255,0.35)" }}
-              >
-                <option value="" style={{ color: "#0a1f5c" }}>Select country</option>
-                {COUNTRY_OPTIONS.map((country) => (
-                  <option key={country.code} value={country.code} style={{ color: "#0a1f5c" }}>
-                    {country.name}
-                  </option>
-                ))}
-              </select>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showSignupPassword ? "text" : "password"}
-                  placeholder="Password"
-                  value={signupData.password}
-                  onChange={(event) => setSignupData((prev) => ({ ...prev, password: event.target.value }))}
-                  style={{ ...inputStyle, paddingRight: "42px" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSignupPassword((prev) => !prev)}
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "transparent",
-                    border: 0,
-                    color: ANDROID_THEME.primaryText,
-                  }}
-                >
-                  {showSignupPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showSignupConfirmPassword ? "text" : "password"}
-                  placeholder="Confirm password"
-                  value={signupData.confirmPassword}
-                  onChange={(event) => setSignupData((prev) => ({ ...prev, confirmPassword: event.target.value }))}
-                  style={{ ...inputStyle, paddingRight: "42px" }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSignupConfirmPassword((prev) => !prev)}
-                  style={{
-                    position: "absolute",
-                    right: "12px",
-                    top: "50%",
-                    transform: "translateY(-50%)",
-                    background: "transparent",
-                    border: 0,
-                    color: ANDROID_THEME.primaryText,
-                  }}
-                >
-                  {showSignupConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
+              {loading ? "Signing in..." : "Sign in"}
+            </button>
+
+            <div style={{ display: "grid", gap: "10px", marginBottom: "16px" }}>
               <button
                 type="button"
-                onClick={() => void handleSignup()}
+                onClick={() => void handleGoogleSignIn()}
                 disabled={loading}
                 style={{
                   width: "100%",
-                  background: "#ffffff",
-                  color: "#0a1f5c",
-                  borderRadius: ANDROID_THEME.buttonRadius,
-                  padding: "11px",
-                  border: "none",
-                  fontSize: "12px",
-                  fontWeight: 700,
-                  fontFamily: ANDROID_THEME.fontFamily,
+                  borderRadius: "12px",
+                  padding: "11px 14px",
+                  border: `1px solid ${TOKENS.inputBorder}`,
+                  background: TOKENS.background,
+                  color: TOKENS.textPrimary,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "10px",
+                  fontSize: "13px",
+                  fontWeight: 600,
                 }}
               >
-                {loading ? "Creating account..." : "Create account ->"}
+                {renderGoogleIcon()}
+                Continue with Google
               </button>
+
               <button
                 type="button"
-                onClick={() => handleLinkedInAuth("signup")}
+                onClick={() => handleLinkedInAuth("login")}
+                disabled={loading}
                 style={{
-                  ...buttonBaseStyle,
+                  width: "100%",
+                  borderRadius: "12px",
+                  padding: "11px 14px",
+                  border: `1px solid ${TOKENS.inputBorder}`,
+                  background: TOKENS.greenLight,
+                  color: TOKENS.textPrimary,
+                  display: "flex",
+                  alignItems: "center",
                   justifyContent: "center",
-                  background: "rgba(255,255,255,0.08)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  color: ANDROID_THEME.primaryText,
+                  gap: "10px",
+                  fontSize: "13px",
+                  fontWeight: 600,
                 }}
               >
                 <span
                   style={{
-                    width: "13px",
-                    height: "13px",
-                    borderRadius: "2px",
+                    width: "18px",
+                    height: "18px",
+                    borderRadius: "4px",
                     background: "#0077B5",
                     color: "#ffffff",
-                    fontSize: "7px",
+                    fontSize: "10px",
                     fontWeight: 800,
                     display: "inline-flex",
                     alignItems: "center",
@@ -689,15 +589,243 @@ export function AndroidLoginScreen({
                 >
                   in
                 </span>
-                <span style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
-                  {"LinkedIn sign in ->"}
-                </span>
+                Continue with LinkedIn
               </button>
-            </motion.div>
-          ) : null}
-        </AnimatePresence>
+            </div>
+          </>
+        ) : (
+          <>
+            {fieldShell(
+              <User size={14} />,
+              "FULL NAME",
+              <input
+                type="text"
+                placeholder="Enter your full name"
+                value={signupData.name}
+                onChange={(event) => setSignupData((prev) => ({ ...prev, name: event.target.value }))}
+                style={baseInputStyle}
+              />,
+            )}
+
+            {fieldShell(
+              <Mail size={14} />,
+              "EMAIL ADDRESS",
+              <input
+                type="email"
+                placeholder="Enter your email"
+                value={signupData.email}
+                onChange={(event) => setSignupData((prev) => ({ ...prev, email: event.target.value }))}
+                style={baseInputStyle}
+              />,
+            )}
+
+            {fieldShell(
+              <span style={{ fontSize: "14px", fontWeight: 700, lineHeight: 1 }}>in</span>,
+              "LINKEDIN PROFILE",
+              <input
+                type="url"
+                placeholder="Optional linkedin.com profile"
+                value={signupData.linkedinProfile}
+                onChange={(event) => setSignupData((prev) => ({ ...prev, linkedinProfile: event.target.value }))}
+                style={baseInputStyle}
+              />,
+            )}
+
+            {fieldShell(
+              <span style={{ fontSize: "14px", lineHeight: 1 }}>+</span>,
+              "COUNTRY",
+              <select
+                value={signupData.countryCode}
+                onChange={(event) => setSignupData((prev) => ({ ...prev, countryCode: event.target.value }))}
+                style={{ ...baseInputStyle, color: signupData.countryCode ? TOKENS.textPrimary : TOKENS.textMuted }}
+              >
+                <option value="">Select your country</option>
+                {COUNTRY_OPTIONS.map((country) => (
+                  <option key={country.code} value={country.code}>
+                    {country.name}
+                  </option>
+                ))}
+              </select>,
+            )}
+
+            {fieldShell(
+              <Lock size={14} />,
+              "PASSWORD",
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <input
+                  type={showSignupPassword ? "text" : "password"}
+                  placeholder="Create a password"
+                  value={signupData.password}
+                  onChange={(event) => setSignupData((prev) => ({ ...prev, password: event.target.value }))}
+                  style={{ ...baseInputStyle, flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSignupPassword((prev) => !prev)}
+                  aria-label={showSignupPassword ? "Hide password" : "Show password"}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    color: TOKENS.textMuted,
+                    padding: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {showSignupPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>,
+            )}
+
+            {fieldShell(
+              <Lock size={14} />,
+              "CONFIRM PASSWORD",
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <input
+                  type={showSignupConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={signupData.confirmPassword}
+                  onChange={(event) => setSignupData((prev) => ({ ...prev, confirmPassword: event.target.value }))}
+                  style={{ ...baseInputStyle, flex: 1 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSignupConfirmPassword((prev) => !prev)}
+                  aria-label={showSignupConfirmPassword ? "Hide password" : "Show password"}
+                  style={{
+                    border: 0,
+                    background: "transparent",
+                    color: TOKENS.textMuted,
+                    padding: 0,
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {showSignupConfirmPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>,
+              false,
+            )}
+
+            <div
+              style={{
+                marginTop: "12px",
+                marginBottom: "12px",
+                fontSize: "11px",
+                lineHeight: 1.5,
+                color: TOKENS.textSecondary,
+              }}
+            >
+              By continuing, you agree to the latest NRITAX.AI terms and privacy policy.
+            </div>
+
+            <button
+              type="button"
+              onClick={() => void handleSignup()}
+              disabled={loading}
+              style={{
+                width: "100%",
+                border: 0,
+                borderRadius: "12px",
+                padding: "12px 16px",
+                background: TOKENS.primaryGreen,
+                color: "#ffffff",
+                fontSize: "14px",
+                fontWeight: 700,
+                marginBottom: "12px",
+              }}
+            >
+              {loading ? "Creating account..." : "Create account"}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleLinkedInAuth("register")}
+              disabled={loading}
+              style={{
+                width: "100%",
+                borderRadius: "12px",
+                padding: "11px 14px",
+                border: `1px solid ${TOKENS.inputBorder}`,
+                background: TOKENS.greenLight,
+                color: TOKENS.textPrimary,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "10px",
+                fontSize: "13px",
+                fontWeight: 600,
+                marginBottom: "16px",
+              }}
+            >
+              <span
+                style={{
+                  width: "18px",
+                  height: "18px",
+                  borderRadius: "4px",
+                  background: "#0077B5",
+                  color: "#ffffff",
+                  fontSize: "10px",
+                  fontWeight: 800,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  lineHeight: 1,
+                }}
+              >
+                in
+              </span>
+              Continue with LinkedIn
+            </button>
+          </>
+        )}
+
+        {authError ? (
+          <div
+            style={{
+              borderRadius: "12px",
+              background: mode === "login" && authError.includes("Reset link sent") ? TOKENS.greenLight : "#fef2f2",
+              color: mode === "login" && authError.includes("Reset link sent") ? TOKENS.primaryGreen : "#b91c1c",
+              padding: "10px 12px",
+              fontSize: "12px",
+              lineHeight: 1.4,
+              marginBottom: "18px",
+            }}
+          >
+            {authError}
+          </div>
+        ) : null}
+
+        <div
+          style={{
+            paddingBottom: "max(18px, env(safe-area-inset-bottom))",
+            textAlign: "center",
+            fontSize: "12px",
+            color: TOKENS.textSecondary,
+          }}
+        >
+          {mode === "login" ? "New to NRITAX.AI?" : "Already have an account?"}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setMode(mode === "login" ? "register" : "login");
+              setAuthError("");
+            }}
+            style={{
+              border: 0,
+              background: "transparent",
+              color: TOKENS.primaryGreen,
+              fontSize: "12px",
+              fontWeight: 700,
+              padding: 0,
+            }}
+          >
+            {mode === "login" ? "Create one" : "Sign in"}
+          </button>
         </div>
-      </div>
+      </section>
     </main>
   );
 }

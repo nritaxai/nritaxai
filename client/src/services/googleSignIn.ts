@@ -6,7 +6,7 @@ import { googleLoginUser } from "../utils/api";
 import { persistAuth } from "./authStorage";
 
 const GOOGLE_WEB_CLIENT_ID =
-  "307987125319-g9bbal34asnd3d16dk269us6lb0jfigs.apps.googleusercontent.com";
+  "307987125319-k7ifrilh3a9f2bb24p263hsj7k6j1fjq.apps.googleusercontent.com";
 
 let googleInitialized = false;
 
@@ -14,6 +14,11 @@ type NativeGoogleSignInResult = {
   token: string;
   user: Record<string, unknown> | null;
   response: any;
+};
+
+type NativeGoogleSignInError = Error & {
+  code?: string;
+  cause?: unknown;
 };
 
 // Android only
@@ -32,13 +37,26 @@ export const signInWithNativeGoogle = async (): Promise<NativeGoogleSignInResult
     googleInitialized = true;
   }
 
-  const googleResult = await SocialLogin.login({
-    provider: "google",
-    options: {
-      filterByAuthorizedAccounts: false,
-      autoSelectEnabled: false,
-    },
-  });
+  let googleResult: Awaited<ReturnType<typeof SocialLogin.login<"google">>>;
+
+  try {
+    googleResult = await SocialLogin.login({
+      provider: "google",
+      options: {
+        filterByAuthorizedAccounts: false,
+        autoSelectEnabled: false,
+      },
+    });
+  } catch (error: any) {
+    const normalizedError = new Error(
+      error?.code === "USER_CANCELLED"
+        ? "Google Sign-In could not reach Google services. Please try again."
+        : error?.message || "Google Sign-In failed. Please try again."
+    ) as NativeGoogleSignInError;
+    normalizedError.code = error?.code;
+    normalizedError.cause = error;
+    throw normalizedError;
+  }
   const idToken = googleResult?.result?.idToken ?? null;
 
   if (!idToken) {

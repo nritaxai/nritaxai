@@ -27,13 +27,14 @@ export function AndroidPageWrapper({
       data-android-page
       className={`android-page page-content ${className}`.trim()}
       style={{
-        paddingTop: includeHeaderOffset ? "56px" : "0",
+        paddingTop: includeHeaderOffset ? "calc(56px + env(safe-area-inset-top))" : "0",
         paddingBottom: includeBottomNavOffset
           ? "calc(60px + env(safe-area-inset-bottom, 16px))"
           : "0",
         minHeight: "100dvh",
         overflowY: scrollable ? "auto" : "visible",
         WebkitOverflowScrolling: scrollable ? "touch" : "auto",
+        boxSizing: "border-box",
       }}
     >
       {children}

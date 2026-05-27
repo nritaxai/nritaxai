@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Capacitor } from "@capacitor/core"
 import { Calculator, DollarSign, FileText, Info, Users } from 'lucide-react'
 import { motion } from 'motion/react'
 import { AuthGateCard } from '../components/AuthGateCard'
@@ -22,6 +23,7 @@ interface CalculatorsProps {
 }
 
 export function Calculators({ onRequireLogin }: CalculatorsProps) {
+  const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android"
   const isAuthenticated = Boolean(typeof window !== 'undefined' && getStoredAuthToken())
   const [activeCalc, setActiveCalc] = useState<CalculatorType>('residency')
 
@@ -36,7 +38,7 @@ export function Calculators({ onRequireLogin }: CalculatorsProps) {
   }
 
   return (
-    <div className="min-h-screen max-w-5xl mx-auto px-4 py-8 md:px-6 md:py-10">
+    <div className={`max-w-5xl mx-auto px-4 md:px-6 ${isAndroidNative ? "py-4 pb-6" : "min-h-screen py-8 md:py-10"}`}>
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}

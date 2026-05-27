@@ -14,14 +14,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "307987125319-8ioooqfm0iel5c0d4smmg1l204p7dtjm.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.nritaxai.app",
-            "certificate_hash": "e29831f7c7434576b18ca92479c0100eb2a88c04"
-          }
-        },
-        {
           "client_id": "307987125319-97ajiq8oufvv7b3lqroviddau5ev54ch.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
@@ -30,7 +22,7 @@
           }
         },
         {
-          "client_id": "307987125319-k7ifrilh3a9f2bb24p263hsj7k6j1fjq.apps.googleusercontent.com",
+          "client_id": "307987125319-g9bbal34asnd3d16dk269us6lb0jfigs.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
@@ -43,7 +35,7 @@
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "307987125319-k7ifrilh3a9f2bb24p263hsj7k6j1fjq.apps.googleusercontent.com",
+              "client_id": "307987125319-g9bbal34asnd3d16dk269us6lb0jfigs.apps.googleusercontent.com",
               "client_type": 3
             }
           ]

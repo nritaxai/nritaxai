@@ -6,6 +6,7 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite",
+    "android:build": "cd android && gradlew.bat assembleDebug",
     "cap:sync": "npx cap sync",
     "cap:add:android": "npx cap add android",
     "cap:open:ios": "npx cap open ios",
