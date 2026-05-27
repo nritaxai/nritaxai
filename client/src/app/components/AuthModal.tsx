@@ -128,6 +128,8 @@ export function AuthModal({
   const selectedSignupCountry = COUNTRY_OPTIONS.find((country) => country.code === signupData.countryCode);
   const signupCanContinue = signupData.termsAccepted && Boolean(signupData.countryCode);
   const fullName = `${signupData.firstName} ${signupData.lastName}`.trim();
+  const shellMaxWidthClassName = mode === "signup" ? "max-w-[68rem]" : "max-w-5xl";
+  const formMaxWidthClassName = mode === "signup" ? "max-w-[500px]" : "max-w-[540px]";
 
   const passwordHint = useMemo(() => {
     if (!signupData.password) return "Use 8 or more characters.";
@@ -480,7 +482,7 @@ export function AuthModal({
 
   return (
     <div className="min-h-dvh bg-[radial-gradient(circle_at_top,#e0f2fe_0%,#f8fafc_45%,#e2e8f0_100%)] px-4 py-4 sm:px-5 lg:px-6">
-      <div className="mx-auto flex min-h-[calc(100dvh-2rem)] max-w-5xl items-center justify-center">
+      <div className={`mx-auto flex min-h-[calc(100dvh-2rem)] ${shellMaxWidthClassName} items-center justify-center`}>
         <div className="grid w-full overflow-hidden rounded-[28px] border border-white/80 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur lg:grid-cols-[0.95fr_1.05fr]">
           <section className="hidden bg-[linear-gradient(165deg,#dbeafe_0%,#bfdbfe_45%,#7dd3fc_100%)] p-8 text-sky-950 lg:flex lg:flex-col lg:justify-between">
             <div className="space-y-5">
@@ -514,7 +516,7 @@ export function AuthModal({
           </section>
 
           <section className="p-5 sm:p-6 lg:p-7">
-            <div className="mx-auto flex w-full max-w-[540px] flex-col gap-5">
+            <div className={`mx-auto flex w-full ${formMaxWidthClassName} flex-col gap-5`}>
               <div className="space-y-2 text-center lg:text-left">
                 <div className="inline-flex items-center justify-center gap-2 text-sm text-slate-500 lg:justify-start">
                   <Sparkles className="size-4" />
@@ -625,7 +627,7 @@ export function AuthModal({
                   <SocialDivider label="Or sign up with email" />
 
                   <form onSubmit={handleSignup} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="signup-first-name" className="text-slate-700">First Name</Label>
                         <Input
