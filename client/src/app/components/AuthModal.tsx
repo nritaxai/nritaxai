@@ -479,48 +479,48 @@ export function AuthModal({
   );
 
   return (
-    <div className="min-h-dvh bg-[radial-gradient(circle_at_top,#e0f2fe_0%,#f8fafc_45%,#e2e8f0_100%)] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100dvh-3rem)] max-w-6xl items-center justify-center">
-        <div className="grid w-full overflow-hidden rounded-[32px] border border-white/70 bg-white/95 shadow-[0_30px_90px_rgba(15,23,42,0.16)] backdrop-blur lg:grid-cols-[1.1fr_0.9fr]">
-          <section className="hidden bg-[linear-gradient(160deg,#0f172a_0%,#0f3b82_60%,#38bdf8_100%)] p-10 text-white lg:flex lg:flex-col lg:justify-between">
-            <div className="space-y-6">
+    <div className="min-h-dvh bg-[radial-gradient(circle_at_top,#e0f2fe_0%,#f8fafc_45%,#e2e8f0_100%)] px-4 py-4 sm:px-5 lg:px-6">
+      <div className="mx-auto flex min-h-[calc(100dvh-2rem)] max-w-5xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-[28px] border border-white/80 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.12)] backdrop-blur lg:grid-cols-[0.95fr_1.05fr]">
+          <section className="hidden bg-[linear-gradient(165deg,#dbeafe_0%,#bfdbfe_45%,#7dd3fc_100%)] p-8 text-sky-950 lg:flex lg:flex-col lg:justify-between">
+            <div className="space-y-5">
               <button
                 type="button"
                 onClick={() => navigate("/home")}
-                className="inline-flex items-center gap-2 text-sm font-medium text-white/80 transition hover:text-white"
+                className="inline-flex items-center gap-2 text-sm font-medium text-sky-900/75 transition hover:text-sky-950"
               >
                 <ArrowLeft className="size-4" />
                 Back to home
               </button>
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-[0.18em]">
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-900/10 bg-white/35 px-4 py-2 text-[11px] font-semibold tracking-[0.18em] text-sky-900/80">
                 <Sparkles className="size-4" />
                 SECURE CLIENT ACCESS
               </div>
-              <div className="space-y-4">
-                <h1 className="text-4xl font-semibold leading-tight">
+              <div className="space-y-3">
+                <h1 className="text-[2rem] font-semibold leading-tight">
                   {mode === "signup" ? "Create your NRITAX.AI account" : "Welcome back to NRITAX.AI"}
                 </h1>
-                <p className="max-w-md text-base leading-7 text-white/78">
+                <p className="max-w-sm text-[15px] leading-7 text-sky-950/72">
                   {mode === "signup"
                     ? "Create your account and continue directly into your NRI tax workflow with faster onboarding."
                     : "Access AI-powered global tax guidance for NRIs with your secure account."}
                 </p>
               </div>
             </div>
-            <div className="space-y-3 text-sm text-white/72">
+            <div className="space-y-2 text-sm text-sky-950/68">
               <p>AI-powered guidance for NRIs, built for cross-border tax workflows.</p>
               <p>Powered by {COMPANY_LEGAL_NAME}.</p>
             </div>
           </section>
 
-          <section className="p-6 sm:p-8 lg:p-10">
-            <div className="mx-auto flex w-full max-w-[600px] flex-col gap-6">
-              <div className="space-y-3 text-center lg:text-left">
+          <section className="p-5 sm:p-6 lg:p-7">
+            <div className="mx-auto flex w-full max-w-[540px] flex-col gap-5">
+              <div className="space-y-2 text-center lg:text-left">
                 <div className="inline-flex items-center justify-center gap-2 text-sm text-slate-500 lg:justify-start">
                   <Sparkles className="size-4" />
                   <span className="tracking-wide">SECURE CLIENT ACCESS</span>
                 </div>
-                <h2 className="text-3xl font-semibold text-slate-900">
+                <h2 className="text-[2rem] font-semibold text-slate-900">
                   {mode === "signup" ? "Create your account" : "Login to NRITAX.AI"}
                 </h2>
                 <p className="text-sm leading-6 text-slate-500">
@@ -530,8 +530,8 @@ export function AuthModal({
                 </p>
               </div>
 
-              <Tabs value={mode} onValueChange={(value) => switchMode(value === "signup" ? "signup" : "login")} className="w-full gap-6">
-                <TabsList className="grid h-12 w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
+              <Tabs value={mode} onValueChange={(value) => switchMode(value === "signup" ? "signup" : "login")} className="w-full gap-5">
+                <TabsList className="grid h-11 w-full grid-cols-2 rounded-2xl bg-slate-100 p-1">
                   <TabsTrigger value="login" className="rounded-[14px] data-[state=active]:bg-white data-[state=active]:text-slate-900">
                     Login
                   </TabsTrigger>
@@ -540,7 +540,7 @@ export function AuthModal({
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="login" className="space-y-5">
+                <TabsContent value="login" className="space-y-4">
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="login-email" className="text-slate-700">Email Address</Label>
@@ -550,7 +550,7 @@ export function AuthModal({
                         placeholder="name@company.com"
                         value={loginData.email}
                         onChange={(event) => setLoginData((prev) => ({ ...prev, email: event.target.value }))}
-                        className="h-12 rounded-2xl border-slate-200"
+                        className="h-11 rounded-2xl border-slate-200"
                       />
                     </div>
                     <div className="space-y-2">
@@ -561,11 +561,11 @@ export function AuthModal({
                         placeholder="Enter your password"
                         value={loginData.password}
                         onChange={(event) => setLoginData((prev) => ({ ...prev, password: event.target.value }))}
-                        className="h-12 rounded-2xl border-slate-200"
+                        className="h-11 rounded-2xl border-slate-200"
                       />
                     </div>
                     {loginError ? <p className="text-sm text-rose-600">{loginError}</p> : null}
-                    <Button type="submit" className="h-12 w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800" disabled={loading}>
+                    <Button type="submit" className="h-11 w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800" disabled={loading}>
                       {loading ? "Logging in..." : "Login"}
                     </Button>
                     <button
@@ -601,7 +601,7 @@ export function AuthModal({
                   </div>
                 </TabsContent>
 
-                <TabsContent value="signup" className="space-y-5">
+                <TabsContent value="signup" className="space-y-4">
                   <div className="space-y-3">
                     {canUseGoogleAuth ? renderGoogleButton("signup") : null}
                     {canUseLinkedInAuth ? (
@@ -634,7 +634,7 @@ export function AuthModal({
                           placeholder="John"
                           value={signupData.firstName}
                           onChange={(event) => setSignupData((prev) => ({ ...prev, firstName: event.target.value }))}
-                          className="h-12 rounded-2xl border-slate-200"
+                          className="h-11 rounded-2xl border-slate-200"
                         />
                       </div>
                       <div className="space-y-2">
@@ -645,7 +645,7 @@ export function AuthModal({
                           placeholder="Doe"
                           value={signupData.lastName}
                           onChange={(event) => setSignupData((prev) => ({ ...prev, lastName: event.target.value }))}
-                          className="h-12 rounded-2xl border-slate-200"
+                          className="h-11 rounded-2xl border-slate-200"
                         />
                       </div>
                     </div>
@@ -658,7 +658,7 @@ export function AuthModal({
                         placeholder="name@company.com"
                         value={signupData.email}
                         onChange={(event) => setSignupData((prev) => ({ ...prev, email: event.target.value }))}
-                        className="h-12 rounded-2xl border-slate-200"
+                        className="h-11 rounded-2xl border-slate-200"
                       />
                     </div>
 
@@ -668,7 +668,7 @@ export function AuthModal({
                         id="signup-country"
                         value={signupData.countryCode}
                         onChange={(event) => setSignupData((prev) => ({ ...prev, countryCode: event.target.value }))}
-                        className="h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
+                        className="h-11 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-900 focus:border-slate-400 focus:outline-none"
                       >
                         <option value="">Select your country</option>
                         {COUNTRY_OPTIONS.map((country) => (
@@ -687,7 +687,7 @@ export function AuthModal({
                         placeholder="https://www.linkedin.com/in/your-profile"
                         value={signupData.linkedinProfile}
                         onChange={(event) => setSignupData((prev) => ({ ...prev, linkedinProfile: event.target.value }))}
-                        className="h-12 rounded-2xl border-slate-200"
+                        className="h-11 rounded-2xl border-slate-200"
                       />
                     </div>
 
@@ -699,7 +699,7 @@ export function AuthModal({
                         placeholder="Create a password"
                         value={signupData.password}
                         onChange={(event) => setSignupData((prev) => ({ ...prev, password: event.target.value }))}
-                        className="h-12 rounded-2xl border-slate-200"
+                        className="h-11 rounded-2xl border-slate-200"
                       />
                     </div>
 
@@ -711,12 +711,12 @@ export function AuthModal({
                         placeholder="Re-enter your password"
                         value={signupData.confirmPassword}
                         onChange={(event) => setSignupData((prev) => ({ ...prev, confirmPassword: event.target.value }))}
-                        className="h-12 rounded-2xl border-slate-200"
+                        className="h-11 rounded-2xl border-slate-200"
                       />
                       <p className="text-xs text-slate-400">{passwordHint}</p>
                     </div>
 
-                    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
                       <Checkbox
                         checked={signupData.termsAccepted}
                         onCheckedChange={(checked) =>
@@ -734,7 +734,7 @@ export function AuthModal({
 
                     <Button
                       type="submit"
-                      className="h-12 w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
+                      className="h-11 w-full rounded-2xl bg-slate-900 text-white hover:bg-slate-800"
                       disabled={loading || !signupCanContinue}
                     >
                       {loading ? "Creating account..." : "Create Account"}
