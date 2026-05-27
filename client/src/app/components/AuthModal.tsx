@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { GoogleLogin } from "@react-oauth/google";
 import { Apple, ArrowLeft, Linkedin, Sparkles } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { AuthPopup } from "./AuthPopup";
 import { Button } from "./ui/button";
@@ -727,16 +727,26 @@ export function AuthModal({
                         }
                         className="mt-0.5"
                       />
-                      <Label htmlFor="signup-terms" className="cursor-pointer text-sm font-normal leading-6 text-slate-600">
-                        I accept the{" "}
-                        <a href="/terms-and-conditions" className="font-medium text-blue-600 hover:underline">
-                          Terms of Service
-                        </a>{" "}
-                        and{" "}
-                        <a href="/privacy-policy" className="font-medium text-blue-600 hover:underline">
-                          Privacy Policy
-                        </a>.
-                      </Label>
+                      <div className="space-y-1 leading-6">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSignupData((prev) => ({ ...prev, termsAccepted: !prev.termsAccepted }))
+                          }
+                          className="text-left text-sm font-normal text-slate-600"
+                        >
+                          I accept the Terms of Service and Privacy Policy.
+                        </button>
+                        <div className="flex flex-wrap items-center gap-x-2 text-sm">
+                          <Link to="/terms-and-conditions" className="font-medium text-blue-600 hover:underline">
+                            Terms of Service
+                          </Link>
+                          <span className="text-slate-400">and</span>
+                          <Link to="/privacy-policy" className="font-medium text-blue-600 hover:underline">
+                            Privacy Policy
+                          </Link>
+                        </div>
+                      </div>
                     </div>
 
                     {signupError ? <p className="text-sm text-rose-600">{signupError}</p> : null}
