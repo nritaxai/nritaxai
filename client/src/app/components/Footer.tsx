@@ -65,7 +65,7 @@ const footerColumns: FooterColumn[] = [
     heading: "Account",
     links: [
       { label: "Login", to: "/login" },
-      { label: "Signup", to: "/login" },
+      { label: "Signup", to: "/login?mode=signup" },
       { label: "Partner With Us", to: "/join-as-expert" },
     ],
   },

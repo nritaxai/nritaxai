@@ -106,7 +106,7 @@ section[class*="dark"],
 [class*="alert-bar"],
 [class*="announcement"] {
   color: #f8fafc !important;
-  background-color: #0f172a !important;
+  background-color: #0b1f3a !important;
 }
 
 [class*="marquee"] [class*="badge"],
@@ -116,28 +116,28 @@ section[class*="dark"],
 [class*="ticker"] span[class*="alert"],
 [class*="ticker"] span[class*="label"] {
   color: #ffffff !important;
-  background-color: #1e3a8a !important;
-  border: 1px solid #3b82f6 !important;
+  background-color: #1d4ed8 !important;
+  border: 1px solid #93c5fd !important;
   font-weight: 600 !important;
 }
 
 [class*="ticker"] [class*="country"],
 [class*="ticker"] [class*="region"],
 [class*="marquee"] [class*="country"] {
-  color: #dbeafe !important;
-  background-color: #1e40af !important;
+  color: #eff6ff !important;
+  background-color: #164e63 !important;
 }
 
 [class*="ticker"] [class*="title"],
 [class*="ticker"] [class*="text"],
 [class*="marquee"] p,
 [class*="marquee"] span:not([class*="badge"]):not([class*="tag"]) {
-  color: #e2e8f0 !important;
+  color: #ffffff !important;
 }
 
 [class*="ticker"] [class*="date"],
 [class*="marquee"] [class*="date"] {
-  color: #94a3b8 !important;
+  color: #dbeafe !important;
 }
 
 [class*="card"],

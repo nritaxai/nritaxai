@@ -61,7 +61,9 @@ export function Header({ onLogin, onSignup }: HeaderProps) {
     { to: "/pricing", label: "Pricing" },
     { to: "/calculators", label: "Tax Calculator" },
   ] as const;
-  const showBackButton = !["/", "/home", "/hero", "/Hero"].includes(location.pathname);
+  const homeRoutes = new Set(["/", "/home", "/hero", "/Hero"]);
+  const isHomePage = homeRoutes.has(location.pathname);
+  const showBackButton = !isHomePage;
 
   const isNavItemActive = (to: string) => {
     const [path, hash] = to.split("#");
@@ -241,75 +243,81 @@ export function Header({ onLogin, onSignup }: HeaderProps) {
               </Link>
             </div>
 
-            <nav className="hidden items-center gap-5 md:flex lg:gap-7">
-              {navItems.map((item) => {
-                const isActive = isNavItemActive(item.to);
-                return (
-                  <motion.div
-                    key={item.to}
-                    whileHover={shouldReduceMotion ? undefined : { y: -1 }}
-                    transition={{ duration: 0.2, ease: PREMIUM_EASE }}
-                  >
-                    <Link
-                      to={item.to}
-                      className={`relative rounded-full px-1 py-2 text-sm font-medium leading-5 transition-colors ${
-                        isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
-                      }`}
-                    >
-                      {renderTextWithShortForms(item.label)}
-                      <motion.span
-                        className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-blue-600"
-                        initial={false}
-                        animate={{ scaleX: isActive ? 1 : 0.45, opacity: isActive ? 1 : 0 }}
-                        whileHover={shouldReduceMotion ? undefined : { scaleX: 1, opacity: 1 }}
-                        transition={{ duration: 0.22, ease: PREMIUM_EASE }}
-                        style={{ originX: 0.5 }}
-                      />
-                    </Link>
-                  </motion.div>
-                );
-              })}
-            </nav>
+            {isHomePage ? (
+              <>
+                <nav className="hidden items-center gap-5 md:flex lg:gap-7">
+                  {navItems.map((item) => {
+                    const isActive = isNavItemActive(item.to);
+                    return (
+                      <motion.div
+                        key={item.to}
+                        whileHover={shouldReduceMotion ? undefined : { y: -1 }}
+                        transition={{ duration: 0.2, ease: PREMIUM_EASE }}
+                      >
+                        <Link
+                          to={item.to}
+                          className={`relative rounded-full px-1 py-2 text-sm font-medium leading-5 transition-colors ${
+                            isActive ? "text-blue-700" : "text-slate-900 hover:text-blue-700"
+                          }`}
+                        >
+                          {renderTextWithShortForms(item.label)}
+                          <motion.span
+                            className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-blue-600"
+                            initial={false}
+                            animate={{ scaleX: isActive ? 1 : 0.45, opacity: isActive ? 1 : 0 }}
+                            whileHover={shouldReduceMotion ? undefined : { scaleX: 1, opacity: 1 }}
+                            transition={{ duration: 0.22, ease: PREMIUM_EASE }}
+                            style={{ originX: 0.5 }}
+                          />
+                        </Link>
+                      </motion.div>
+                    );
+                  })}
+                </nav>
 
-            <div className="hidden items-center md:flex">
-              {user ? (
-                <>
-                  <Link
-                    to="/profile"
-                    className="flex items-center gap-3 text-sm font-medium text-slate-700 transition-colors hover:text-blue-700"
-                    aria-label="Open profile"
-                    title="Open profile"
-                  >
-                    {renderUserAvatar("h-11 w-11", "size-5")}
-                    <span className="leading-5">WELCOME! {user.name}</span>
-                  </Link>
-                  <Button
-                    variant="outline"
-                    onClick={handleLogout}
-                    className="h-10 border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
-                  >
-                    <LogOut className="mr-2 size-4" />
-                    Logout
-                  </Button>
-                </>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <Button
-                    variant="ghost"
-                    onClick={onLogin}
-                    className="h-11 rounded-full border border-slate-200/80 bg-white/80 px-5 text-slate-900 shadow-sm hover:bg-white"
-                  >
-                    Login
-                  </Button>
-                  <Button
-                    onClick={onSignup}
-                    className="h-11 rounded-full bg-[linear-gradient(135deg,#0F172A,#1D4ED8)] px-5 text-white shadow-[0_16px_34px_rgba(29,78,216,0.20)] hover:brightness-110"
-                  >
-                    Sign Up
-                  </Button>
+                <div className="hidden items-center md:flex">
+                  {user ? (
+                    <>
+                      <Link
+                        to="/profile"
+                        className="flex items-center gap-3 text-sm font-medium text-slate-700 transition-colors hover:text-blue-700"
+                        aria-label="Open profile"
+                        title="Open profile"
+                      >
+                        {renderUserAvatar("h-11 w-11", "size-5")}
+                        <span className="leading-5">WELCOME! {user.name}</span>
+                      </Link>
+                      <Button
+                        variant="outline"
+                        onClick={handleLogout}
+                        className="h-10 border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+                      >
+                        <LogOut className="mr-2 size-4" />
+                        Logout
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-3">
+                      <Button
+                        variant="ghost"
+                        onClick={onLogin}
+                        className="h-11 rounded-full border border-slate-200/80 bg-white/80 px-5 text-slate-900 shadow-sm hover:bg-white"
+                      >
+                        Login
+                      </Button>
+                      <Button
+                        onClick={onSignup}
+                        className="h-11 rounded-full bg-[linear-gradient(135deg,#0F172A,#1D4ED8)] px-5 text-white shadow-[0_16px_34px_rgba(29,78,216,0.20)] hover:brightness-110"
+                      >
+                        Signup
+                      </Button>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              </>
+            ) : (
+              <div className="hidden md:block" aria-hidden="true" />
+            )}
           </div>
         </div>
       </motion.div>
@@ -324,70 +332,78 @@ export function Header({ onLogin, onSignup }: HeaderProps) {
             className="border-b border-white/70 bg-white/92 py-4 backdrop-blur-xl md:hidden"
           >
             <div className="mx-auto max-w-6xl px-4">
-              <nav className="space-y-2">
-                {navItems.map((item) => {
-                  const isActive = isNavItemActive(item.to);
-                  return (
-                    <Link
-                      key={item.to}
-                      to={item.to}
-                      className={`block rounded-2xl px-4 py-3 text-sm font-medium leading-5 transition-colors ${
-                        isActive ? "bg-blue-50 text-blue-700" : "text-slate-800 hover:bg-slate-100 hover:text-blue-700"
-                      }`}
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      {renderTextWithShortForms(item.label)}
-                    </Link>
-                  );
-                })}
-              </nav>
+              {isHomePage ? (
+                <>
+                  <nav className="space-y-2">
+                    {navItems.map((item) => {
+                      const isActive = isNavItemActive(item.to);
+                      return (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          className={`block rounded-2xl px-4 py-3 text-sm font-medium leading-5 transition-colors ${
+                            isActive ? "bg-blue-50 text-blue-700" : "text-slate-800 hover:bg-slate-100 hover:text-blue-700"
+                          }`}
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          {renderTextWithShortForms(item.label)}
+                        </Link>
+                      );
+                    })}
+                  </nav>
 
-              <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
-                {user ? (
-                  <>
-                    <Link
-                      to="/profile"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 hover:text-blue-700"
-                    >
-                      {renderUserAvatar("h-10 w-10", "size-5")}
-                      <span>{user.name}</span>
-                    </Link>
-                    <Button
-                      variant="outline"
-                      onClick={handleLogout}
-                      className="w-full border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
-                    >
-                      <LogOut className="mr-2 size-4" />
-                      Logout
-                    </Button>
-                  </>
-                ) : (
-                  <div className="grid gap-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        onLogin();
-                      }}
-                      className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
-                    >
-                      <LogIn className="mr-2 size-4" />
-                      Login
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setMobileMenuOpen(false);
-                        onSignup();
-                      }}
-                      className="h-11 w-full justify-start rounded-2xl bg-[linear-gradient(135deg,#0F172A,#1D4ED8)] text-white shadow-[0_16px_34px_rgba(29,78,216,0.20)] hover:brightness-110"
-                    >
-                      <LogIn className="mr-2 size-4" />
-                      Sign Up
-                    </Button>
+                  <div className="mt-4 space-y-2 border-t border-slate-200 pt-4">
+                    {user ? (
+                      <>
+                        <Link
+                          to="/profile"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium text-slate-800 transition-colors hover:bg-slate-100 hover:text-blue-700"
+                        >
+                          {renderUserAvatar("h-10 w-10", "size-5")}
+                          <span>{user.name}</span>
+                        </Link>
+                        <Button
+                          variant="outline"
+                          onClick={handleLogout}
+                          className="w-full border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
+                        >
+                          <LogOut className="mr-2 size-4" />
+                          Logout
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="grid gap-2">
+                        <Button
+                          variant="ghost"
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            onLogin();
+                          }}
+                          className="h-11 w-full justify-start rounded-2xl border border-slate-200/80 bg-white text-slate-900 shadow-sm hover:bg-slate-50"
+                        >
+                          <LogIn className="mr-2 size-4" />
+                          Login
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setMobileMenuOpen(false);
+                            onSignup();
+                          }}
+                          className="h-11 w-full justify-start rounded-2xl bg-[linear-gradient(135deg,#0F172A,#1D4ED8)] text-white shadow-[0_16px_34px_rgba(29,78,216,0.20)] hover:brightness-110"
+                        >
+                          <LogIn className="mr-2 size-4" />
+                          Signup
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </>
+              ) : (
+                <p className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  Use the back button to return, or tap the logo to go home.
+                </p>
+              )}
             </div>
           </motion.div>
         )}

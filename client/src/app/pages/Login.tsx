@@ -20,6 +20,8 @@ export function Login() {
       ) : (
         <LoginModal
           initialMode={mode}
+          presentation="page"
+          disableClose
           onClose={() => navigate("/home")}
         />
       )}

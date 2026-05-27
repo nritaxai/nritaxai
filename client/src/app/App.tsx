@@ -465,7 +465,8 @@ export default function App() {
   }
 
   const isHeroRoute = location.pathname === "/" || location.pathname === "/hero" || location.pathname === "/Hero";
-  const isStandaloneRoute = isHeroRoute || location.pathname === "/reset-password";
+  const isStandaloneRoute =
+    isHeroRoute || location.pathname === "/reset-password" || (!isNative && !isIosNativeApp && location.pathname === "/login");
   const isYuktiRoute =
     location.pathname === "/yukti" ||
     location.pathname === "/ios-yukti" ||
@@ -507,7 +508,8 @@ export default function App() {
     location.pathname !== "/reset-password" &&
     location.pathname !== "/login" &&
     location.pathname !== "/";
-  const shouldShowNewsTicker = !isIosNativeApp && location.pathname === "/home";
+  const shouldShowNewsTicker = !isNative && !isIosNativeApp && location.pathname === "/home"; // Android only
+  const shouldShowYuktiWidget = !isStandaloneRoute && !isYuktiRoute && isAuthenticated;
   const nativeHomeRoute = isIosNativeApp ? <IOSHomePage /> : isNative ? (
     <AndroidLauncher />
   ) : (
@@ -518,7 +520,7 @@ export default function App() {
     : isNative
     ? (
       isAuthenticated ? (
-        <AndroidPageWrapper includeHeaderOffset={false}>
+        <AndroidPageWrapper includeHeaderOffset={false} includeBottomNavOffset={false} scrollable={true}>
           <AndroidHomePage onRequireLogin={() => navigate("/login")} />
         </AndroidPageWrapper>
       ) : <Navigate to="/login" replace />
@@ -569,7 +571,7 @@ export default function App() {
 
             <Route
               path="/calculators"
-              element={<Calculators onRequireLogin={() => setShowLoginModal(true)} />}
+              element={withPageScaffold(<Calculators onRequireLogin={() => setShowLoginModal(true)} />)}
             />
             <Route path="/Pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
             <Route path="/pricing" element={withPageScaffold(<Pricing onRequireLogin={() => setShowLoginModal(true)} />)} />
@@ -577,7 +579,7 @@ export default function App() {
               path="/checkout"
               element={withPageScaffold(<CheckoutPage onRequireLogin={() => setShowLoginModal(true)} />)}
             />
-            <Route path="/login" element={isNative ? <Login /> : isIosNativeApp ? <Login /> : withPageScaffold(<Login />)} />
+            <Route path="/login" element={<Login />} />
             <Route path="/reset-password" element={withPageScaffold(<ResetPassword />)} />
             <Route path="/profile" element={withPageScaffold(<Profile />)} />
             <Route path="/chat" element={isIosNativeApp ? <Chat onRequireLogin={() => setShowLoginModal(true)} /> : withPageScaffold(<Chat onRequireLogin={() => setShowLoginModal(true)} />)} />
@@ -585,7 +587,7 @@ export default function App() {
             <Route path="/compliance" element={withPageScaffold(<ComplianceStandards />)} />
             <Route path="/builder" element={withPageScaffold(<Builder />)} />
             <Route path="/consult" element={withPageScaffold(<Consult onRequireLogin={() => setShowLoginModal(true)} />)} />
-            <Route path="/join-as-expert" element={withPageScaffold(<JoinAsExpertPage />)} />
+            <Route path="/join-as-expert" element={isNative || isIosNativeApp ? withPageScaffold(<JoinAsExpertPage />) : <JoinAsExpertPage />} />
             <Route path="/reschedule" element={withPageScaffold(<Reschedule />)} />
             <Route path="/cancel" element={withPageScaffold(<Cancel />)} />
             <Route path="/privacy-policy" element={withPageScaffold(<PrivacyPolicy />)} />
@@ -598,7 +600,7 @@ export default function App() {
         </Suspense>
       </div>
 
-      {!isStandaloneRoute && !isYuktiRoute && isAuthenticated && <TigerBotAvatar />}
+      {!isNative && shouldShowYuktiWidget && <TigerBotAvatar />}
 
       {hasSiteHeader && <Footer />}
       {shouldShowAndroidBottomNav && <AndroidBottomNav />}

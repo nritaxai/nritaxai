@@ -1,4 +1,4 @@
-import { type ChangeEvent, type FormEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type DragEvent, type FormEvent, useEffect, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -177,6 +177,7 @@ export function JoinAsExpertPage() {
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const loading = uploadLoading || submitLoading;
 
   useEffect(() => {
@@ -266,6 +267,10 @@ export function JoinAsExpertPage() {
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
+    applyProfileFile(file);
+  };
+
+  const applyProfileFile = (file: File | null) => {
     const fileError = validateProfileFile(file);
 
     setProfileFile(fileError ? null : file);
@@ -291,6 +296,7 @@ export function JoinAsExpertPage() {
 
   const handleRemoveFile = () => {
     setProfileFile(null);
+    setIsDraggingFile(false);
     setErrorMessage("");
     setErrors((prev) => ({
       ...prev,
@@ -302,6 +308,26 @@ export function JoinAsExpertPage() {
     }
   };
 
+  const handleFileDragState = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (loading) return;
+    if (event.type === "dragenter" || event.type === "dragover") {
+      setIsDraggingFile(true);
+      return;
+    }
+    setIsDraggingFile(false);
+  };
+
+  const handleFileDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (loading) return;
+    setIsDraggingFile(false);
+    const file = event.dataTransfer.files?.[0] || null;
+    applyProfileFile(file);
+  };
+
   const refreshCaptchaWidget = (nextStatus: CaptchaStatus = "idle") => {
     setCaptchaToken("");
     setCaptchaStatus(nextStatus);
@@ -310,7 +336,6 @@ export function JoinAsExpertPage() {
 
   const handleCaptchaChange = (token: string | null) => {
     const normalizedToken = trimValue(token);
-    console.log("captchaToken", normalizedToken);
     setCaptchaToken(normalizedToken);
     setCaptchaStatus(normalizedToken ? "verified" : "idle");
     setErrors((prev) => ({
@@ -488,7 +513,6 @@ export function JoinAsExpertPage() {
       }
 
       formData.append("g-recaptcha-response", captchaToken);
-      console.log("captchaToken", captchaToken);
 
       debugLog("Submitting expert onboarding form.", {
         url: EXPERT_ONBOARDING_WEBHOOK,
@@ -532,6 +556,7 @@ export function JoinAsExpertPage() {
         setSubmittedName(normalizedValues.fullName);
         setValues(initialValues);
         setProfileFile(null);
+        setIsDraggingFile(false);
         setErrors({});
         setShowErrorBanner(false);
         setErrorMessage("");
@@ -589,13 +614,15 @@ export function JoinAsExpertPage() {
   const isCaptchaVerified = Boolean(captchaToken) && captchaStatus === "verified";
   const isSubmitDisabled = loading || !isCaptchaVerified || !RECAPTCHA_SITE_KEY;
   const showSuccess = submitSuccess && Boolean(successMessage);
+  const firstSectionCardClassName =
+    "rounded-[24px] border border-white/70 bg-white/78 shadow-[0_18px_50px_rgba(15,23,42,0.08)] backdrop-blur";
 
   return (
     <div
       className={
         IS_IOS_NATIVE_APP
           ? "nritax-ios-join-page overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(59,130,246,0.18),_transparent_38%),linear-gradient(180deg,#eff6ff_0%,#f8fafc_48%,#e2e8f0_100%)] font-sans text-slate-950"
-          : "overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_35%),linear-gradient(180deg,#eff6ff_0%,#f8fafc_46%,#e2e8f0_100%)] py-10 font-sans text-slate-950"
+          : "overflow-x-hidden bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.16),_transparent_35%),linear-gradient(180deg,#eff6ff_0%,#f8fafc_46%,#e2e8f0_100%)] py-6 font-sans text-slate-950 lg:py-8"
       }
     >
       <Toaster position="top-right" richColors closeButton />
@@ -625,8 +652,8 @@ export function JoinAsExpertPage() {
         </style>
       ) : null}
 
-      <div className={IS_IOS_NATIVE_APP ? "mx-auto w-full max-w-full px-3" : "mx-auto max-w-6xl px-4 sm:px-6 lg:px-8"}>
-        <div className={IS_IOS_NATIVE_APP ? "mb-5 w-full max-w-full" : "mb-10 max-w-4xl"}>
+      <div className={IS_IOS_NATIVE_APP ? "mx-auto w-full max-w-full px-3" : "mx-auto max-w-7xl px-4 sm:px-6 lg:px-8"}>
+        <div className={IS_IOS_NATIVE_APP ? "mb-5 w-full max-w-full" : "mb-6 max-w-4xl lg:mb-8"}>
           <p className="text-sm font-semibold uppercase tracking-[0.28em] text-sky-700">Expert Onboarding</p>
           <h1 className={IS_IOS_NATIVE_APP ? "mt-3 text-3xl font-semibold text-slate-950" : "mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl"}>
             Secure expert onboarding for NRITAX.AI
@@ -650,6 +677,7 @@ export function JoinAsExpertPage() {
           </div>
         </div>
 
+        <div className={IS_IOS_NATIVE_APP ? "space-y-4" : "grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]"}>
         <Card className="overflow-hidden border border-white/60 bg-white/72 shadow-[0_20px_80px_rgba(15,23,42,0.12)] backdrop-blur-xl">
           <CardHeader className={IS_IOS_NATIVE_APP ? "px-4 py-5" : "border-b border-slate-200/70 px-6 py-7 sm:px-8"}>
             <CardTitle className={IS_IOS_NATIVE_APP ? "text-xl text-slate-950" : "text-2xl font-semibold text-slate-950"}>
@@ -660,7 +688,7 @@ export function JoinAsExpertPage() {
             </CardDescription>
           </CardHeader>
 
-          <CardContent className={IS_IOS_NATIVE_APP ? "px-4 pb-5 pt-5" : "px-6 pb-8 pt-6 sm:px-8"}>
+          <CardContent className={IS_IOS_NATIVE_APP ? "px-4 pb-5 pt-5" : "px-6 pb-6 pt-5 sm:px-8"}>
             {showSuccess ? (
               <div className="rounded-[24px] border border-emerald-200/80 bg-[linear-gradient(135deg,rgba(236,253,245,0.96),rgba(219,234,254,0.88))] p-6 shadow-[0_20px_45px_rgba(16,185,129,0.10)]">
                 <div className="flex items-start gap-4">
@@ -698,8 +726,8 @@ export function JoinAsExpertPage() {
                   </div>
                 ) : null}
 
-                <form ref={formRef} onSubmit={handleSubmit} className={IS_IOS_NATIVE_APP ? "w-full max-w-full space-y-5" : "space-y-8"} noValidate>
-                  <div className={IS_IOS_NATIVE_APP ? "grid w-full max-w-full grid-cols-1 gap-4" : "grid gap-5 md:grid-cols-2"}>
+                <form ref={formRef} onSubmit={handleSubmit} className={IS_IOS_NATIVE_APP ? "w-full max-w-full space-y-5" : "space-y-6"} noValidate>
+                  <div className={IS_IOS_NATIVE_APP ? "grid w-full max-w-full grid-cols-1 gap-4" : "grid gap-4 md:grid-cols-2"}>
                     <div className="space-y-2">
                       <Label htmlFor="fullName" className="text-sm font-medium text-slate-900">Full Name {requiredAsterisk}</Label>
                       <Input
@@ -907,12 +935,22 @@ export function JoinAsExpertPage() {
                       <Label htmlFor="profile" className="text-sm font-medium text-slate-900">Profile {requiredAsterisk}</Label>
                       <div
                         ref={setFieldRef("profile") as never}
-                        className={`rounded-[22px] border border-dashed bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.88))] p-5 shadow-inner transition duration-200 ${errors.profile ? "border-rose-400" : "border-sky-200/80"}`}
+                        onDragEnter={handleFileDragState}
+                        onDragOver={handleFileDragState}
+                        onDragLeave={handleFileDragState}
+                        onDrop={handleFileDrop}
+                        className={`rounded-[22px] border border-dashed bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(239,246,255,0.88))] p-5 shadow-inner transition duration-200 ${
+                          errors.profile
+                            ? "border-rose-400"
+                            : isDraggingFile
+                              ? "border-sky-500 bg-[linear-gradient(180deg,rgba(239,246,255,0.98),rgba(219,234,254,0.94))]"
+                              : "border-sky-200/80"
+                        }`}
                       >
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="text-sm font-semibold text-slate-900">Secure resume upload</p>
-                            <p className="mt-1 text-xs text-slate-600">PDF, DOC, or DOCX only. Maximum file size: 10 MB.</p>
+                            <p className="mt-1 text-xs text-slate-600">Drag and drop your file here, or choose a file manually. PDF, DOC, or DOCX only. Maximum file size: 10 MB.</p>
                           </div>
                           <Button
                             type="button"
@@ -956,14 +994,18 @@ export function JoinAsExpertPage() {
                               Remove
                             </button>
                           </div>
-                        ) : null}
+                        ) : (
+                          <div className="mt-4 rounded-2xl border border-sky-100 bg-white/80 px-4 py-3 text-xs leading-5 text-slate-600">
+                            Accepted file types: `.pdf`, `.doc`, `.docx`. The uploaded profile is used only for secure onboarding review.
+                          </div>
+                        )}
 
                         {errors.profile ? <p id={getFieldErrorId("profile")} className={errorMessageClassName}>{errors.profile}</p> : null}
                       </div>
                     </div>
                   </div>
 
-                  <div className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(255,255,255,0.72))] p-5 shadow-inner">
+                  <div className="rounded-[22px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(255,255,255,0.72))] p-4 sm:p-5 shadow-inner">
                     <div
                       ref={setFieldRef("captcha") as never}
                       className={`rounded-2xl border px-4 py-4 transition duration-200 ${
@@ -1096,6 +1138,31 @@ export function JoinAsExpertPage() {
             )}
           </CardContent>
         </Card>
+        {!IS_IOS_NATIVE_APP ? (
+          <aside className="space-y-4 xl:sticky xl:top-28">
+            <div className={firstSectionCardClassName}>
+              <div className="px-5 py-5">
+                <p className="text-sm font-semibold text-slate-950">What happens next</p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>1. Share your details and upload your professional profile.</p>
+                  <p>2. Complete the visible CAPTCHA check before submission.</p>
+                  <p>3. NRITAX.AI reviews your credentials and reaches out with activation steps.</p>
+                </div>
+              </div>
+            </div>
+            <div className={firstSectionCardClassName}>
+              <div className="px-5 py-5">
+                <p className="text-sm font-semibold text-slate-950">Before you submit</p>
+                <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>Keep your membership number and qualification details ready.</p>
+                  <p>Use a profile file under 10 MB in PDF, DOC, or DOCX format.</p>
+                  <p>The submit button stays disabled until the CAPTCHA is completed.</p>
+                </div>
+              </div>
+            </div>
+          </aside>
+        ) : null}
+        </div>
       </div>
     </div>
   );

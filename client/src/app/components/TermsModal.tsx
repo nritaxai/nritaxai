@@ -16,16 +16,20 @@ export function TermsModal({
   const [checked, setChecked] = useState(false);
   const [hasScrolled, setHasScrolled] = useState(false);
   const contentRef = useRef<HTMLDivElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const previouslyFocusedRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (isOpen) {
       setChecked(false);
       setHasScrolled(false);
+      previouslyFocusedRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       document.body.style.overflow = "hidden";
     }
 
     return () => {
       document.body.style.overflow = "auto";
+      previouslyFocusedRef.current?.focus?.();
     };
   }, [isOpen]);
 
@@ -33,6 +37,33 @@ export function TermsModal({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         onClose();
+        return;
+      }
+
+      if (event.key !== "Tab") return;
+      const dialog = dialogRef.current;
+      if (!dialog) return;
+
+      const focusableElements = Array.from(
+        dialog.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+        )
+      );
+      if (!focusableElements.length) return;
+
+      const first = focusableElements[0];
+      const last = focusableElements[focusableElements.length - 1];
+      const activeElement = document.activeElement as HTMLElement | null;
+
+      if (event.shiftKey && (!activeElement || activeElement === first)) {
+        event.preventDefault();
+        last.focus();
+        return;
+      }
+
+      if (!event.shiftKey && (!activeElement || activeElement === last)) {
+        event.preventDefault();
+        first.focus();
       }
     };
 
@@ -44,6 +75,19 @@ export function TermsModal({
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const timeoutId = window.setTimeout(() => {
+      const focusableElement = dialogRef.current?.querySelector<HTMLElement>(
+        'button:not([disabled]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      );
+      focusableElement?.focus();
+    }, 20);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isOpen, type]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -100,7 +144,10 @@ export function TermsModal({
         }
       }}
     >
-      <div className="animate-fadeIn relative z-[60] flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+      <div
+        ref={dialogRef}
+        className="animate-fadeIn relative z-[60] flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
+      >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
           <h2 id="terms-modal-title" className="text-lg font-semibold text-slate-900">
             {title}
