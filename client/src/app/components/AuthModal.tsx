@@ -718,19 +718,26 @@ export function AuthModal({
                       <p className="text-xs text-slate-400">{passwordHint}</p>
                     </div>
 
-                    <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
+                    <div className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm text-slate-600">
                       <Checkbox
+                        id="signup-terms"
                         checked={signupData.termsAccepted}
                         onCheckedChange={(checked) =>
                           setSignupData((prev) => ({ ...prev, termsAccepted: checked === true }))
                         }
                         className="mt-0.5"
                       />
-                      <span>
-                        I accept the <a href="/terms-and-conditions" className="font-medium text-blue-600 hover:underline">Terms of Service</a> and{" "}
-                        <a href="/privacy-policy" className="font-medium text-blue-600 hover:underline">Privacy Policy</a>.
-                      </span>
-                    </label>
+                      <Label htmlFor="signup-terms" className="cursor-pointer text-sm font-normal leading-6 text-slate-600">
+                        I accept the{" "}
+                        <a href="/terms-and-conditions" className="font-medium text-blue-600 hover:underline">
+                          Terms of Service
+                        </a>{" "}
+                        and{" "}
+                        <a href="/privacy-policy" className="font-medium text-blue-600 hover:underline">
+                          Privacy Policy
+                        </a>.
+                      </Label>
+                    </div>
 
                     {signupError ? <p className="text-sm text-rose-600">{signupError}</p> : null}
 
