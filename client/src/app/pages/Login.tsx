@@ -1,6 +1,6 @@
 import { Capacitor } from "@capacitor/core";
 import { AndroidLoginScreen } from "../../components/AndroidLoginScreen";
-import { LoginModal } from "../components/LoginModal";
+import { AuthModal } from "../components/AuthModal";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 export function Login() {
@@ -19,17 +19,14 @@ export function Login() {
           onLoginSuccess={() => navigate("/home", { replace: true })}
         />
       ) : (
-        <LoginModal
+        <AuthModal
           initialMode={mode}
-          presentation="page"
-          disableClose
           redirectTo={redirectTo}
           onModeChange={(nextMode) => {
             const params = new URLSearchParams(searchParams);
             params.set("mode", nextMode);
             setSearchParams(params, { replace: true });
           }}
-          onClose={() => navigate("/home")}
         />
       )}
     </div>
