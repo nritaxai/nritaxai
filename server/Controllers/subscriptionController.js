@@ -207,12 +207,6 @@ const loadActivePromoCode = async ({ code, billing, planKey }) => {
   if (promo.status !== "active") {
     return { error: "This promo code has already been used or is inactive." };
   }
-  if (promo.planKey !== planKey) {
-    return { error: "This promo code is not valid for the selected plan." };
-  }
-  if (promo.billing !== billing) {
-    return { error: `This promo code is valid only for ${promo.billing} billing.` };
-  }
 
   return { promo, presentation: buildPromoPresentation(promo) };
 };
