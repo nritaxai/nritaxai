@@ -256,10 +256,6 @@ export default function App() {
 
     sessionStorage.removeItem("auth_popup");
     sessionStorage.removeItem("subscription_popup");
-    if (isTransientWelcomeMessage(message)) {
-      setSuccessPopup(null);
-      return;
-    }
 
     setSuccessPopup(message);
 
