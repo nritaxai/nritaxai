@@ -1171,14 +1171,6 @@ export const validatePromoCode = async (req, res) => {
       });
     }
 
-    const existingPromoRedemption = await findExistingPromoRedemptionForUser(user);
-    if (existingPromoRedemption) {
-      return res.status(409).json({
-        success: false,
-        message: `You have already redeemed promo code ${existingPromoRedemption.code}. Each user can redeem only one promo code.`,
-      });
-    }
-
     const promoResult = await loadActivePromoCode({
       code: promoCode,
       billing,
