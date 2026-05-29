@@ -411,16 +411,6 @@ export const createSubscription = async (req, res) => {
     });
     const displayCurrency = requestedDisplayCurrency || countryPolicy.billingCurrency || "INR";
 
-    if (promoCode) {
-      const existingPromoRedemption = await findExistingPromoRedemptionForUser(user);
-      if (existingPromoRedemption) {
-        return res.status(409).json({
-          success: false,
-          message: `You have already redeemed promo code ${existingPromoRedemption.code}. Each user can redeem only one promo code.`,
-        });
-      }
-    }
-
     const discountPercent = promoPresentation?.discountPercent || 0;
     const discountPaise = promoPresentation ? baseAmountInPaise : 0;
     const amountInPaise = promoPresentation ? 0 : baseAmountInPaise;
