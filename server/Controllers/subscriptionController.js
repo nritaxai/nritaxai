@@ -1129,6 +1129,7 @@ export const razorpayWebhook = async (req, res) => {
 
 export const validatePromoCode = async (req, res) => {
   try {
+    console.log("validatePromoCode called with body:", req.body);
     const meta = resolvePlanMeta(req.body || {});
     if (!meta) {
       return res.status(400).json({
@@ -1139,6 +1140,7 @@ export const validatePromoCode = async (req, res) => {
 
     const billing = String(req.body?.billing || "monthly").toLowerCase();
     const promoCode = String(req.body?.promoCode || "").trim().toUpperCase();
+    console.log("validatePromoCode parsed:", { billing, promoCode, planKey: meta.planKey });
 
     if (!promoCode) {
       return res.status(400).json({
@@ -1154,12 +1156,14 @@ export const validatePromoCode = async (req, res) => {
         message: "User not found",
       });
     }
+    console.log("validatePromoCode user found:", user._id);
 
     const promoResult = await loadActivePromoCode({
       code: promoCode,
       billing,
       planKey: meta.planKey,
     });
+    console.log("validatePromoCode result:", promoResult);
     if (promoResult?.error || !promoResult.presentation) {
       return res.status(400).json({
         success: false,
