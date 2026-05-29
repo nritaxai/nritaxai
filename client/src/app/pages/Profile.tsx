@@ -317,8 +317,13 @@ export function Profile() {
       } else {
         const data = profileResponse.value?.data;
         if (!data) {
-          setProfileLoadFailed(true);
-          setError("Unable to load profile data.");
+          setProfile((current) => {
+            if (!current) {
+              setProfileLoadFailed(true);
+              setError("Unable to load profile data.");
+            }
+            return current;
+          });
         } else {
           applyProfileData(data, subscription);
           void fetchSubscription();
