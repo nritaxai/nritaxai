@@ -67,6 +67,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
   const isAndroidNative = Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const firstName = useMemo(() => {
     const parts = userName.trim().split(/\s+/);
@@ -133,8 +134,8 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
             zIndex: 9999,
             padding: "12px 14px",
             paddingTop: "calc(env(safe-area-inset-top, 0px) + 12px)",
-            background: "rgba(255,255,255,0.08)",
-            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            background: "rgba(255,255,255,0.6)",
+            borderBottom: "1px solid rgba(59,130,246,0.4)",
             backdropFilter: "blur(10px)",
           }}
         >
@@ -145,7 +146,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                   width: "32px",
                   height: "32px",
                   borderRadius: "999px",
-                  background: "rgba(255,255,255,0.2)",
+                  background: "rgba(37,99,235,0.2)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
@@ -179,8 +180,8 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
         <div style={{ padding: "12px 14px 16px", display: "flex", flexDirection: "column", flex: 1 }}>
           <div
             style={{
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.6)",
+              border: "1px solid rgba(59,130,246,0.4)",
               borderRadius: "10px",
               color: ANDROID_THEME.primaryText,
               padding: "10px 12px",
@@ -190,9 +191,22 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
             }}
           >
             <Search size={14} color={ANDROID_THEME.secondaryText} />
-            <span style={{ fontSize: "12px", color: ANDROID_THEME.mutedText }}>
-              Search tax questions, tools, or reports
-            </span>
+            <input
+              type="text"
+              placeholder="Search tax questions, tools, or reports"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                border: "none",
+                outline: "none",
+                background: "transparent",
+                color: ANDROID_THEME.primaryText,
+                fontSize: "12px",
+                fontFamily: ANDROID_THEME.fontFamily,
+                flex: 1,
+                padding: 0,
+              }}
+            />
           </div>
 
           <div style={{ marginTop: "18px", fontSize: "13px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
@@ -256,8 +270,8 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
           <div
             style={{
               marginTop: "14px",
-              background: "rgba(255,255,255,0.08)",
-              border: "1px solid rgba(255,255,255,0.15)",
+              background: "rgba(255,255,255,0.6)",
+              border: "1px solid rgba(59,130,246,0.4)",
               borderRadius: "14px",
               padding: "12px 10px",
               marginBottom: "8px",
@@ -295,8 +309,8 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
               <article
                 key={item.label + item.title}
                 style={{
-                  background: "rgba(255,255,255,0.1)",
-                  border: "1px solid rgba(255,255,255,0.18)",
+                  background: "rgba(255,255,255,0.6)",
+                  border: "1px solid rgba(59,130,246,0.4)",
                   borderRadius: "14px",
                   padding: "12px",
                 }}
@@ -306,7 +320,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                     display: "inline-flex",
                     padding: "4px 8px",
                     borderRadius: "999px",
-                    background: "rgba(255,255,255,0.14)",
+                    background: "rgba(37,99,235,0.15)",
                     color: ANDROID_THEME.primaryText,
                     fontSize: "8px",
                     fontWeight: 700,
@@ -330,8 +344,8 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
               marginTop: "20px",
               padding: "16px 14px",
               paddingTop: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
-              background: "rgba(255,255,255,0.15)",
-              borderTop: "1px solid rgba(255,255,255,0.2)",
+              background: "rgba(255,255,255,0.6)",
+              borderTop: "1px solid rgba(59,130,246,0.4)",
               backdropFilter: "blur(10px)",
             }}
           >
