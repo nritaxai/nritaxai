@@ -190,7 +190,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
             }}
           >
             <Search size={14} color={ANDROID_THEME.secondaryText} />
-            <span style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)" }}>
+            <span style={{ fontSize: "12px", color: ANDROID_THEME.mutedText }}>
               Search tax questions, tools, or reports
             </span>
           </div>
@@ -244,7 +244,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                     <div style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
                       {item.title}
                     </div>
-                    <div style={{ marginTop: "4px", fontSize: "9px", color: "rgba(255,255,255,0.55)" }}>
+                    <div style={{ marginTop: "4px", fontSize: "9px", color: ANDROID_THEME.secondaryText }}>
                       {item.subtitle}
                     </div>
                   </div>
@@ -275,7 +275,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                   <div style={{ fontSize: "12px", fontWeight: 800, color: ANDROID_THEME.accent }}>
                     {item.label === "Savings guided" ? "Rs 3.8L" : item.value}
                   </div>
-                  <div style={{ marginTop: "4px", fontSize: "8px", color: "rgba(255,255,255,0.55)" }}>
+                  <div style={{ marginTop: "4px", fontSize: "8px", color: ANDROID_THEME.secondaryText }}>
                     {item.label}
                   </div>
                 </div>
@@ -315,7 +315,7 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
                 >
                   {item.label}
                 </span>
-                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, lineHeight: 1.4 }}>
+                <div style={{ marginTop: "8px", fontSize: "11px", fontWeight: 700, lineHeight: 1.4, color: ANDROID_THEME.primaryText }}>
                   {item.title}
                 </div>
                 <div style={{ marginTop: "6px", fontSize: "9px", color: ANDROID_THEME.secondaryText }}>

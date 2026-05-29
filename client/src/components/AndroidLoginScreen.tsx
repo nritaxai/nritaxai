@@ -21,16 +21,16 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const LINKEDIN_URL_PATTERN = /^https?:\/\/(?:www\.)?linkedin\.com\/.+/i;
 
 const TOKENS = {
-  primaryGreen: "#5B8A3C",
-  greenHover: "#4a7230",
-  greenLight: "#f0f7eb",
-  background: "#ffffff",
-  inputBorder: "#e2e8f0",
-  inputFocus: "#5B8A3C",
-  textPrimary: "#1a1a1a",
-  textSecondary: "#64748b",
-  textMuted: "#94a3b8",
-  tabBg: "#f1f5f9",
+  primaryBlue: "#2563eb",
+  blueHover: "#1d4ed8",
+  blueLight: "#eff6ff",
+  background: "linear-gradient(160deg, #e0f2fe 0%, #bae6fd 40%, #f0f9ff 100%)",
+  inputBorder: "rgba(59,130,246,0.3)",
+  inputFocus: "#2563eb",
+  textPrimary: "#1e3a8a",
+  textSecondary: "rgba(30,58,138,0.7)",
+  textMuted: "rgba(30,58,138,0.5)",
+  tabBg: "rgba(255,255,255,0.8)",
   fontFamily: "system-ui,-apple-system,sans-serif",
 } as const;
 
@@ -307,7 +307,7 @@ export function AndroidLoginScreen({
     >
       <section
         style={{
-          background: TOKENS.primaryGreen,
+          background: TOKENS.primaryBlue,
           padding: "28px 20px 28px",
           textAlign: "center",
           position: "relative",
@@ -416,7 +416,7 @@ export function AndroidLoginScreen({
               border: 0,
               borderRadius: "8px",
               padding: "9px",
-              background: mode === "login" ? TOKENS.primaryGreen : "transparent",
+              background: mode === "login" ? TOKENS.primaryBlue : "transparent",
               color: mode === "login" ? "#ffffff" : TOKENS.textSecondary,
               fontSize: "12px",
               fontWeight: mode === "login" ? 700 : 600,
@@ -435,7 +435,7 @@ export function AndroidLoginScreen({
               border: 0,
               borderRadius: "8px",
               padding: "9px",
-              background: mode === "register" ? TOKENS.primaryGreen : "transparent",
+              background: mode === "register" ? TOKENS.primaryBlue : "transparent",
               color: mode === "register" ? "#ffffff" : TOKENS.textSecondary,
               fontSize: "12px",
               fontWeight: mode === "register" ? 700 : 600,
@@ -501,7 +501,7 @@ export function AndroidLoginScreen({
                   border: 0,
                   background: "transparent",
                   padding: 0,
-                  color: TOKENS.primaryGreen,
+                  color: TOKENS.primaryBlue,
                   fontSize: "12px",
                   fontWeight: 600,
                 }}
@@ -519,7 +519,7 @@ export function AndroidLoginScreen({
                 border: 0,
                 borderRadius: "12px",
                 padding: "12px 16px",
-                background: TOKENS.primaryGreen,
+                background: TOKENS.primaryBlue,
                 color: "#ffffff",
                 fontSize: "14px",
                 fontWeight: 700,
@@ -562,7 +562,7 @@ export function AndroidLoginScreen({
                   borderRadius: "12px",
                   padding: "11px 14px",
                   border: `1px solid ${TOKENS.inputBorder}`,
-                  background: TOKENS.greenLight,
+                  background: TOKENS.blueLight,
                   color: TOKENS.textPrimary,
                   display: "flex",
                   alignItems: "center",
@@ -730,7 +730,7 @@ export function AndroidLoginScreen({
                 border: 0,
                 borderRadius: "12px",
                 padding: "12px 16px",
-                background: TOKENS.primaryGreen,
+                background: TOKENS.primaryBlue,
                 color: "#ffffff",
                 fontSize: "14px",
                 fontWeight: 700,
@@ -740,7 +740,7 @@ export function AndroidLoginScreen({
               {loading ? "Creating account..." : "Create account"}
             </button>
 
-            <button
+              <button
               type="button"
               onClick={() => handleLinkedInAuth("register")}
               disabled={loading}
@@ -749,7 +749,7 @@ export function AndroidLoginScreen({
                 borderRadius: "12px",
                 padding: "11px 14px",
                 border: `1px solid ${TOKENS.inputBorder}`,
-                background: TOKENS.greenLight,
+                background: TOKENS.blueLight,
                 color: TOKENS.textPrimary,
                 display: "flex",
                 alignItems: "center",
@@ -786,8 +786,8 @@ export function AndroidLoginScreen({
           <div
             style={{
               borderRadius: "12px",
-              background: mode === "login" && authError.includes("Reset link sent") ? TOKENS.greenLight : "#fef2f2",
-              color: mode === "login" && authError.includes("Reset link sent") ? TOKENS.primaryGreen : "#b91c1c",
+              background: mode === "login" && authError.includes("Reset link sent") ? TOKENS.blueLight : "#fef2f2",
+              color: mode === "login" && authError.includes("Reset link sent") ? TOKENS.primaryBlue : "#b91c1c",
               padding: "10px 12px",
               fontSize: "12px",
               lineHeight: 1.4,
@@ -816,7 +816,7 @@ export function AndroidLoginScreen({
             style={{
               border: 0,
               background: "transparent",
-              color: TOKENS.primaryGreen,
+              color: TOKENS.primaryBlue,
               fontSize: "12px",
               fontWeight: 700,
               padding: 0,
