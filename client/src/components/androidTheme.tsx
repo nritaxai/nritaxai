@@ -2,18 +2,18 @@ import type { CSSProperties } from "react";
 
 // Android only
 export const ANDROID_NAVY_BACKGROUND =
-  "linear-gradient(160deg, #0a1f5c 0%, #0d2878 40%, #0a1a4a 100%)";
+  "linear-gradient(160deg, #e0f2fe 0%, #bae6fd 40%, #f0f9ff 100%)";
 
 // Android only
 export const ANDROID_THEME = {
   background: ANDROID_NAVY_BACKGROUND,
-  cardBackground: "rgba(255,255,255,0.10)",
-  cardBorder: "1px solid rgba(255,255,255,0.18)",
+  cardBackground: "rgba(255,255,255,0.8)",
+  cardBorder: "1px solid rgba(59,130,246,0.3)",
   cardRadius: "14px",
-  primaryText: "#ffffff",
-  secondaryText: "rgba(255,255,255,0.6)",
-  mutedText: "rgba(255,255,255,0.4)",
-  accent: "#4285F4",
+  primaryText: "#1e3a8a",
+  secondaryText: "rgba(30,58,138,0.7)",
+  mutedText: "rgba(30,58,138,0.5)",
+  accent: "#2563eb",
   fontFamily: "system-ui,-apple-system,sans-serif",
   buttonRadius: "50px",
 } as const;
@@ -39,7 +39,7 @@ export function AndroidDecorBackground() {
           width: "150px",
           height: "150px",
           borderRadius: "50%",
-          background: "rgba(30,80,200,0.3)",
+          background: "rgba(59,130,246,0.3)",
         }}
       />
       <div
@@ -50,7 +50,7 @@ export function AndroidDecorBackground() {
           width: "130px",
           height: "130px",
           borderRadius: "50%",
-          background: "rgba(20,60,180,0.4)",
+          background: "rgba(37,99,235,0.4)",
         }}
       />
       <div
@@ -67,7 +67,7 @@ export function AndroidDecorBackground() {
           key={index}
           style={{
             position: "absolute",
-            color: "rgba(255,255,255,0.05)",
+            color: "rgba(30,58,138,0.1)",
             fontWeight: 700,
             lineHeight: 1,
             ...(symbol as CSSProperties),

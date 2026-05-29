@@ -324,6 +324,44 @@ export function AndroidHomePage({ onRequireLogin }: AndroidHomePageProps) {
               </article>
             ))}
           </div>
+
+          <footer
+            style={{
+              marginTop: "20px",
+              padding: "16px 14px",
+              paddingTop: "calc(env(safe-area-inset-bottom, 0px) + 16px)",
+              background: "rgba(255,255,255,0.15)",
+              borderTop: "1px solid rgba(255,255,255,0.2)",
+              backdropFilter: "blur(10px)",
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: ANDROID_THEME.primaryText }}>
+                  NRITAX.AI
+                </div>
+                <div style={{ marginTop: "2px", fontSize: "9px", color: ANDROID_THEME.secondaryText }}>
+                  Billion Dollar Technologies Pvt Ltd
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: "12px" }}>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("/profile", true)}
+                  style={{ background: "transparent", border: 0, color: ANDROID_THEME.primaryText }}
+                >
+                  <UserRound size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("/chat", true)}
+                  style={{ background: "transparent", border: 0, color: ANDROID_THEME.primaryText }}
+                >
+                  <Bot size={16} />
+                </button>
+              </div>
+            </div>
+          </footer>
         </div>
       </div>
     </main>
