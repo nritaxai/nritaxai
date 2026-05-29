@@ -1088,8 +1088,28 @@ export const razorpayWebhook = async (req, res) => {
       user.subscription.plan = mapPlanFromRazorpayPlanId(subscriptionEntity.plan_id);
     }
 
-    user.subscription.currentPeriodStart = toDateOrNull(subscriptionEntity.current_start);
-    user.subscription.currentPeriodEnd = toDateOrNull(subscriptionEntity.current_end);
+    const razorpayStartDate = toDateOrNull(subscriptionEntity.current_start);
+    const razorpayEndDate = toDateOrNull(subscriptionEntity.current_end);
+    const localStartDate = user.subscription.currentPeriodStart;
+    const localEndDate = user.subscription.currentPeriodEnd;
+
+    // Only use Razorpay dates if they are more recent and don't cause early expiration
+    if (razorpayEndDate && localEndDate) {
+      if (razorpayEndDate.getTime() > localEndDate.getTime()) {
+        user.subscription.currentPeriodStart = razorpayStartDate;
+        user.subscription.currentPeriodEnd = razorpayEndDate;
+        user.subscriptionStartDate = razorpayStartDate;
+        user.subscriptionEndDate = razorpayEndDate;
+      }
+    } else if (razorpayEndDate && !localEndDate) {
+      user.subscription.currentPeriodStart = razorpayStartDate;
+      user.subscription.currentPeriodEnd = razorpayEndDate;
+      user.subscriptionStartDate = razorpayStartDate;
+      user.subscriptionEndDate = razorpayEndDate;
+    } else {
+      user.subscription.currentPeriodStart = razorpayStartDate || localStartDate;
+      user.subscription.currentPeriodEnd = razorpayEndDate || localEndDate;
+    }
     await user.save();
 
     if (featureFlags.paymentReliabilityEnabled) {
