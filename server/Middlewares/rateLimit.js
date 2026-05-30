@@ -11,18 +11,17 @@ const nowMs = () => Date.now();
 
 const GLOBAL_RATE_LIMIT_PER_MIN = process.env.GLOBAL_RATE_LIMIT_PER_MIN || 120;
 
-export const createRateLimiter = async ({
+export const createRateLimiter = ({
   windowMs = 60 * 1000,
   maxRequests = 60,
   message = "Too many requests. Please try again later.",
 } = {}) => {
-  const redis = await getRedisConnection({ requireQueueing: false, role: "rate-limit" });
-
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const key = getClientKey(req);
+    const redis = await getRedisConnection({ requireQueueing: false, role: "rate-limit" });
 
     if (redis) {
-      handleRedisRateLimit({ redis, key, maxRequests, windowMs, message, res, next });
+      await handleRedisRateLimit({ redis, key, maxRequests, windowMs, message, res, next });
     } else {
       handleMapRateLimit({ key, windowMs, maxRequests, message, res, next });
     }
